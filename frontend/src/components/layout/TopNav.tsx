@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import WalletButton from "@/components/wallet/WalletButton";
 
 const links = [
   { href: "/", label: "Home" },
@@ -50,7 +51,7 @@ export default function TopNav() {
         ))}
       </div>
       <div className="nav-right">
-        <Link href="/login" className="btn btn-outline btn-sm">Sign In</Link>
+        <WalletButton />
         <Link href="/discover" className="btn btn-emerald btn-sm">Donate Now 💚</Link>
       </div>
     </nav>
