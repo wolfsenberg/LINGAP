@@ -1,6 +1,57 @@
-import Link from "next/link";
+"use client";
+import { useState } from "react";
+import { useFreighter } from "@/hooks/useFreighter";
+import { escrowApi } from "@/lib/api";
+import { STELLAR_CONFIG } from "@/lib/stellar";
+import toast from "react-hot-toast";
+
+const CAMPAIGN_ID = 0; // first on-chain campaign
+const AMOUNTS = [100, 250, 500, 1000, 5000];
 
 export default function DetailPage() {
+  const { connected, publicKey, connect } = useFreighter();
+  const [selectedAmount, setSelectedAmount] = useState(500);
+  const [customAmount, setCustomAmount] = useState("");
+  const [useCustom, setUseCustom] = useState(false);
+  const [donating, setDonating] = useState(false);
+
+  const effectiveAmount = useCustom ? parseFloat(customAmount) || 0 : selectedAmount;
+
+  async function handleDonate() {
+    if (!connected || !publicKey) {
+      await connect();
+      return;
+    }
+    if (effectiveAmount <= 0) {
+      toast.error("Enter a valid amount.");
+      return;
+    }
+    setDonating(true);
+    try {
+      // 1. Get unsigned XDR from backend
+      const xdrRes = await escrowApi.getDepositXdr(CAMPAIGN_ID, publicKey, effectiveAmount);
+      const unsignedXdr = xdrRes.data.data.xdr;
+
+      // 2. Sign with Freighter
+      const { signTransaction } = await import("@stellar/freighter-api");
+      const signResult = await signTransaction(unsignedXdr, {
+        networkPassphrase: STELLAR_CONFIG.network,
+      });
+      if (signResult.error) throw new Error(signResult.error);
+
+      // 3. Submit signed XDR
+      const submitRes = await escrowApi.submitSignedXdr(signResult.signedTxXdr);
+      const txHash = submitRes.data.data.tx_hash;
+
+      toast.success(`Donation confirmed! Tx: ${txHash.slice(0, 8)}…`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Donation failed";
+      toast.error(msg);
+    } finally {
+      setDonating(false);
+    }
+  }
+
   return (
     <div style={{background:'linear-gradient(180deg,var(--navy) 300px, var(--bg) 300px)'}}>
       <div className="detail-grid">
@@ -71,7 +122,7 @@ export default function DetailPage() {
           </div>
         </div>
 
-        {/* RIGHT */}
+        {/* RIGHT — sticky donate card */}
         <div>
           <div style={{background:'#fff',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:28,marginBottom:20,position:'sticky',top:84}}>
             <div className="flex flex-center flex-between mb-16">
@@ -82,16 +133,65 @@ export default function DetailPage() {
             <div className="flex flex-center flex-between mb-24" style={{fontSize:13,color:'var(--text3)'}}>
               <span>👥 342 donors</span><span>⏳ 12 days left</span>
             </div>
+
+            {/* Amount picker */}
             <div style={{marginBottom:18}}>
-              <div style={{fontSize:13,fontWeight:600,color:'var(--text2)',marginBottom:10}}>Choose amount:</div>
+              <div style={{fontSize:13,fontWeight:600,color:'var(--text2)',marginBottom:10}}>Choose amount (XLM):</div>
               <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,marginBottom:10}}>
-                {['₱100','₱250','₱500','₱1,000','₱5,000','Custom'].map((a,i)=>(
-                  <button key={a} className={`btn btn-sm ${i===2?'btn-primary':'btn-outline'}`}>{a}</button>
+                {AMOUNTS.map((a) => (
+                  <button
+                    key={a}
+                    onClick={() => { setSelectedAmount(a); setUseCustom(false); }}
+                    className={`btn btn-sm ${!useCustom && selectedAmount === a ? 'btn-primary' : 'btn-outline'}`}
+                  >
+                    {a} XLM
+                  </button>
                 ))}
+                <button
+                  onClick={() => setUseCustom(true)}
+                  className={`btn btn-sm ${useCustom ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  Custom
+                </button>
               </div>
+              {useCustom && (
+                <input
+                  type="number"
+                  min="1"
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  placeholder="Enter XLM amount"
+                  style={{width:'100%',border:'1px solid var(--border)',borderRadius:8,padding:'8px 12px',fontSize:14,outline:'none',boxSizing:'border-box'}}
+                />
+              )}
             </div>
-            <button className="btn btn-emerald btn-lg" style={{width:'100%',justifyContent:'center',marginBottom:12}}>💸 Donate ₱500 Now</button>
+
+            {/* Wallet status hint */}
+            {!connected && (
+              <div style={{marginBottom:12,padding:'10px 14px',background:'rgba(16,184,145,.06)',border:'1px solid rgba(16,184,145,.2)',borderRadius:8,fontSize:12,color:'var(--emerald-dark)'}}>
+                🔗 Connect your Freighter wallet to donate on-chain.
+              </div>
+            )}
+            {connected && publicKey && (
+              <div style={{marginBottom:12,padding:'10px 14px',background:'rgba(16,184,145,.06)',border:'1px solid rgba(16,184,145,.2)',borderRadius:8,fontSize:12,color:'var(--emerald-dark)'}}>
+                ✅ Wallet: {publicKey.slice(0,6)}…{publicKey.slice(-4)}
+              </div>
+            )}
+
+            <button
+              onClick={handleDonate}
+              disabled={donating}
+              className="btn btn-emerald btn-lg"
+              style={{width:'100%',justifyContent:'center',marginBottom:12,opacity:donating?0.7:1}}
+            >
+              {donating
+                ? '⏳ Submitting to Stellar…'
+                : connected
+                  ? `💸 Donate ${effectiveAmount} XLM`
+                  : '🔗 Connect Wallet to Donate'}
+            </button>
             <button className="btn btn-outline" style={{width:'100%',justifyContent:'center',fontSize:14}}>🔄 Set Monthly Donation</button>
+
             <div style={{marginTop:20,paddingTop:20,borderTop:'1px solid var(--border)'}}>
               <div style={{fontSize:12,color:'var(--text3)',marginBottom:12,textAlign:'center'}}>Donor confidence indicators</div>
               {['Blockchain Verified Transaction','Protected by Soroban Escrow','AI Risk Assessment: Low Risk','Institution-Bound Release'].map((t)=>(
