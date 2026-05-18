@@ -1,0 +1,93 @@
+import axios from "axios";
+import type {
+  User,
+  Donation,
+  Beneficiary,
+  AidRequest,
+  ProvenanceRecord,
+  DashboardStats,
+  ApiResponse,
+  PaginatedResponse,
+} from "@/types";
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  headers: { "Content-Type": "application/json" },
+});
+
+api.interceptors.request.use((config) => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("lingap_token") : null;
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("lingap_token");
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
+
+export const authApi = {
+  login: (email: string, password: string) =>
+    api.post<ApiResponse<{ token: string; user: User }>>("/api/v1/auth/login", { email, password }),
+  register: (data: Partial<User> & { password: string }) =>
+    api.post<ApiResponse<User>>("/api/v1/auth/register", data),
+  me: () => api.get<ApiResponse<User>>("/api/v1/auth/me"),
+};
+
+export const donationsApi = {
+  list: (page = 1, size = 20) =>
+    api.get<PaginatedResponse<Donation>>("/api/v1/donations", { params: { page, size } }),
+  get: (id: string) => api.get<ApiResponse<Donation>>(`/api/v1/donations/${id}`),
+  create: (data: Partial<Donation>) => api.post<ApiResponse<Donation>>("/api/v1/donations", data),
+  getProvenance: (id: string) =>
+    api.get<ApiResponse<ProvenanceRecord[]>>(`/api/v1/donations/${id}/provenance`),
+};
+
+export const beneficiariesApi = {
+  list: (page = 1, size = 20) =>
+    api.get<PaginatedResponse<Beneficiary>>("/api/v1/beneficiaries", { params: { page, size } }),
+  get: (id: string) => api.get<ApiResponse<Beneficiary>>(`/api/v1/beneficiaries/${id}`),
+  create: (data: Partial<Beneficiary>) =>
+    api.post<ApiResponse<Beneficiary>>("/api/v1/beneficiaries", data),
+  verify: (id: string) =>
+    api.patch<ApiResponse<Beneficiary>>(`/api/v1/beneficiaries/${id}/verify`),
+};
+
+export const aidRequestsApi = {
+  list: (page = 1, size = 20, status?: string) =>
+    api.get<PaginatedResponse<AidRequest>>("/api/v1/aid-requests", {
+      params: { page, size, status },
+    }),
+  get: (id: string) => api.get<ApiResponse<AidRequest>>(`/api/v1/aid-requests/${id}`),
+  create: (data: Partial<AidRequest>) =>
+    api.post<ApiResponse<AidRequest>>("/api/v1/aid-requests", data),
+  approve: (id: string) =>
+    api.patch<ApiResponse<AidRequest>>(`/api/v1/aid-requests/${id}/approve`),
+  disburse: (id: string) =>
+    api.patch<ApiResponse<AidRequest>>(`/api/v1/aid-requests/${id}/disburse`),
+  reject: (id: string, reason: string) =>
+    api.patch<ApiResponse<AidRequest>>(`/api/v1/aid-requests/${id}/reject`, { reason }),
+};
+
+export const dashboardApi = {
+  stats: () => api.get<ApiResponse<DashboardStats>>("/api/v1/dashboard/stats"),
+};
+
+export const stellarApi = {
+  verifyTransaction: (txHash: string) =>
+    api.get<ApiResponse<{ confirmed: boolean; ledger: number }>>("/api/v1/stellar/verify", {
+      params: { tx_hash: txHash },
+    }),
+  accountInfo: (publicKey: string) =>
+    api.get<ApiResponse<{ balance: string; sequence: string }>>("/api/v1/stellar/account", {
+      params: { public_key: publicKey },
+    }),
+};
+
+export default api;
