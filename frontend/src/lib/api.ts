@@ -90,4 +90,34 @@ export const stellarApi = {
     }),
 };
 
+export const escrowApi = {
+  // Donor: get unsigned XDR → sign with Freighter → submit
+  getDepositXdr: (campaignId: number, donorPublicKey: string, amountXlm: number) =>
+    api.post<ApiResponse<{ xdr: string }>>("/api/v1/stellar/escrow/deposit-xdr", {
+      campaign_id: campaignId,
+      donor_public_key: donorPublicKey,
+      amount_xlm: amountXlm,
+    }),
+  submitSignedXdr: (signedXdr: string) =>
+    api.post<ApiResponse<{ tx_hash: string }>>("/api/v1/stellar/escrow/submit", {
+      signed_xdr: signedXdr,
+    }),
+
+  // Admin: milestone lifecycle
+  verifyMilestone: (campaignId: number) =>
+    api.post<ApiResponse<{ tx_hash: string }>>(`/api/v1/stellar/escrow/verify/${campaignId}`),
+  releaseMilestone: (campaignId: number) =>
+    api.post<ApiResponse<{ tx_hash: string }>>(`/api/v1/stellar/escrow/release/${campaignId}`),
+  pauseCampaign: (campaignId: number) =>
+    api.post<ApiResponse<{ tx_hash: string }>>(`/api/v1/stellar/escrow/pause/${campaignId}`),
+  unpauseCampaign: (campaignId: number) =>
+    api.post<ApiResponse<{ tx_hash: string }>>(`/api/v1/stellar/escrow/unpause/${campaignId}`),
+
+  // Read-only
+  getCampaign: (campaignId: number) =>
+    api.get<ApiResponse<{ campaign_id: number; result_xdr: string }>>(`/api/v1/stellar/escrow/campaign/${campaignId}`),
+  getCampaignCount: () =>
+    api.get<ApiResponse<{ count: number }>>("/api/v1/stellar/escrow/count"),
+};
+
 export default api;
