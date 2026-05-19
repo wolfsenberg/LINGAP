@@ -8,7 +8,11 @@ from app.models.donation import Donation
 from app.models.provenance import ProvenanceRecord
 from app.schemas.donation import DonationCreate, DonationRead
 from app.stellar.client import verify_transaction
+from app.certificates.service import create_certificate_for_donation
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/donations", tags=["donations"])
 
@@ -59,6 +63,15 @@ async def create_donation(
         tx_info = await verify_transaction(body.stellar_tx_hash)
         donation.blockchain_confirmed = tx_info.get("confirmed", False)
         await db.commit()
+
+        # NEW: Trigger certificate generation if confirmed
+        if donation.blockchain_confirmed:
+            try:
+                await create_certificate_for_donation(donation, db)
+            except Exception as e:
+                logger.error(
+                    f"Certificate generation failed for donation {donation.id}: {e}"
+                )
     except Exception:
         pass
 
