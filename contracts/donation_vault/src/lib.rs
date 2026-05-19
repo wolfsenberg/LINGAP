@@ -2,7 +2,7 @@
 
 use soroban_sdk::{
     contract, contractimpl, contracttype,
-    token, Address, Env, String,
+    token, Address, Env, String, Vec,
 };
 
 // ── Storage key enum ────────────────────────────────────────────────────────
@@ -14,7 +14,10 @@ pub enum DataKey {
     Token,
     CampaignCount,
     Campaign(u64),
-    Milestone(u64, u32), // (campaign_id, milestone_index)
+    Milestone(u64, u32),       // (campaign_id, milestone_index)
+    DonorDeposit(u64, Address), // (campaign_id, donor) -> i128
+    DonorList(u64),            // campaign_id -> Vec<Address>
+    PauseVote(u64, Address),   // (campaign_id, donor) -> bool (has active vote)
 }
 
 // ── Domain types ─────────────────────────────────────────────────────────────
@@ -32,7 +35,6 @@ pub enum MilestoneStatus {
 pub struct Milestone {
     pub amount: i128,
     pub status: MilestoneStatus,
-    /// Institution / beneficiary that will receive the funds when released.
     pub recipient: Address,
     pub description: String,
 }
@@ -42,11 +44,16 @@ pub struct Milestone {
 pub struct Campaign {
     pub organizer: Address,
     pub total_deposited: i128,
+    pub total_released: i128,
     pub milestone_count: u32,
-    /// Index of the next milestone that must be verified/released (sequential).
     pub current_milestone: u32,
     pub paused: bool,
+    pub pause_vote_weight: i128,
+    pub clawback_executed: bool,
 }
+
+// Pause threshold: 60% of total deposited weight must vote.
+const PAUSE_THRESHOLD_PCT: i128 = 60;
 
 // ── Contract ─────────────────────────────────────────────────────────────────
 
@@ -69,10 +76,6 @@ impl DonationVaultContract {
 
     // ── Campaign management ─────────────────────────────────────────────────
 
-    /// Organizer creates a campaign and defines its milestones upfront.
-    /// `milestone_amounts`  – ordered list of token amounts per milestone.
-    /// `milestone_recipients` – institution address for each milestone release.
-    /// `milestone_descs`      – human-readable description for each milestone.
     pub fn create_campaign(
         env: Env,
         organizer: Address,
@@ -89,7 +92,6 @@ impl DonationVaultContract {
             "milestone arrays must have equal length"
         );
 
-        // Assign the next campaign ID.
         let campaign_id: u64 = env
             .storage()
             .instance()
@@ -99,15 +101,17 @@ impl DonationVaultContract {
         let campaign = Campaign {
             organizer: organizer.clone(),
             total_deposited: 0,
+            total_released: 0,
             milestone_count: n,
             current_milestone: 0,
             paused: false,
+            pause_vote_weight: 0,
+            clawback_executed: false,
         };
         env.storage()
             .persistent()
             .set(&DataKey::Campaign(campaign_id), &campaign);
 
-        // Store each milestone.
         for i in 0..n {
             let milestone = Milestone {
                 amount: milestone_amounts.get(i).unwrap(),
@@ -129,7 +133,6 @@ impl DonationVaultContract {
 
     // ── Funding ─────────────────────────────────────────────────────────────
 
-    /// Any donor deposits tokens into a specific campaign's escrow.
     pub fn deposit(env: Env, campaign_id: u64, donor: Address, amount: i128) {
         donor.require_auth();
         assert!(amount > 0, "amount must be positive");
@@ -141,10 +144,34 @@ impl DonationVaultContract {
             .expect("campaign not found");
 
         assert!(!campaign.paused, "campaign is paused");
+        assert!(!campaign.clawback_executed, "clawback already executed");
 
         let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = token::Client::new(&env, &token_addr);
         token_client.transfer(&donor, &env.current_contract_address(), &amount);
+
+        // Track per-donor deposit for proportional clawback.
+        let prev: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::DonorDeposit(campaign_id, donor.clone()))
+            .unwrap_or(0);
+
+        if prev == 0 {
+            let mut list: Vec<Address> = env
+                .storage()
+                .persistent()
+                .get(&DataKey::DonorList(campaign_id))
+                .unwrap_or(Vec::new(&env));
+            list.push_back(donor.clone());
+            env.storage()
+                .persistent()
+                .set(&DataKey::DonorList(campaign_id), &list);
+        }
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::DonorDeposit(campaign_id, donor.clone()), &(prev + amount));
 
         campaign.total_deposited += amount;
         env.storage()
@@ -154,8 +181,6 @@ impl DonationVaultContract {
 
     // ── Milestone lifecycle ─────────────────────────────────────────────────
 
-    /// Admin marks the current milestone as verified (documents checked).
-    /// Milestones must be released in order — you cannot skip ahead.
     pub fn verify_milestone(env: Env, campaign_id: u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
@@ -190,8 +215,6 @@ impl DonationVaultContract {
             .set(&DataKey::Milestone(campaign_id, idx), &milestone);
     }
 
-    /// Admin releases funds for the current verified milestone to its recipient.
-    /// Automatically advances `current_milestone` so the next one can begin.
     pub fn release_milestone(env: Env, campaign_id: u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
@@ -220,7 +243,6 @@ impl DonationVaultContract {
             "milestone must be verified before releasing"
         );
 
-        // Transfer funds to the institution.
         let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = token::Client::new(&env, &token_addr);
         token_client.transfer(
@@ -229,21 +251,21 @@ impl DonationVaultContract {
             &milestone.amount,
         );
 
+        campaign.total_released += milestone.amount;
+
         milestone.status = MilestoneStatus::Released;
         env.storage()
             .persistent()
             .set(&DataKey::Milestone(campaign_id, idx), &milestone);
 
-        // Advance to next milestone.
         campaign.current_milestone += 1;
         env.storage()
             .persistent()
             .set(&DataKey::Campaign(campaign_id), &campaign);
     }
 
-    // ── Pause / unpause ─────────────────────────────────────────────────────
+    // ── Admin pause / unpause ───────────────────────────────────────────────
 
-    /// Admin can pause a campaign (e.g., fraud suspected).
     pub fn pause_campaign(env: Env, campaign_id: u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
@@ -276,6 +298,158 @@ impl DonationVaultContract {
             .set(&DataKey::Campaign(campaign_id), &campaign);
     }
 
+    // ── Donor voting ────────────────────────────────────────────────────────
+
+    /// Donor casts a vote to pause a suspicious campaign.
+    /// Vote weight = donor's total deposited amount.
+    /// Auto-pauses the campaign when cumulative weight >= 60% of total_deposited.
+    pub fn vote_pause(env: Env, campaign_id: u64, donor: Address) {
+        donor.require_auth();
+
+        let mut campaign: Campaign = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Campaign(campaign_id))
+            .expect("campaign not found");
+
+        assert!(!campaign.clawback_executed, "clawback already executed");
+
+        let donor_deposit: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::DonorDeposit(campaign_id, donor.clone()))
+            .unwrap_or(0);
+        assert!(donor_deposit > 0, "must have deposited to vote");
+
+        let already_voted: bool = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PauseVote(campaign_id, donor.clone()))
+            .unwrap_or(false);
+        assert!(!already_voted, "already voted");
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::PauseVote(campaign_id, donor.clone()), &true);
+
+        campaign.pause_vote_weight += donor_deposit;
+
+        // Auto-pause when threshold is reached.
+        if campaign.total_deposited > 0
+            && campaign.pause_vote_weight * 100
+                >= campaign.total_deposited * PAUSE_THRESHOLD_PCT
+        {
+            campaign.paused = true;
+        }
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Campaign(campaign_id), &campaign);
+    }
+
+    /// Donor retracts their pause vote.
+    /// If vote weight drops below the threshold the campaign is unpaused.
+    pub fn revoke_vote(env: Env, campaign_id: u64, donor: Address) {
+        donor.require_auth();
+
+        let mut campaign: Campaign = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Campaign(campaign_id))
+            .expect("campaign not found");
+
+        assert!(!campaign.clawback_executed, "clawback already executed");
+
+        let already_voted: bool = env
+            .storage()
+            .persistent()
+            .get(&DataKey::PauseVote(campaign_id, donor.clone()))
+            .unwrap_or(false);
+        assert!(already_voted, "no active vote to revoke");
+
+        let donor_deposit: i128 = env
+            .storage()
+            .persistent()
+            .get(&DataKey::DonorDeposit(campaign_id, donor.clone()))
+            .unwrap_or(0);
+
+        env.storage()
+            .persistent()
+            .remove(&DataKey::PauseVote(campaign_id, donor.clone()));
+
+        campaign.pause_vote_weight -= donor_deposit;
+
+        // Lift the donor-driven pause if weight drops below threshold.
+        if campaign.total_deposited > 0
+            && campaign.pause_vote_weight * 100
+                < campaign.total_deposited * PAUSE_THRESHOLD_PCT
+        {
+            campaign.paused = false;
+        }
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Campaign(campaign_id), &campaign);
+    }
+
+    // ── Clawback ────────────────────────────────────────────────────────────
+
+    /// Executes a proportional refund of unspent escrow funds to all donors.
+    /// Requires: campaign paused AND vote weight >= 60% threshold.
+    pub fn execute_clawback(env: Env, campaign_id: u64) {
+        let mut campaign: Campaign = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Campaign(campaign_id))
+            .expect("campaign not found");
+
+        assert!(campaign.paused, "campaign must be paused to clawback");
+        assert!(!campaign.clawback_executed, "clawback already executed");
+        assert!(
+            campaign.total_deposited > 0
+                && campaign.pause_vote_weight * 100
+                    >= campaign.total_deposited * PAUSE_THRESHOLD_PCT,
+            "insufficient vote weight for clawback"
+        );
+
+        let remaining = campaign.total_deposited - campaign.total_released;
+        assert!(remaining > 0, "no funds remaining to refund");
+
+        let token_addr: Address = env.storage().instance().get(&DataKey::Token).unwrap();
+        let token_client = token::Client::new(&env, &token_addr);
+
+        let donor_list: Vec<Address> = env
+            .storage()
+            .persistent()
+            .get(&DataKey::DonorList(campaign_id))
+            .unwrap_or(Vec::new(&env));
+
+        for donor in donor_list.iter() {
+            let donor_deposit: i128 = env
+                .storage()
+                .persistent()
+                .get(&DataKey::DonorDeposit(campaign_id, donor.clone()))
+                .unwrap_or(0);
+
+            if donor_deposit > 0 {
+                // Proportional share: donor_deposit / total_deposited * remaining
+                let refund = donor_deposit * remaining / campaign.total_deposited;
+                if refund > 0 {
+                    token_client.transfer(
+                        &env.current_contract_address(),
+                        &donor,
+                        &refund,
+                    );
+                }
+            }
+        }
+
+        campaign.clawback_executed = true;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Campaign(campaign_id), &campaign);
+    }
+
     // ── Read-only queries ───────────────────────────────────────────────────
 
     pub fn get_campaign(env: Env, campaign_id: u64) -> Campaign {
@@ -301,5 +475,28 @@ impl DonationVaultContract {
 
     pub fn get_admin(env: Env) -> Address {
         env.storage().instance().get(&DataKey::Admin).unwrap()
+    }
+
+    pub fn get_donor_deposit(env: Env, campaign_id: u64, donor: Address) -> i128 {
+        env.storage()
+            .persistent()
+            .get(&DataKey::DonorDeposit(campaign_id, donor))
+            .unwrap_or(0)
+    }
+
+    pub fn has_voted(env: Env, campaign_id: u64, donor: Address) -> bool {
+        env.storage()
+            .persistent()
+            .get(&DataKey::PauseVote(campaign_id, donor))
+            .unwrap_or(false)
+    }
+
+    pub fn get_vote_weight(env: Env, campaign_id: u64) -> i128 {
+        let campaign: Campaign = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Campaign(campaign_id))
+            .expect("campaign not found");
+        campaign.pause_vote_weight
     }
 }

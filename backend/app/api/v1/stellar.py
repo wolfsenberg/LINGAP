@@ -1,7 +1,11 @@
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.stellar.client import verify_transaction, get_account_info
 from app.stellar import soroban
+from app.core.database import get_db
+from app.models.donor_vote import DonorVote
 
 router = APIRouter(prefix="/stellar", tags=["stellar"])
 
@@ -120,5 +124,83 @@ async def campaign_count():
     try:
         count = await soroban.query_campaign_count()
         return {"success": True, "data": {"count": count}}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Donor voting ──────────────────────────────────────────────────────────────
+
+class VoteRequest(BaseModel):
+    donor_public_key: str
+
+
+@router.post("/escrow/vote/{campaign_id}")
+async def vote_pause(
+    campaign_id: int,
+    body: VoteRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns an unsigned vote_pause XDR for the donor to sign with Freighter.
+    After signing, submit via POST /escrow/submit.
+    """
+    try:
+        xdr = await soroban.build_vote_pause_xdr(
+            campaign_id=campaign_id,
+            donor_public_key=body.donor_public_key,
+        )
+        return {"success": True, "data": {"xdr": xdr, "action": "vote_pause"}}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/escrow/vote/{campaign_id}")
+async def revoke_vote(
+    campaign_id: int,
+    body: VoteRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns an unsigned revoke_vote XDR for the donor to sign with Freighter.
+    After signing, submit via POST /escrow/submit.
+    """
+    try:
+        xdr = await soroban.build_revoke_vote_xdr(
+            campaign_id=campaign_id,
+            donor_public_key=body.donor_public_key,
+        )
+        return {"success": True, "data": {"xdr": xdr, "action": "revoke_vote"}}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/escrow/votes/{campaign_id}")
+async def get_vote_status(
+    campaign_id: int,
+    donor_public_key: str | None = Query(default=None),
+):
+    """
+    Returns on-chain vote status for a campaign.
+    Optionally pass donor_public_key to check if a specific donor has voted.
+    """
+    try:
+        data = await soroban.query_vote_status(
+            campaign_id=campaign_id,
+            donor_public_key=donor_public_key,
+        )
+        return {"success": True, "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/escrow/clawback/{campaign_id}")
+async def execute_clawback(campaign_id: int):
+    """
+    Admin: execute proportional clawback of unspent funds to donors.
+    Requires campaign paused AND >= 60% vote weight.
+    """
+    try:
+        tx_hash = await soroban.admin_execute_clawback(campaign_id)
+        return {"success": True, "data": {"tx_hash": tx_hash}}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
