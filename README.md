@@ -11,10 +11,16 @@ Ledger-Integrated Network for Giving, Accountability, and Protection
 
 ---
 
-### Step 1 - Copy the .env file
+### Step 1 - Create the .env file
 
-Go to backend/ folder, copy .env.example to .env
-Or create backend/.env manually using the contents in Step 2.
+The backend/.env file is not included in the repo (gitignored for security).
+You need to create it manually before running docker-compose.
+
+Mac/Linux:
+cp backend/.env.example backend/.env
+
+Windows:
+copy backend\.env.example backend\.env
 
 ---
 
