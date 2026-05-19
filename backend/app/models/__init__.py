@@ -10,6 +10,15 @@ from .progress_update import (
     VerifierConfirmation,
     VerifyDecision,
 )
+from .risk import (
+    RiskAssessment,
+    RiskEngineKind,
+    SpendingComparison,
+    ScamFlag,
+    FlagSource,
+    FlagSeverity,
+    FlagStatus,
+)
 
 __all__ = [
     "User", "UserRole",
@@ -20,4 +29,7 @@ __all__ = [
     "ProofArtifact", "ProofKind",
     "ProgressUpdate", "ProgressStatus",
     "VerifierConfirmation", "VerifyDecision",
+    "RiskAssessment", "RiskEngineKind",
+    "SpendingComparison",
+    "ScamFlag", "FlagSource", "FlagSeverity", "FlagStatus",
 ]

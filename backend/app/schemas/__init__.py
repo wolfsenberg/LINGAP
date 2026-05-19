@@ -9,3 +9,9 @@ from .progress import (
     VerifierConfirmationRead,
     VerifyRequest,
 )
+from .risk import (
+    RiskAssessmentRead,
+    ScamFlagPatch,
+    ScamFlagRead,
+    SpendingComparisonRead,
+)

@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from app.core.database import get_db
+from app.core.database import AsyncSessionLocal, get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.models.user import User
 from app.models.aid_request import AidRequest, AidRequestStatus, RiskLevel
@@ -25,6 +25,20 @@ def _enrich(req: AidRequest, beneficiary_name: str) -> dict:
     d = AidRequestRead.model_validate(req).model_dump()
     d["beneficiary_name"] = beneficiary_name
     return d
+
+
+async def _risk_rescan_bg(aid_request_id: uuid.UUID, reason: str) -> None:
+    from app.ai.service import risk_service
+
+    async with AsyncSessionLocal() as session:
+        try:
+            await risk_service.rescan(session, aid_request_id, reason=reason)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Background risk rescan failed for %s", aid_request_id
+            )
 
 
 @router.get("")
@@ -52,6 +66,7 @@ async def list_aid_requests(
 @router.post("", status_code=201)
 async def create_aid_request(
     body: AidRequestCreate,
+    background: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -65,12 +80,14 @@ async def create_aid_request(
     db.add(req)
     await db.commit()
     await db.refresh(req)
+    background.add_task(_risk_rescan_bg, req.id, "aid_request_created")
     return {"success": True, "message": "Aid request created", "data": _enrich(req, b.name)}
 
 
 @router.patch("/{request_id}/approve")
 async def approve_request(
     request_id: uuid.UUID,
+    background: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
@@ -84,6 +101,7 @@ async def approve_request(
     req.approved_by = admin.id
     await db.commit()
     await db.refresh(req)
+    background.add_task(_risk_rescan_bg, req.id, "aid_request_approved")
     b = (await db.execute(select(Beneficiary).where(Beneficiary.id == req.beneficiary_id))).scalar_one()
     return {"success": True, "message": "Request approved", "data": _enrich(req, b.name)}
 
