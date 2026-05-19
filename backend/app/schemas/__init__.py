@@ -3,3 +3,9 @@ from .donation import DonationCreate, DonationRead
 from .beneficiary import BeneficiaryCreate, BeneficiaryRead
 from .aid_request import AidRequestCreate, AidRequestRead, RejectRequest
 from .proof import ProofArtifactRead, ProofArtifactList
+from .progress import (
+    ProgressCreate,
+    ProgressUpdateRead,
+    VerifierConfirmationRead,
+    VerifyRequest,
+)

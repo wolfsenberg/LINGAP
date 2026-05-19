@@ -6,6 +6,7 @@ from .aid_requests import router as aid_requests_router
 from .dashboard import router as dashboard_router
 from .stellar import router as stellar_router
 from .proofs import router as proofs_router
+from .progress import progress_router, verify_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -16,3 +17,5 @@ api_router.include_router(aid_requests_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(stellar_router)
 api_router.include_router(proofs_router)
+api_router.include_router(progress_router)
+api_router.include_router(verify_router)
