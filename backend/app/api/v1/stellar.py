@@ -122,3 +122,49 @@ async def campaign_count():
         return {"success": True, "data": {"count": count}}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ── Donor voting ──────────────────────────────────────────────────────────────
+
+class VoteRequest(BaseModel):
+    donor_public_key: str
+
+
+@router.post("/escrow/vote/{campaign_id}")
+async def vote_pause(campaign_id: int, body: VoteRequest):
+    """Returns unsigned vote_pause XDR for donor to sign with Freighter."""
+    try:
+        xdr = await soroban.build_vote_pause_xdr(campaign_id, body.donor_public_key)
+        return {"success": True, "data": {"xdr": xdr, "action": "vote_pause"}}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/escrow/vote/{campaign_id}")
+async def revoke_vote(campaign_id: int, body: VoteRequest):
+    """Returns unsigned revoke_vote XDR for donor to sign with Freighter."""
+    try:
+        xdr = await soroban.build_revoke_vote_xdr(campaign_id, body.donor_public_key)
+        return {"success": True, "data": {"xdr": xdr, "action": "revoke_vote"}}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/escrow/votes/{campaign_id}")
+async def get_vote_status(campaign_id: int, donor_public_key: str | None = Query(default=None)):
+    """Returns on-chain vote status. Pass donor_public_key to check if they voted."""
+    try:
+        data = await soroban.query_vote_status(campaign_id, donor_public_key)
+        return {"success": True, "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/escrow/clawback/{campaign_id}")
+async def execute_clawback(campaign_id: int):
+    """Admin: execute proportional clawback. Requires paused + 60% vote quorum."""
+    try:
+        tx_hash = await soroban.admin_execute_clawback(campaign_id)
+        return {"success": True, "data": {"tx_hash": tx_hash}}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
