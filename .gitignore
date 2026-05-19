@@ -17,6 +17,9 @@ backend/venv/
 backend/*.egg-info/
 backend/dist/
 backend/.pytest_cache/
+backend/uploads/
+.pytest_cache/
+.git-commit-msg.tmp
 
 # Environment — never commit secrets
 .env
