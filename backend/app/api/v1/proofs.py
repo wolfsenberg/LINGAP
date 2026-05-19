@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -18,28 +17,13 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import AsyncSessionLocal, get_db
+from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.models.aid_request import AidRequest, AidRequestStatus
 from app.models.proof_artifact import ProofArtifact, ProofKind
 from app.models.user import User
 from app.schemas.proof import ProofArtifactList, ProofArtifactRead
 from app.storage.local import open_stream, save_upload
-
-
-async def _rescan_in_background(aid_request_id: uuid.UUID, reason: str) -> None:
-    """Open a fresh DB session and trigger a risk rescan."""
-    from app.ai.service import risk_service
-
-    async with AsyncSessionLocal() as session:
-        try:
-            await risk_service.rescan(session, aid_request_id, reason=reason)
-        except Exception:  # noqa: BLE001 — never fail an upload because of risk
-            import logging
-
-            logging.getLogger(__name__).exception(
-                "Background risk rescan failed for %s", aid_request_id
-            )
 
 router = APIRouter(prefix="/aid-requests/{request_id}/proofs", tags=["proofs"])
 
@@ -67,7 +51,6 @@ async def _get_aid_request(db: AsyncSession, request_id: uuid.UUID) -> AidReques
 @router.post("", status_code=201, response_model=ProofArtifactRead)
 async def upload_proof(
     request_id: uuid.UUID,
-    background: BackgroundTasks,
     file: UploadFile = File(...),
     kind: ProofKind = Form(ProofKind.receipt),
     claimed_amount: float | None = Form(None),
@@ -116,7 +99,6 @@ async def upload_proof(
     await db.commit()
     await db.refresh(artifact)
 
-    background.add_task(_rescan_in_background, request_id, "proof_uploaded")
     return _to_read(artifact)
 
 
