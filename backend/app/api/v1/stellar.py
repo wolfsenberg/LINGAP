@@ -29,15 +29,11 @@ async def account_info(public_key: str = Query(...)):
 class DepositXdrRequest(BaseModel):
     campaign_id: int
     donor_public_key: str
-    amount_xlm: float  # human-readable XLM (e.g. 500.0)
+    amount_xlm: float
 
 
 @router.post("/escrow/deposit-xdr")
 async def get_deposit_xdr(body: DepositXdrRequest):
-    """
-    Returns an unsigned transaction XDR for the donor to sign with Freighter.
-    amount_xlm is converted to stroops internally (1 XLM = 10_000_000 stroops).
-    """
     try:
         stroops = int(body.amount_xlm * 10_000_000)
         xdr = await soroban.build_deposit_xdr(
@@ -56,7 +52,6 @@ class SubmitXdrRequest(BaseModel):
 
 @router.post("/escrow/submit")
 async def submit_xdr(body: SubmitXdrRequest):
-    """Submit a Freighter-signed transaction XDR to Stellar."""
     try:
         tx_hash = await soroban.submit_signed_xdr(body.signed_xdr)
         return {"success": True, "data": {"tx_hash": tx_hash}}
@@ -68,7 +63,6 @@ async def submit_xdr(body: SubmitXdrRequest):
 
 @router.post("/escrow/verify/{campaign_id}")
 async def verify_milestone(campaign_id: int):
-    """Admin: mark the current milestone as verified."""
     try:
         tx_hash = await soroban.admin_verify_milestone(campaign_id)
         return {"success": True, "data": {"tx_hash": tx_hash}}
@@ -78,7 +72,6 @@ async def verify_milestone(campaign_id: int):
 
 @router.post("/escrow/release/{campaign_id}")
 async def release_milestone(campaign_id: int):
-    """Admin: release funds for the current verified milestone."""
     try:
         tx_hash = await soroban.admin_release_milestone(campaign_id)
         return {"success": True, "data": {"tx_hash": tx_hash}}
@@ -88,7 +81,6 @@ async def release_milestone(campaign_id: int):
 
 @router.post("/escrow/pause/{campaign_id}")
 async def pause_campaign(campaign_id: int):
-    """Admin: pause a campaign (fraud response)."""
     try:
         tx_hash = await soroban.admin_pause_campaign(campaign_id)
         return {"success": True, "data": {"tx_hash": tx_hash}}
@@ -98,7 +90,6 @@ async def pause_campaign(campaign_id: int):
 
 @router.post("/escrow/unpause/{campaign_id}")
 async def unpause_campaign(campaign_id: int):
-    """Admin: unpause a campaign."""
     try:
         tx_hash = await soroban.admin_unpause_campaign(campaign_id)
         return {"success": True, "data": {"tx_hash": tx_hash}}
@@ -110,7 +101,6 @@ async def unpause_campaign(campaign_id: int):
 
 @router.get("/escrow/campaign/{campaign_id}")
 async def get_campaign(campaign_id: int):
-    """Read campaign state from the contract."""
     try:
         data = await soroban.query_campaign(campaign_id)
         return {"success": True, "data": data}
@@ -120,7 +110,6 @@ async def get_campaign(campaign_id: int):
 
 @router.get("/escrow/count")
 async def campaign_count():
-    """Return total number of campaigns on-chain."""
     try:
         count = await soroban.query_campaign_count()
         return {"success": True, "data": {"count": count}}

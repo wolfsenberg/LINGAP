@@ -5,8 +5,6 @@ use soroban_sdk::{
     token, Address, Env, String, Vec,
 };
 
-// ── Storage key enum ────────────────────────────────────────────────────────
-
 #[contracttype]
 #[derive(Clone)]
 pub enum DataKey {
@@ -19,8 +17,6 @@ pub enum DataKey {
     DonorList(u64),            // campaign_id -> Vec<Address>
     PauseVote(u64, Address),   // (campaign_id, donor) -> bool (has active vote)
 }
-
-// ── Domain types ─────────────────────────────────────────────────────────────
 
 #[contracttype]
 #[derive(Clone, PartialEq)]
@@ -62,8 +58,6 @@ pub struct DonationVaultContract;
 
 #[contractimpl]
 impl DonationVaultContract {
-
-    // ── One-time setup ──────────────────────────────────────────────────────
 
     pub fn initialize(env: Env, admin: Address, token_address: Address) {
         if env.storage().instance().has(&DataKey::Admin) {
