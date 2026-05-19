@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from app.core.database import get_db
+from app.core.database import AsyncSessionLocal, get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.models.user import User
-from app.models.aid_request import AidRequest, AidRequestStatus
+from app.models.aid_request import AidRequest, AidRequestStatus, RiskLevel
 from app.models.beneficiary import Beneficiary
+from app.models.proof_artifact import ProofArtifact
+from app.models.progress_update import (
+    ProgressUpdate,
+    VerifierConfirmation,
+    VerifyDecision,
+)
 from app.models.provenance import ProvenanceRecord
 from app.schemas.aid_request import AidRequestCreate, AidRequestRead, RejectRequest
 from app.stellar.client import send_payment
@@ -19,6 +25,20 @@ def _enrich(req: AidRequest, beneficiary_name: str) -> dict:
     d = AidRequestRead.model_validate(req).model_dump()
     d["beneficiary_name"] = beneficiary_name
     return d
+
+
+async def _risk_rescan_bg(aid_request_id: uuid.UUID, reason: str) -> None:
+    from app.ai.service import risk_service
+
+    async with AsyncSessionLocal() as session:
+        try:
+            await risk_service.rescan(session, aid_request_id, reason=reason)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Background risk rescan failed for %s", aid_request_id
+            )
 
 
 @router.get("")
@@ -46,6 +66,7 @@ async def list_aid_requests(
 @router.post("", status_code=201)
 async def create_aid_request(
     body: AidRequestCreate,
+    background: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
@@ -59,12 +80,14 @@ async def create_aid_request(
     db.add(req)
     await db.commit()
     await db.refresh(req)
+    background.add_task(_risk_rescan_bg, req.id, "aid_request_created")
     return {"success": True, "message": "Aid request created", "data": _enrich(req, b.name)}
 
 
 @router.patch("/{request_id}/approve")
 async def approve_request(
     request_id: uuid.UUID,
+    background: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
@@ -78,13 +101,67 @@ async def approve_request(
     req.approved_by = admin.id
     await db.commit()
     await db.refresh(req)
+    background.add_task(_risk_rescan_bg, req.id, "aid_request_approved")
     b = (await db.execute(select(Beneficiary).where(Beneficiary.id == req.beneficiary_id))).scalar_one()
     return {"success": True, "message": "Request approved", "data": _enrich(req, b.name)}
+
+
+async def _enforce_disburse_gate(
+    db: AsyncSession, req: AidRequest, override: bool, admin: User
+) -> None:
+    """Block disbursement unless proof + verifier requirements are satisfied.
+
+    Only runs when ``settings.ENFORCE_PROOF_GATE`` is true so existing flows
+    stay green until the frontend can drive proof uploads.
+    """
+    if not settings.ENFORCE_PROOF_GATE:
+        return
+
+    live_proofs = (
+        await db.execute(
+            select(func.count()).select_from(ProofArtifact).where(
+                ProofArtifact.aid_request_id == req.id,
+                ProofArtifact.deleted_at.is_(None),
+            )
+        )
+    ).scalar() or 0
+    if live_proofs < settings.MIN_PROOFS_FOR_DISBURSE:
+        raise HTTPException(
+            400,
+            f"At least {settings.MIN_PROOFS_FOR_DISBURSE} proof(s) required before disbursement",
+        )
+
+    confirmed = (
+        await db.execute(
+            select(func.count())
+            .select_from(VerifierConfirmation)
+            .join(
+                ProgressUpdate,
+                ProgressUpdate.id == VerifierConfirmation.progress_update_id,
+            )
+            .where(
+                ProgressUpdate.aid_request_id == req.id,
+                VerifierConfirmation.decision == VerifyDecision.confirmed,
+            )
+        )
+    ).scalar() or 0
+    if confirmed < 1:
+        raise HTTPException(
+            400,
+            "At least one verifier confirmation required before disbursement",
+        )
+
+    if req.cached_risk_level == RiskLevel.critical and not override:
+        raise HTTPException(
+            400,
+            "Risk level is critical; admin must pass override=true to disburse",
+        )
 
 
 @router.patch("/{request_id}/disburse")
 async def disburse_request(
     request_id: uuid.UUID,
+    override: bool = Query(False, description="Admin override for critical-risk requests"),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
@@ -93,6 +170,8 @@ async def disburse_request(
         raise HTTPException(404, "Request not found")
     if req.status != AidRequestStatus.approved:
         raise HTTPException(400, "Only approved requests can be disbursed")
+
+    await _enforce_disburse_gate(db, req, override, admin)
 
     b = (await db.execute(select(Beneficiary).where(Beneficiary.id == req.beneficiary_id))).scalar_one()
     if not b.stellar_public_key:
@@ -107,7 +186,7 @@ async def disburse_request(
 
     req.status = AidRequestStatus.disbursed
     req.stellar_tx_hash = tx_hash
-    b.total_received = float(b.total_received) + req.requested_amount
+    b.total_received = float(b.total_received) + float(req.requested_amount)
 
     prov = ProvenanceRecord(
         donation_id=uuid.uuid4(),  # in production: link to actual donation
