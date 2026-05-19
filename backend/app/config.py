@@ -19,9 +19,40 @@ class Settings(BaseSettings):
 
     CORS_ORIGINS: str = "http://localhost:3000"
 
+    # Proof of Reality / file uploads
+    UPLOAD_DIR: str = "/app/uploads/proofs"
+    MAX_UPLOAD_MB: int = 10
+    ALLOWED_UPLOAD_MIME: str = "image/png,image/jpeg,image/webp,application/pdf"
+
+    # Disbursement gating (flipped on once frontend lands)
+    ENFORCE_PROOF_GATE: bool = False
+    MIN_PROOFS_FOR_DISBURSE: int = 1
+
+    # AI risk audit
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_VISION_MODEL: str = ""
+    RISK_ENGINE: str = "llm"
+    RISK_AUTO_BLOCK_LEVEL: str = "critical"
+
+    # AWS S3 for certificates
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_S3_BUCKET: str = ""
+    AWS_REGION: str = "us-east-1"
+    AWS_S3_PRESIGNED_EXPIRY_HOURS: int = 24
+
+    # Certificate generation
+    CERTIFICATE_TITLE_FONT: str = "Helvetica-Bold"
+    CERTIFICATE_BODY_FONT: str = "Helvetica"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]
+
+    @property
+    def allowed_upload_mime_list(self) -> list[str]:
+        return [m.strip() for m in self.ALLOWED_UPLOAD_MIME.split(",") if m.strip()]
 
 
 settings = Settings()

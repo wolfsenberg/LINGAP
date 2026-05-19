@@ -6,6 +6,7 @@ import type {
   AidRequest,
   ProvenanceRecord,
   DashboardStats,
+  DonationCertificate,
   ApiResponse,
   PaginatedResponse,
 } from "@/types";
@@ -118,6 +119,21 @@ export const escrowApi = {
     api.get<ApiResponse<{ campaign_id: number; result_xdr: string }>>(`/api/v1/stellar/escrow/campaign/${campaignId}`),
   getCampaignCount: () =>
     api.get<ApiResponse<{ count: number }>>("/api/v1/stellar/escrow/count"),
+};
+
+export const certificatesApi = {
+  get: (id: string) =>
+    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`),
+  getByDonation: (donationId: string) =>
+    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/donation/${donationId}`),
+  listByDonor: (donorId: string) =>
+    api.get<ApiResponse<DonationCertificate[]>>(`/api/v1/certificates/donor/${donorId}/all`),
+  updateVisibility: (id: string, isPublic: boolean) =>
+    api.patch<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`, {
+      is_public: isPublic,
+    }),
+  getDownloadUrl: (id: string) =>
+    api.get<ApiResponse<{ download_url: string; filename: string }>>(`/api/v1/certificates/${id}/download`),
 };
 
 export default api;
