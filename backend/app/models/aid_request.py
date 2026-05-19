@@ -1,9 +1,16 @@
 import uuid
-from sqlalchemy import String, Numeric, ForeignKey, Text, Enum
+from sqlalchemy import String, Numeric, ForeignKey, Text, Enum, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from .mixins import TimestampMixin
 import enum
+
+
+class RiskLevel(str, enum.Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+    critical = "critical"
 
 
 class AidRequestStatus(str, enum.Enum):
@@ -27,6 +34,10 @@ class AidRequest(Base, TimestampMixin):
     stellar_tx_hash: Mapped[str | None] = mapped_column(String(64))
     approved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     rejection_reason: Mapped[str | None] = mapped_column(Text)
+
+    proof_count: Mapped[int] = mapped_column(Integer, default=0)
+    cached_risk_score: Mapped[float | None] = mapped_column(Numeric(6, 2))
+    cached_risk_level: Mapped[RiskLevel | None] = mapped_column(Enum(RiskLevel))
 
     beneficiary: Mapped["Beneficiary"] = relationship(back_populates="aid_requests")  # noqa: F821
     approver: Mapped["User | None"] = relationship("User", foreign_keys=[approved_by])  # noqa: F821
