@@ -121,12 +121,13 @@ async def admin_unpause_campaign(campaign_id: int) -> str:
     return _invoke_admin("unpause_campaign", [scval.to_uint64(campaign_id)])
 
 
-# ── Donor voting flow ─────────────────────────────────────────────────────────
+# ── Donor voting flow (unsigned XDR → Freighter signs → submit) ───────────────
 
 async def build_vote_pause_xdr(campaign_id: int, donor_public_key: str) -> str:
-    """Build unsigned vote_pause XDR for donor to sign with Freighter."""
+    """Build unsigned vote_pause transaction XDR for the donor to sign."""
     server = _server()
     account = server.load_account(donor_public_key)
+
     tx = (
         TransactionBuilder(account, NETWORK_PASSPHRASE, base_fee=1_000_000)
         .append_invoke_contract_function_op(
@@ -145,9 +146,10 @@ async def build_vote_pause_xdr(campaign_id: int, donor_public_key: str) -> str:
 
 
 async def build_revoke_vote_xdr(campaign_id: int, donor_public_key: str) -> str:
-    """Build unsigned revoke_vote XDR for donor to sign with Freighter."""
+    """Build unsigned revoke_vote transaction XDR for the donor to sign."""
     server = _server()
     account = server.load_account(donor_public_key)
+
     tx = (
         TransactionBuilder(account, NETWORK_PASSPHRASE, base_fee=1_000_000)
         .append_invoke_contract_function_op(
@@ -171,11 +173,12 @@ async def admin_execute_clawback(campaign_id: int) -> str:
 
 
 async def query_vote_status(campaign_id: int, donor_public_key: str | None = None) -> dict:
-    """Return campaign vote state and optionally whether a donor has voted."""
+    """Return vote weight, threshold, and optionally whether a donor has voted."""
     server = _server()
     admin = _admin()
     account = server.load_account(admin.public_key)
 
+    # Fetch campaign (includes pause_vote_weight and total_deposited).
     campaign_tx = (
         TransactionBuilder(account, NETWORK_PASSPHRASE, base_fee=1_000_000)
         .append_invoke_contract_function_op(

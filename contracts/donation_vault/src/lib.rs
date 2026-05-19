@@ -12,10 +12,10 @@ pub enum DataKey {
     Token,
     CampaignCount,
     Campaign(u64),
-    Milestone(u64, u32),
-    DonorDeposit(u64, Address),
-    DonorList(u64),
-    PauseVote(u64, Address),
+    Milestone(u64, u32),       // (campaign_id, milestone_index)
+    DonorDeposit(u64, Address), // (campaign_id, donor) -> i128
+    DonorList(u64),            // campaign_id -> Vec<Address>
+    PauseVote(u64, Address),   // (campaign_id, donor) -> bool (has active vote)
 }
 
 #[contracttype]
@@ -48,7 +48,10 @@ pub struct Campaign {
     pub clawback_executed: bool,
 }
 
+// Pause threshold: 60% of total deposited weight must vote.
 const PAUSE_THRESHOLD_PCT: i128 = 60;
+
+// ── Contract ─────────────────────────────────────────────────────────────────
 
 #[contract]
 pub struct DonationVaultContract;
@@ -64,6 +67,8 @@ impl DonationVaultContract {
         env.storage().instance().set(&DataKey::Token, &token_address);
         env.storage().instance().set(&DataKey::CampaignCount, &0u64);
     }
+
+    // ── Campaign management ─────────────────────────────────────────────────
 
     pub fn create_campaign(
         env: Env,
@@ -120,6 +125,8 @@ impl DonationVaultContract {
         campaign_id
     }
 
+    // ── Funding ─────────────────────────────────────────────────────────────
+
     pub fn deposit(env: Env, campaign_id: u64, donor: Address, amount: i128) {
         donor.require_auth();
         assert!(amount > 0, "amount must be positive");
@@ -137,6 +144,7 @@ impl DonationVaultContract {
         let token_client = token::Client::new(&env, &token_addr);
         token_client.transfer(&donor, &env.current_contract_address(), &amount);
 
+        // Track per-donor deposit for proportional clawback.
         let prev: i128 = env
             .storage()
             .persistent()
@@ -164,6 +172,8 @@ impl DonationVaultContract {
             .persistent()
             .set(&DataKey::Campaign(campaign_id), &campaign);
     }
+
+    // ── Milestone lifecycle ─────────────────────────────────────────────────
 
     pub fn verify_milestone(env: Env, campaign_id: u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
@@ -236,6 +246,7 @@ impl DonationVaultContract {
         );
 
         campaign.total_released += milestone.amount;
+
         milestone.status = MilestoneStatus::Released;
         env.storage()
             .persistent()
@@ -246,6 +257,8 @@ impl DonationVaultContract {
             .persistent()
             .set(&DataKey::Campaign(campaign_id), &campaign);
     }
+
+    // ── Admin pause / unpause ───────────────────────────────────────────────
 
     pub fn pause_campaign(env: Env, campaign_id: u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
@@ -279,6 +292,11 @@ impl DonationVaultContract {
             .set(&DataKey::Campaign(campaign_id), &campaign);
     }
 
+    // ── Donor voting ────────────────────────────────────────────────────────
+
+    /// Donor casts a vote to pause a suspicious campaign.
+    /// Vote weight = donor's total deposited amount.
+    /// Auto-pauses the campaign when cumulative weight >= 60% of total_deposited.
     pub fn vote_pause(env: Env, campaign_id: u64, donor: Address) {
         donor.require_auth();
 
@@ -310,6 +328,7 @@ impl DonationVaultContract {
 
         campaign.pause_vote_weight += donor_deposit;
 
+        // Auto-pause when threshold is reached.
         if campaign.total_deposited > 0
             && campaign.pause_vote_weight * 100
                 >= campaign.total_deposited * PAUSE_THRESHOLD_PCT
@@ -322,6 +341,8 @@ impl DonationVaultContract {
             .set(&DataKey::Campaign(campaign_id), &campaign);
     }
 
+    /// Donor retracts their pause vote.
+    /// If vote weight drops below the threshold the campaign is unpaused.
     pub fn revoke_vote(env: Env, campaign_id: u64, donor: Address) {
         donor.require_auth();
 
@@ -352,6 +373,7 @@ impl DonationVaultContract {
 
         campaign.pause_vote_weight -= donor_deposit;
 
+        // Lift the donor-driven pause if weight drops below threshold.
         if campaign.total_deposited > 0
             && campaign.pause_vote_weight * 100
                 < campaign.total_deposited * PAUSE_THRESHOLD_PCT
@@ -364,6 +386,10 @@ impl DonationVaultContract {
             .set(&DataKey::Campaign(campaign_id), &campaign);
     }
 
+    // ── Clawback ────────────────────────────────────────────────────────────
+
+    /// Executes a proportional refund of unspent escrow funds to all donors.
+    /// Requires: campaign paused AND vote weight >= 60% threshold.
     pub fn execute_clawback(env: Env, campaign_id: u64) {
         let mut campaign: Campaign = env
             .storage()
@@ -400,6 +426,7 @@ impl DonationVaultContract {
                 .unwrap_or(0);
 
             if donor_deposit > 0 {
+                // Proportional share: donor_deposit / total_deposited * remaining
                 let refund = donor_deposit * remaining / campaign.total_deposited;
                 if refund > 0 {
                     token_client.transfer(
@@ -416,6 +443,8 @@ impl DonationVaultContract {
             .persistent()
             .set(&DataKey::Campaign(campaign_id), &campaign);
     }
+
+    // ── Read-only queries ───────────────────────────────────────────────────
 
     pub fn get_campaign(env: Env, campaign_id: u64) -> Campaign {
         env.storage()

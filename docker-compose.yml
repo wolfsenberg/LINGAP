@@ -1,6 +1,7 @@
 version: "3.9"
 
 services:
+
   postgres:
     image: postgres:16-alpine
     environment:
@@ -32,17 +33,21 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
+      - backend_uploads:/app/uploads
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_STELLAR_NETWORK: testnet
+      NEXT_PUBLIC_CONTRACT_DONATION_VAULT: CDZTFM2BHBLYQLIJSSF7UOSWCQMQMOUATXEJTDOHKBIZ6R4DFZKB7DDP
+      NEXT_PUBLIC_CONTRACT_AID_PROVENANCE: CDZTFM2BHBLYQLIJSSF7UOSWCQMQMOUATXEJTDOHKBIZ6R4DFZKB7DDP
+      NEXT_PUBLIC_CONTRACT_BENEFICIARY_REGISTRY: CDZTFM2BHBLYQLIJSSF7UOSWCQMQMOUATXEJTDOHKBIZ6R4DFZKB7DDP
     depends_on:
       - backend
     volumes:
@@ -53,3 +58,4 @@ services:
 
 volumes:
   pgdata:
+  backend_uploads:

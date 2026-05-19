@@ -14,7 +14,7 @@ class AidRequestCreate(BaseModel):
 class AidRequestRead(BaseModel):
     id: UUID
     beneficiary_id: UUID
-    beneficiary_name: str
+    beneficiary_name: str = ""
     requested_amount: float
     asset: str
     purpose: str

@@ -31,3 +31,20 @@ async def require_admin(user: User = Depends(get_current_user)) -> User:
     if user.role not in ("admin",):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
+
+
+def _role_value(role) -> str:
+    return role.value if hasattr(role, "value") else str(role)
+
+
+async def require_aid_worker_or_admin(user: User = Depends(get_current_user)) -> User:
+    """Allow aid workers and admins to confirm/dispute progress updates.
+
+    Kept separate from ``require_admin`` so the admin gate is untouched.
+    """
+    if _role_value(user.role) not in ("admin", "aid_worker"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Aid worker or admin access required",
+        )
+    return user
