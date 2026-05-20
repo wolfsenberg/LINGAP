@@ -41,6 +41,20 @@ async def _risk_rescan_bg(aid_request_id: uuid.UUID, reason: str) -> None:
             )
 
 
+async def _credibility_rescan_bg(beneficiary_id: uuid.UUID, reason: str) -> None:
+    from app.credibility.service import credibility_service
+
+    async with AsyncSessionLocal() as session:
+        try:
+            await credibility_service.rescan(session, beneficiary_id, reason=reason)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Background credibility rescan failed for %s", beneficiary_id
+            )
+
+
 @router.get("")
 async def list_aid_requests(
     page: int = 1,
@@ -161,6 +175,7 @@ async def _enforce_disburse_gate(
 @router.patch("/{request_id}/disburse")
 async def disburse_request(
     request_id: uuid.UUID,
+    background: BackgroundTasks,
     override: bool = Query(False, description="Admin override for critical-risk requests"),
     db: AsyncSession = Depends(get_db),
     admin: User = Depends(require_admin),
@@ -201,6 +216,7 @@ async def disburse_request(
     db.add(prov)
     await db.commit()
     await db.refresh(req)
+    background.add_task(_credibility_rescan_bg, b.id, "aid_request_disbursed")
     return {"success": True, "message": "Aid disbursed on-chain", "data": _enrich(req, b.name)}
 
 
