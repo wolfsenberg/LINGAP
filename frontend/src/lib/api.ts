@@ -119,6 +119,38 @@ export const escrowApi = {
     api.get<ApiResponse<{ campaign_id: number; result_xdr: string }>>(`/api/v1/stellar/escrow/campaign/${campaignId}`),
   getCampaignCount: () =>
     api.get<ApiResponse<{ count: number }>>("/api/v1/stellar/escrow/count"),
+
+  // Donor voting
+  getVoteXdr: (campaignId: number, donorPublicKey: string) =>
+    api.post<ApiResponse<{ xdr: string; action: string }>>(`/api/v1/stellar/escrow/vote/${campaignId}`, {
+      donor_public_key: donorPublicKey,
+    }),
+  getRevokeVoteXdr: (campaignId: number, donorPublicKey: string) =>
+    api.delete<ApiResponse<{ xdr: string; action: string }>>(`/api/v1/stellar/escrow/vote/${campaignId}`, {
+      data: { donor_public_key: donorPublicKey },
+    }),
+  getVoteStatus: (campaignId: number, donorPublicKey?: string) =>
+    api.get<ApiResponse<{ campaign_id: number; campaign_xdr: string; donor_has_voted: boolean | null }>>(
+      `/api/v1/stellar/escrow/votes/${campaignId}`,
+      { params: donorPublicKey ? { donor_public_key: donorPublicKey } : {} }
+    ),
+  executeClawback: (campaignId: number) =>
+    api.post<ApiResponse<{ tx_hash: string }>>(`/api/v1/stellar/escrow/clawback/${campaignId}`),
+};
+
+export const certificatesApi = {
+  get: (id: string) =>
+    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`),
+  getByDonation: (donationId: string) =>
+    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/donation/${donationId}`),
+  listByDonor: (donorId: string) =>
+    api.get<ApiResponse<DonationCertificate[]>>(`/api/v1/certificates/donor/${donorId}/all`),
+  updateVisibility: (id: string, isPublic: boolean) =>
+    api.patch<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`, {
+      is_public: isPublic,
+    }),
+  getDownloadUrl: (id: string) =>
+    api.get<ApiResponse<{ download_url: string; filename: string }>>(`/api/v1/certificates/${id}/download`),
 };
 
 export const certificatesApi = {

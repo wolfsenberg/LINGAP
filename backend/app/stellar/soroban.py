@@ -121,6 +121,107 @@ async def admin_unpause_campaign(campaign_id: int) -> str:
     return _invoke_admin("unpause_campaign", [scval.to_uint64(campaign_id)])
 
 
+# ── Donor voting flow (unsigned XDR → Freighter signs → submit) ───────────────
+
+async def build_vote_pause_xdr(campaign_id: int, donor_public_key: str) -> str:
+    """Build unsigned vote_pause transaction XDR for the donor to sign."""
+    server = _server()
+    account = server.load_account(donor_public_key)
+
+    tx = (
+        TransactionBuilder(account, NETWORK_PASSPHRASE, base_fee=1_000_000)
+        .append_invoke_contract_function_op(
+            contract_id=CONTRACT_ID,
+            function_name="vote_pause",
+            parameters=[
+                scval.to_uint64(campaign_id),
+                scval.to_address(donor_public_key),
+            ],
+        )
+        .set_timeout(30)
+        .build()
+    )
+    prepared = server.prepare_transaction(tx)
+    return prepared.to_xdr()
+
+
+async def build_revoke_vote_xdr(campaign_id: int, donor_public_key: str) -> str:
+    """Build unsigned revoke_vote transaction XDR for the donor to sign."""
+    server = _server()
+    account = server.load_account(donor_public_key)
+
+    tx = (
+        TransactionBuilder(account, NETWORK_PASSPHRASE, base_fee=1_000_000)
+        .append_invoke_contract_function_op(
+            contract_id=CONTRACT_ID,
+            function_name="revoke_vote",
+            parameters=[
+                scval.to_uint64(campaign_id),
+                scval.to_address(donor_public_key),
+            ],
+        )
+        .set_timeout(30)
+        .build()
+    )
+    prepared = server.prepare_transaction(tx)
+    return prepared.to_xdr()
+
+
+async def admin_execute_clawback(campaign_id: int) -> str:
+    """Admin: execute proportional clawback after vote quorum is reached."""
+    return _invoke_admin("execute_clawback", [scval.to_uint64(campaign_id)])
+
+
+async def query_vote_status(campaign_id: int, donor_public_key: str | None = None) -> dict:
+    """Return vote weight, threshold, and optionally whether a donor has voted."""
+    server = _server()
+    admin = _admin()
+    account = server.load_account(admin.public_key)
+
+    # Fetch campaign (includes pause_vote_weight and total_deposited).
+    campaign_tx = (
+        TransactionBuilder(account, NETWORK_PASSPHRASE, base_fee=1_000_000)
+        .append_invoke_contract_function_op(
+            contract_id=CONTRACT_ID,
+            function_name="get_campaign",
+            parameters=[scval.to_uint64(campaign_id)],
+        )
+        .set_timeout(30)
+        .build()
+    )
+    sim = server.simulate_transaction(campaign_tx)
+    campaign_xdr = sim.results[0].xdr if sim.results else None
+
+    result: dict = {
+        "campaign_id": campaign_id,
+        "campaign_xdr": campaign_xdr,
+        "donor_has_voted": None,
+    }
+
+    if donor_public_key:
+        account2 = server.load_account(admin.public_key)
+        voted_tx = (
+            TransactionBuilder(account2, NETWORK_PASSPHRASE, base_fee=1_000_000)
+            .append_invoke_contract_function_op(
+                contract_id=CONTRACT_ID,
+                function_name="has_voted",
+                parameters=[
+                    scval.to_uint64(campaign_id),
+                    scval.to_address(donor_public_key),
+                ],
+            )
+            .set_timeout(30)
+            .build()
+        )
+        sim2 = server.simulate_transaction(voted_tx)
+        if sim2.results:
+            from stellar_sdk import xdr as stellar_xdr
+            val = stellar_xdr.SCVal.from_xdr(sim2.results[0].xdr)
+            result["donor_has_voted"] = bool(val.b)
+
+    return result
+
+
 # ── Read-only queries ─────────────────────────────────────────────────────────
 
 async def query_campaign(campaign_id: int) -> dict:
