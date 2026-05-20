@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, Boolean, Enum, Numeric
+from sqlalchemy import String, Boolean, Enum, Numeric, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from .mixins import TimestampMixin
@@ -34,5 +34,7 @@ class Beneficiary(Base, TimestampMixin):
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
     stellar_public_key: Mapped[str | None] = mapped_column(String(56))
     total_received: Mapped[float] = mapped_column(Numeric(18, 7), default=0)
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True, index=True)
 
     aid_requests: Mapped[list["AidRequest"]] = relationship(back_populates="beneficiary")  # noqa: F821
