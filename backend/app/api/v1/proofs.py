@@ -23,7 +23,7 @@ from app.models.aid_request import AidRequest, AidRequestStatus
 from app.models.proof_artifact import ProofArtifact, ProofKind
 from app.models.user import User
 from app.schemas.proof import ProofArtifactList, ProofArtifactRead
-from app.storage.local import open_stream, save_upload
+from app.storage.factory import open_stream, save_upload
 
 router = APIRouter(prefix="/aid-requests/{request_id}/proofs", tags=["proofs"])
 
@@ -146,7 +146,7 @@ async def download_proof(
     if not os.path.exists(proof.stored_path):
         raise HTTPException(410, "Proof file is no longer available on disk")
 
-    fp = open_stream(proof.stored_path)
+    fp = await open_stream(proof.stored_path)
     headers = {
         "Content-Disposition": f'attachment; filename="{proof.filename}"',
         "Content-Length": str(proof.size_bytes),
