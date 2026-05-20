@@ -9,6 +9,7 @@ const links = [
   { href: "/detail", label: "Campaign Detail" },
   { href: "/escrow", label: "Escrow Dashboard" },
   { href: "/proof", label: "Proof Center" },
+  { href: "/volunteer", label: "Volunteer" },
   { href: "/donor", label: "My Impact" },
   { href: "/certificate", label: "Certificate" },
   { href: "/admin", label: "Admin" },

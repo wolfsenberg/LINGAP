@@ -91,6 +91,62 @@ export const stellarApi = {
     }),
 };
 
+export const volunteerApi = {
+  listOpportunities: (category?: string) =>
+    api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/opportunities", {
+      params: category ? { category } : {},
+    }),
+  getStats: () =>
+    api.get<ApiResponse<{ open_opportunities: number; total_volunteers: number; slots_needed: number }>>(
+      "/api/v1/volunteer/stats"
+    ),
+  apply: (opportunityId: string, message: string, skills: string[]) =>
+    api.post<ApiResponse<{ id: string; status: string }>>(
+      `/api/v1/volunteer/opportunities/${opportunityId}/apply`,
+      { message, skills }
+    ),
+  mySignups: () =>
+    api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/me/signups"),
+  createOpportunity: (data: {
+    campaign_name: string; title: string; description: string;
+    category: string; skills_needed: string[]; location: string;
+    schedule: string; slots: number; urgent: boolean;
+  }) => api.post<ApiResponse<VolunteerOpportunity>>("/api/v1/volunteer/opportunities", data),
+};
+
+export interface VolunteerOpportunity {
+  id: string;
+  organizer_name: string;
+  campaign_name: string;
+  title: string;
+  description: string;
+  category: string;
+  skills_needed: string[];
+  location: string;
+  schedule: string;
+  slots: number;
+  slots_filled: number;
+  slots_remaining: number;
+  status: string;
+  urgent: boolean;
+  my_signup_status: string | null;
+  created_at: string;
+  signup_id?: string;
+  applied_at?: string;
+}
+
+export const donorsApi = {
+  leaderboard: (limit = 10) =>
+    api.get<ApiResponse<Array<{ rank: number; name: string; total_donated: number; donation_count: number }>>>(
+      "/api/v1/donors/leaderboard",
+      { params: { limit } }
+    ),
+  myImpact: () =>
+    api.get<ApiResponse<{ name: string; total_donated: number; campaigns_helped: number; lives_impacted: number }>>(
+      "/api/v1/donors/me/impact"
+    ),
+};
+
 export const escrowApi = {
   // Donor: get unsigned XDR → sign with Freighter → submit
   getDepositXdr: (campaignId: number, donorPublicKey: string, amountXlm: number) =>
