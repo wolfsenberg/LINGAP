@@ -43,6 +43,17 @@ class Settings(BaseSettings):
     RISK_ENGINE: str = "llm"
     RISK_AUTO_BLOCK_LEVEL: str = "critical"
 
+    # AWS S3 for certificates
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    AWS_S3_BUCKET: str = ""
+    AWS_REGION: str = "us-east-1"
+    AWS_S3_PRESIGNED_EXPIRY_HOURS: int = 24
+
+    # Certificate generation
+    CERTIFICATE_TITLE_FONT: str = "Helvetica-Bold"
+    CERTIFICATE_BODY_FONT: str = "Helvetica"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]

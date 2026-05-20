@@ -39,3 +39,10 @@ contracts/target/
 # Logs
 *.log
 npm-debug.log*
+
+
+
+
+# certficates_mdfiles
+
+/certficates_mdfiles/
