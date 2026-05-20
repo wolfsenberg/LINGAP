@@ -12,7 +12,7 @@ from .risk import (
     aid_request_risk_router,
     aid_request_spending_router,
 )
-from .geo import router as geo_router
+from .credibility import router as credibility_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -28,4 +28,4 @@ api_router.include_router(verify_router)
 api_router.include_router(risk_router)
 api_router.include_router(aid_request_risk_router)
 api_router.include_router(aid_request_spending_router)
-api_router.include_router(geo_router)
+api_router.include_router(credibility_router)
