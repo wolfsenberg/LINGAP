@@ -6,6 +6,7 @@ from .provenance import ProvenanceRecord
 from .proof_artifact import ProofArtifact, ProofKind
 from .donor_vote import DonorVote
 from .credibility import CredibilityAssessment, CredibilityTier
+from .volunteer import VolunteerOpportunity, VolunteerSignup, VolunteerCategory, OpportunityStatus, SignupStatus
 
 __all__ = [
     "User", "UserRole",
@@ -16,4 +17,5 @@ __all__ = [
     "ProofArtifact", "ProofKind",
     "DonorVote",
     "CredibilityAssessment", "CredibilityTier",
+    "VolunteerOpportunity", "VolunteerSignup", "VolunteerCategory", "OpportunityStatus", "SignupStatus",
 ]

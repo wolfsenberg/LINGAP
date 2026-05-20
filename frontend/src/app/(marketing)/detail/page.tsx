@@ -6,6 +6,38 @@ import { STELLAR_CONFIG } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 
+function getShareUrl() {
+  return typeof window !== "undefined" ? window.location.href : "";
+}
+
+function shareFacebook() {
+  window.open(
+    `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl())}`,
+    "_blank", "width=600,height=400"
+  );
+}
+
+function shareMessenger() {
+  const url = getShareUrl();
+  if (/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+    window.location.href = `fb-messenger://share?link=${encodeURIComponent(url)}`;
+  } else {
+    navigator.clipboard.writeText(url).then(() =>
+      toast.success("Link copied! Paste it in Messenger.")
+    );
+  }
+}
+
+async function shareTikTok() {
+  const url = getShareUrl();
+  if (navigator.share) {
+    try { await navigator.share({ title: "Help Maria Santos on LINGAP", url }); } catch { /* cancelled */ }
+  } else {
+    await navigator.clipboard.writeText(url);
+    toast.success("Link copied! Share it on TikTok.");
+  }
+}
+
 const CAMPAIGN_ID = 0; // first on-chain campaign
 const AMOUNTS = [100, 250, 500, 1000, 5000];
 
@@ -216,9 +248,9 @@ export default function DetailPage() {
           <div style={{background:'#fff',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:20}}>
             <div style={{fontSize:13,fontWeight:600,color:'var(--text2)',marginBottom:12}}>Share this campaign:</div>
             <div className="flex gap-8">
-              <button className="btn btn-sm" style={{background:'#1877F2',color:'#fff',flex:1,justifyContent:'center'}}>📘 Facebook</button>
-              <button className="btn btn-sm" style={{background:'#0078FF',color:'#fff',flex:1,justifyContent:'center'}}>💬 Messenger</button>
-              <button className="btn btn-sm" style={{background:'#000',color:'#fff',flex:1,justifyContent:'center'}}>🎵 TikTok</button>
+              <button onClick={shareFacebook} className="btn btn-sm" style={{background:'#1877F2',color:'#fff',flex:1,justifyContent:'center'}}>📘 Facebook</button>
+              <button onClick={shareMessenger} className="btn btn-sm" style={{background:'#0078FF',color:'#fff',flex:1,justifyContent:'center'}}>💬 Messenger</button>
+              <button onClick={shareTikTok} className="btn btn-sm" style={{background:'#000',color:'#fff',flex:1,justifyContent:'center'}}>🎵 TikTok</button>
             </div>
           </div>
 

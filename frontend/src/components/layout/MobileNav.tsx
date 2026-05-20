@@ -6,6 +6,7 @@ const items = [
   { href: "/", label: "Home", icon: "🏠" },
   { href: "/discover", label: "Discover", icon: "🔍" },
   { href: "/escrow", label: "Escrow", icon: "🔒" },
+  { href: "/volunteer", label: "Volunteer", icon: "🤝" },
   { href: "/donor", label: "My Impact", icon: "💙" },
   { href: "/admin", label: "Admin", icon: "⚙️" },
 ];

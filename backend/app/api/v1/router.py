@@ -13,6 +13,8 @@ from .risk import (
     aid_request_spending_router,
 )
 from .credibility import router as credibility_router
+from .leaderboard import router as leaderboard_router
+from .volunteer import router as volunteer_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -29,3 +31,5 @@ api_router.include_router(risk_router)
 api_router.include_router(aid_request_risk_router)
 api_router.include_router(aid_request_spending_router)
 api_router.include_router(credibility_router)
+api_router.include_router(leaderboard_router)
+api_router.include_router(volunteer_router)
