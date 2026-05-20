@@ -4,6 +4,7 @@ import { useFreighter } from "@/hooks/useFreighter";
 import { escrowApi } from "@/lib/api";
 import { STELLAR_CONFIG } from "@/lib/stellar";
 import toast from "react-hot-toast";
+import VotingPanel from "@/components/stellar/VotingPanel";
 
 const CAMPAIGN_ID = 0; // first on-chain campaign
 const AMOUNTS = [100, 250, 500, 1000, 5000];
@@ -220,6 +221,8 @@ export default function DetailPage() {
               <button className="btn btn-sm" style={{background:'#000',color:'#fff',flex:1,justifyContent:'center'}}>🎵 TikTok</button>
             </div>
           </div>
+
+          <VotingPanel campaignId={CAMPAIGN_ID} campaignName="Maria Santos — Stage 3 Ovarian Cancer Treatment" />
         </div>
       </div>
     </div>

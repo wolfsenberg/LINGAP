@@ -4,6 +4,8 @@ from .donation import Donation
 from .aid_request import AidRequest, AidRequestStatus, RiskLevel
 from .provenance import ProvenanceRecord
 from .proof_artifact import ProofArtifact, ProofKind
+from .donor_vote import DonorVote
+from .credibility import CredibilityAssessment, CredibilityTier
 
 __all__ = [
     "User", "UserRole",
@@ -12,4 +14,6 @@ __all__ = [
     "AidRequest", "AidRequestStatus", "RiskLevel",
     "ProvenanceRecord",
     "ProofArtifact", "ProofKind",
+    "DonorVote",
+    "CredibilityAssessment", "CredibilityTier",
 ]

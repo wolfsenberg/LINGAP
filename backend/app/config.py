@@ -28,10 +28,18 @@ class Settings(BaseSettings):
     ENFORCE_PROOF_GATE: bool = False
     MIN_PROOFS_FOR_DISBURSE: int = 1
 
-    # AI risk audit
+    # AI risk audit -- provider-agnostic settings (preferred)
+    LLM_PROVIDER: str = "groq"
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = "https://api.groq.com/openai/v1"
+    LLM_MODEL: str = "llama-3.1-8b-instant"
+    LLM_VISION_MODEL: str = ""
+
+    # Legacy OpenAI names (backward compatible; used only if LLM_* are empty)
     OPENAI_API_KEY: str = ""
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_MODEL: str = ""
     OPENAI_VISION_MODEL: str = ""
+
     RISK_ENGINE: str = "llm"
     RISK_AUTO_BLOCK_LEVEL: str = "critical"
 
@@ -53,6 +61,29 @@ class Settings(BaseSettings):
     @property
     def allowed_upload_mime_list(self) -> list[str]:
         return [m.strip() for m in self.ALLOWED_UPLOAD_MIME.split(",") if m.strip()]
+
+    @property
+    def effective_api_key(self) -> str:
+        """Provider API key, preferring LLM_API_KEY then falling back to OPENAI_API_KEY."""
+        return self.LLM_API_KEY or self.OPENAI_API_KEY
+
+    @property
+    def effective_base_url(self) -> str:
+        """Base URL for the LLM provider. Empty string means use OpenAI default."""
+        if self.LLM_API_KEY:
+            return self.LLM_BASE_URL
+        if self.OPENAI_API_KEY:
+            return ""
+        return self.LLM_BASE_URL
+
+    @property
+    def effective_model(self) -> str:
+        """Model name, preferring LLM_MODEL then falling back to OPENAI_MODEL."""
+        return self.LLM_MODEL or self.OPENAI_MODEL or "llama-3.1-8b-instant"
+
+    @property
+    def effective_vision_model(self) -> str:
+        return self.LLM_VISION_MODEL or self.OPENAI_VISION_MODEL
 
 
 settings = Settings()
