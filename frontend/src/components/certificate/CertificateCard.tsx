@@ -41,20 +41,34 @@ export function CertificateCard({
     }
   };
 
-  const handlePrint = () => {
-    window.open(certificate.s3Url, '_blank');
-  };
-
-  const handleShare = () => {
-    const url = `${window.location.origin}/certificate/${certificate.id}`;
-    navigator.clipboard.writeText(url);
-    alert('Certificate link copied to clipboard!');
+  const generateShareUrl = (certificateId: string): string => {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/certificate/${certificateId}`;
+    }
+    return '';
   };
 
   const handleShareFacebook = () => {
-    const url = `${window.location.origin}/certificate/${certificate.id}`;
-    const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
-    window.open(facebookUrl, '_blank');
+    const shareUrl = generateShareUrl(certificate.id);
+    const encodedUrl = encodeURIComponent(shareUrl);
+    const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`;
+    window.open(facebookShareUrl, 'facebook-share', 'width=600,height=400');
+  };
+
+  const handleShareLinkedIn = () => {
+    const shareUrl = generateShareUrl(certificate.id);
+    const encodedUrl = encodeURIComponent(shareUrl);
+    const linkedinShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`;
+    window.open(linkedinShareUrl, 'linkedin-share', 'width=600,height=400');
+  };
+
+  const handleCopyLink = () => {
+    const shareUrl = generateShareUrl(certificate.id);
+    navigator.clipboard.writeText(shareUrl).then(() => {
+      alert('Certificate link copied to clipboard!');
+    }).catch(() => {
+      console.error('Failed to copy to clipboard');
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -202,29 +216,15 @@ export function CertificateCard({
             cursor: 'pointer',
             flex: '1 1 auto',
             minWidth: 120,
+            transition: 'opacity 0.2s',
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
         >
           📥 Download PDF
         </button>
         <button
-          onClick={handlePrint}
-          style={{
-            background: 'var(--navy)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            padding: '8px 16px',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-            flex: '1 1 auto',
-            minWidth: 120,
-          }}
-        >
-          🖨️ Print
-        </button>
-        <button
-          onClick={handleShare}
+          onClick={handleCopyLink}
           style={{
             background: 'var(--border)',
             color: 'var(--navy)',
@@ -236,9 +236,12 @@ export function CertificateCard({
             cursor: 'pointer',
             flex: '1 1 auto',
             minWidth: 120,
+            transition: 'opacity 0.2s',
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
         >
-          🔗 Share Link
+          🔗 Copy Link
         </button>
         <button
           onClick={handleShareFacebook}
@@ -253,9 +256,32 @@ export function CertificateCard({
             cursor: 'pointer',
             flex: '1 1 auto',
             minWidth: 120,
+            transition: 'opacity 0.2s',
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
         >
           📘 Facebook
+        </button>
+        <button
+          onClick={handleShareLinkedIn}
+          style={{
+            background: '#0A66C2',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            padding: '8px 16px',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: 'pointer',
+            flex: '1 1 auto',
+            minWidth: 120,
+            transition: 'opacity 0.2s',
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
+        >
+          💼 LinkedIn
         </button>
       </div>
     </div>
