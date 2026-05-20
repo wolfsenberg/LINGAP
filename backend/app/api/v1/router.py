@@ -12,6 +12,7 @@ from .risk import (
     aid_request_risk_router,
     aid_request_spending_router,
 )
+from .streaks import donor_router as streak_donor_router, admin_router as streak_admin_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -27,3 +28,5 @@ api_router.include_router(verify_router)
 api_router.include_router(risk_router)
 api_router.include_router(aid_request_risk_router)
 api_router.include_router(aid_request_spending_router)
+api_router.include_router(streak_donor_router)
+api_router.include_router(streak_admin_router)
