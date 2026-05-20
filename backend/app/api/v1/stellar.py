@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Query, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 from app.stellar.client import verify_transaction, get_account_info
 from app.stellar import soroban
 from app.core.database import get_db
-from app.models.donor_vote import DonorVote
 
 router = APIRouter(prefix="/stellar", tags=["stellar"])
 
