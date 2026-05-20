@@ -20,4 +20,3 @@ class Donation(Base, TimestampMixin):
 
     donor: Mapped["User"] = relationship("User", foreign_keys=[donor_id])  # noqa: F821
     provenance_records: Mapped[list["ProvenanceRecord"]] = relationship(back_populates="donation")  # noqa: F821
-    certificate: Mapped["DonationCertificate"] = relationship(back_populates="donation", uselist=False, cascade="all, delete-orphan")  # noqa: F821
