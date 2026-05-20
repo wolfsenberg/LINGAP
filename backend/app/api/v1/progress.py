@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import AsyncSessionLocal, get_db
 from app.core.dependencies import get_current_user, require_aid_worker_or_admin
 from app.models.aid_request import AidRequest
 from app.models.proof_artifact import ProofArtifact
@@ -28,6 +28,20 @@ progress_router = APIRouter(
 )
 
 verify_router = APIRouter(prefix="/progress", tags=["progress"])
+
+
+async def _credibility_rescan_bg(beneficiary_id: uuid.UUID, reason: str) -> None:
+    from app.credibility.service import credibility_service
+
+    async with AsyncSessionLocal() as session:
+        try:
+            await credibility_service.rescan(session, beneficiary_id, reason=reason)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Background credibility rescan failed for %s", beneficiary_id
+            )
 
 
 def _to_read(
@@ -131,6 +145,7 @@ async def list_progress(
 async def verify_progress(
     progress_id: uuid.UUID,
     body: VerifyRequest,
+    background: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_aid_worker_or_admin),
 ):
@@ -151,4 +166,12 @@ async def verify_progress(
     db.add(confirmation)
     await db.commit()
     await db.refresh(confirmation)
+
+    parent = (
+        await db.execute(select(AidRequest).where(AidRequest.id == update.aid_request_id))
+    ).scalar_one_or_none()
+    if parent is not None:
+        background.add_task(
+            _credibility_rescan_bg, parent.beneficiary_id, "verifier_confirmed"
+        )
     return VerifierConfirmationRead.model_validate(confirmation)

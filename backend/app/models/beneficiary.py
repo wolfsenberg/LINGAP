@@ -1,9 +1,11 @@
 import uuid
-from sqlalchemy import String, Boolean, Enum, Numeric
+from datetime import datetime
+from sqlalchemy import String, Boolean, Enum, Numeric, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 from .mixins import TimestampMixin
 import enum
+from .credibility import CredibilityTier
 
 
 class BeneficiaryCategory(str, enum.Enum):
@@ -34,5 +36,12 @@ class Beneficiary(Base, TimestampMixin):
     verified: Mapped[bool] = mapped_column(Boolean, default=False)
     stellar_public_key: Mapped[str | None] = mapped_column(String(56))
     total_received: Mapped[float] = mapped_column(Numeric(18, 7), default=0)
+    cached_credibility_score: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    cached_credibility_tier: Mapped[CredibilityTier | None] = mapped_column(
+        Enum(CredibilityTier)
+    )
+    credibility_recomputed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     aid_requests: Mapped[list["AidRequest"]] = relationship(back_populates="beneficiary")  # noqa: F821

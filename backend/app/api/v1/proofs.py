@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import (
     APIRouter,
+    BackgroundTasks,
     Depends,
     File,
     Form,
@@ -17,7 +18,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import AsyncSessionLocal, get_db
 from app.core.dependencies import get_current_user, require_admin
 from app.models.aid_request import AidRequest, AidRequestStatus
 from app.models.proof_artifact import ProofArtifact, ProofKind
@@ -29,6 +30,20 @@ router = APIRouter(prefix="/aid-requests/{request_id}/proofs", tags=["proofs"])
 
 
 DELETE_GRACE_WINDOW = timedelta(hours=1)
+
+
+async def _credibility_rescan_bg(beneficiary_id: uuid.UUID, reason: str) -> None:
+    from app.credibility.service import credibility_service
+
+    async with AsyncSessionLocal() as session:
+        try:
+            await credibility_service.rescan(session, beneficiary_id, reason=reason)
+        except Exception:  # noqa: BLE001
+            import logging
+
+            logging.getLogger(__name__).exception(
+                "Background credibility rescan failed for %s", beneficiary_id
+            )
 
 
 def _to_read(p: ProofArtifact) -> ProofArtifactRead:
@@ -51,6 +66,7 @@ async def _get_aid_request(db: AsyncSession, request_id: uuid.UUID) -> AidReques
 @router.post("", status_code=201, response_model=ProofArtifactRead)
 async def upload_proof(
     request_id: uuid.UUID,
+    background: BackgroundTasks,
     file: UploadFile = File(...),
     kind: ProofKind = Form(ProofKind.receipt),
     claimed_amount: float | None = Form(None),
@@ -98,6 +114,7 @@ async def upload_proof(
     req.proof_count = (req.proof_count or 0) + 1
     await db.commit()
     await db.refresh(artifact)
+    background.add_task(_credibility_rescan_bg, req.beneficiary_id, "proof_uploaded")
 
     return _to_read(artifact)
 
