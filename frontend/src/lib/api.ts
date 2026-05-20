@@ -153,19 +153,5 @@ export const certificatesApi = {
     api.get<ApiResponse<{ download_url: string; filename: string }>>(`/api/v1/certificates/${id}/download`),
 };
 
-export const certificatesApi = {
-  get: (id: string) =>
-    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`),
-  getByDonation: (donationId: string) =>
-    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/donation/${donationId}`),
-  listByDonor: (donorId: string) =>
-    api.get<ApiResponse<DonationCertificate[]>>(`/api/v1/certificates/donor/${donorId}/all`),
-  updateVisibility: (id: string, isPublic: boolean) =>
-    api.patch<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`, {
-      is_public: isPublic,
-    }),
-  getDownloadUrl: (id: string) =>
-    api.get<ApiResponse<{ download_url: string; filename: string }>>(`/api/v1/certificates/${id}/download`),
-};
 
 export default api;
