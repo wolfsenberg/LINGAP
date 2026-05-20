@@ -89,8 +89,9 @@ class LLMEngine:
     name = "llm"
 
     async def assess(self, features: RiskFeatures) -> RiskResult:
-        if not settings.OPENAI_API_KEY:
-            log.info("OPENAI_API_KEY empty; falling back to rules engine")
+        api_key = settings.effective_api_key
+        if not api_key:
+            log.info("LLM API key empty; falling back to rules engine")
             return await rules_engine.assess(features)
 
         try:
@@ -99,12 +100,14 @@ class LLMEngine:
             log.warning("openai package not installed; falling back to rules engine")
             return await rules_engine.assess(features)
 
-        client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+        base_url = settings.effective_base_url or None
+        model = settings.effective_model
+        client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         payload = _features_payload(features)
 
         try:
             completion = await client.chat.completions.create(
-                model=settings.OPENAI_MODEL,
+                model=model,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {
@@ -173,7 +176,7 @@ class LLMEngine:
             level=level,
             flags=flags,
             reasoning=reasoning or rules_result.reasoning,
-            model_version=f"openai:{settings.OPENAI_MODEL}",
+            model_version=f"{settings.LLM_PROVIDER}:{model}",
         )
 
 

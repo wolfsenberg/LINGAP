@@ -4,10 +4,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.core.database import init_db
 from app.api.v1.router import api_router
+from app.streaks.listener import register as register_streak_listeners
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    register_streak_listeners()
     await init_db()
     yield
 

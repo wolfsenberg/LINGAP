@@ -33,14 +33,6 @@ First build takes 3-5 minutes.
 
 ---
 
-### Step 3 - Open in browser
-
-Frontend:  http://localhost:3000
-Backend:   http://localhost:8000
-API Docs:  http://localhost:8000/docs
-
----
-
 ## Common Errors
 
 Port already in use:
