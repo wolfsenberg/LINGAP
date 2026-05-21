@@ -38,6 +38,7 @@ type Certificate = {
   theme: "medical" | "relief" | "education" | "community";
 };
 
+
 const themeAccent = {
   medical: "var(--canopy)",
   relief: "var(--amber)",

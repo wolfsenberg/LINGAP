@@ -77,6 +77,17 @@ async def list_aid_requests(
     return {"items": enriched, "total": total, "page": page, "size": size, "pages": -(-total // size)}
 
 
+@router.get("/{request_id}")
+async def get_aid_request(
+    request_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    req = (await db.execute(select(AidRequest).where(AidRequest.id == request_id))).scalar_one_or_none()
+    if not req:
+        raise HTTPException(404, "Aid request not found")
+    b = (await db.execute(select(Beneficiary).where(Beneficiary.id == req.beneficiary_id))).scalar_one_or_none()
+    return _enrich(req, b.name if b else "Unknown")
+
 @router.post("", status_code=201)
 async def create_aid_request(
     body: AidRequestCreate,
