@@ -2,6 +2,7 @@ import {
   Bot, CheckCircle2, AlertTriangle, XCircle, Receipt, Pill, Camera,
   Stethoscope, Ticket, FileWarning, Clock, ShieldCheck
 } from "lucide-react";
+import { CAMPAIGNS } from "@/lib/campaigns";
 
 export default function ProofPage() {
   return (
@@ -27,7 +28,7 @@ export default function ProofPage() {
               <div className="flex flex-center flex-between mb-4">
                 <div className="flex flex-center gap-8">
                   <span className="badge badge-emerald" style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><CheckCircle2 size={10}/> LOW RISK</span>
-                  <span style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>Maria Santos — Cancer Treatment</span>
+                  <span style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>{CAMPAIGNS[0].shortTitle}</span>
                 </div>
                 <span style={{fontSize:12,color:'var(--text3)'}}>2 min ago</span>
               </div>
@@ -73,7 +74,7 @@ export default function ProofPage() {
             {Icon:Pill,bg:'linear-gradient(135deg,rgba(200,134,10,.1),rgba(160,113,74,.1))',badge:{cls:'badge-emerald',text:'Verified'},title:'Pharmacy Invoice — Chemotherapy Drugs',sub:'Nov 26, 2025 • Mercury Drug España Branch',leftBadge:{cls:'badge-navy',text:'₱12,400.00'},rightBadge:{cls:'badge-emerald',text:'AI Verified'}},
             {Icon:Camera,bg:'linear-gradient(135deg,rgba(139,92,246,.1),rgba(109,40,217,.1))',badge:{cls:'badge-emerald',text:'Verified'},title:'Progress Photo — Patient Hospital Room',sub:'Nov 27, 2025 • PGH Ward 4, Bed 12',leftBadge:{cls:'badge-blue',text:'Photo'},rightBadge:{cls:'badge-emerald',text:'Community Confirmed'}},
             {Icon:Stethoscope,bg:'linear-gradient(135deg,rgba(74,155,106,.1),rgba(61,122,82,.1))',badge:{cls:'badge-emerald',text:'Verified'},title:'Medical Certificate — Oncologist Dr. Reyes',sub:'Nov 15, 2025 • PGH Oncology Dept.',leftBadge:{cls:'badge-navy',text:'Official Doc'},rightBadge:{cls:'badge-emerald',text:'Immutable'}},
-            {Icon:Ticket,bg:'linear-gradient(135deg,rgba(61,122,82,.1),rgba(45,90,61,.1))',badge:{cls:'badge-blue',text:'Under Review'},title:'PUP Enrollment Receipt — Juan dela Cruz',sub:'Nov 28, 2025 • PUP Manila Registrar',leftBadge:{cls:'badge-navy',text:'₱8,500.00'},rightBadge:{cls:'badge-gold',text:'Pending'}},
+            {Icon:Ticket,bg:'linear-gradient(135deg,rgba(61,122,82,.1),rgba(45,90,61,.1))',badge:{cls:'badge-blue',text:'Under Review'},title:`${CAMPAIGNS[2].institution} Enrollment Receipt — ${CAMPAIGNS[2].shortTitle}`,sub:'Nov 28, 2025 • PUP Manila Registrar',leftBadge:{cls:'badge-navy',text:'₱8,500.00'},rightBadge:{cls:'badge-gold',text:'Pending'}},
             {Icon:FileWarning,bg:'linear-gradient(135deg,rgba(220,38,38,.08),rgba(185,28,28,.08))',badge:{cls:'badge-red',text:'Flagged'},title:'Invoice — Amount Discrepancy Detected',sub:'Nov 29, 2025 • Reyes Rehab Center',leftBadge:{cls:'badge-red',text:'High Risk'},rightBadge:{cls:'badge-red',text:'Manual Review'}},
           ].map((p)=>(
             <div key={p.title} className="proof-card">

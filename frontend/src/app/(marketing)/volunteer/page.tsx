@@ -32,7 +32,7 @@ const SAMPLE_OPPORTUNITIES: VolunteerOpportunity[] = [
   {
     id: "sample-1",
     organizer_name: "LINGAP Team",
-    campaign_name: "Maria Santos Cancer Fund",
+    campaign_name: CAMPAIGNS[0].shortTitle,
     title: "Medical Volunteer — Chemo Companion",
     description: "Accompany cancer patients to their chemotherapy sessions at PGH. Provide emotional support and help coordinate logistics. No medical license required — just a kind heart.",
     category: "medical",
@@ -50,7 +50,7 @@ const SAMPLE_OPPORTUNITIES: VolunteerOpportunity[] = [
   {
     id: "sample-2",
     organizer_name: "LINGAP Team",
-    campaign_name: "Typhoon Carina Relief",
+    campaign_name: CAMPAIGNS[1].shortTitle,
     title: "Disaster Relief Logistics Coordinator",
     description: "Help organize and distribute relief goods to affected families in Batangas. Coordinate with LGUs and volunteer groups.",
     category: "logistics",
@@ -68,7 +68,7 @@ const SAMPLE_OPPORTUNITIES: VolunteerOpportunity[] = [
   {
     id: "sample-3",
     organizer_name: "LINGAP Team",
-    campaign_name: "Juan dela Cruz Scholarship",
+    campaign_name: CAMPAIGNS[2].shortTitle,
     title: "Tutoring Volunteer — Math & Science",
     description: "Provide weekly tutoring sessions for scholar students preparing for entrance exams. Online or in-person in QC.",
     category: "teaching",
