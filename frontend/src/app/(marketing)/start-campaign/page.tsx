@@ -55,6 +55,15 @@ export default function StartCampaignPage() {
                   <span className="small semi muted">Short story</span>
                   <textarea required placeholder="Tell donors who needs help, why it matters, and what proof you can provide." className="form-input" rows={5}/>
                 </label>
+                <div style={{display:'grid',gap:6}}>
+                  <span className="small semi muted">Campaign Photos</span>
+                  <div style={{padding:20,border:'1px dashed var(--border)',borderRadius:'var(--r-sm)',background:'rgba(255,255,255,.5)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',position:'relative',transition:'all .2s'}} className="hover-border-canopy">
+                    <input type="file" multiple accept="image/png, image/jpeg" style={{opacity:0,position:'absolute',top:0,left:0,width:'100%',height:'100%',cursor:'pointer'}} />
+                    <Upload size={22} color="var(--canopy)" strokeWidth={1.8}/>
+                    <div style={{fontSize:13,fontWeight:700,color:'var(--forest)',marginTop:8}}>Add cover & gallery photos</div>
+                    <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>Show donors who they are helping (PNG/JPG, max 4 photos)</div>
+                  </div>
+                </div>
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                   <label style={{display:'grid',gap:6}}>
                     <span className="small semi muted">Category</span>
