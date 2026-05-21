@@ -1,3 +1,4 @@
+from .verification import Verification
 from .user import User, UserRole
 from .beneficiary import Beneficiary, BeneficiaryCategory, NeedLevel
 from .donation import Donation
