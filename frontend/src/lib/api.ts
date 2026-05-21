@@ -240,4 +240,15 @@ export const volunteerApi = {
   mySignups: () => api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/me/signups"),
 };
 
+export const certificatesApi = {
+  listByDonor: (donorId: string) =>
+    api.get<ApiResponse<any[]>>(`/api/v1/certificates`, { params: { donor_id: donorId } }),
+  get: (id: string) => api.get<ApiResponse<any>>(`/api/v1/certificates/${id}`),
+};
+
+export const paymongoApi = {
+  checkout: (amount: number, description: string) =>
+    api.post<ApiResponse<{ checkout_url: string }>>("/api/v1/fiat/checkout", { amount, description }),
+};
+
 export default api;
