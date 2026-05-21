@@ -1,24 +1,29 @@
 import Link from "next/link";
 import { Hospital, Anchor, BookOpen, Handshake, MapPin, Star, Sparkles, CheckCircle2, Search, Users } from "lucide-react";
+import { CAMPAIGNS } from "@/lib/campaigns";
 
-const CAMPAIGN_ICONS: Record<string, React.ElementType> = {
-  hospital: Hospital,
-  anchor: Anchor,
-  book: BookOpen,
-  handshake: Handshake,
-  heart: Hospital,
-  leaf: Anchor,
+const CATEGORY_ICON: Record<string, React.ElementType> = {
+  Medical: Hospital,
+  "Disaster Relief": Anchor,
+  Education: BookOpen,
 };
 
 export default function DiscoverPage() {
-  const campaigns = [
-    {href:'/detail',bg:'linear-gradient(135deg,#1a3a2a,#2d5a3d)',Icon:Hospital,urgency:{cls:'badge-red',text:'Urgent'},title:'Maria Santos — Stage 3 Cancer Treatment at PGH',desc:'37-year-old mother of three from Quezon City. Undergoing chemotherapy. Needs funds for continued treatment.',raised:'₱182,400',goal:'₱250,000',donors:342,pct:73,badge:'PGH Accredited',daysLeft:'12d left',color:'var(--canopy)'},
-    {href:'/detail',bg:'linear-gradient(135deg,#1a3a2a,#3d7a52)',Icon:Anchor,urgency:{cls:'badge-orange',text:'Emergency'},title:'Typhoon Carina — 400 Families in Batangas Need Help',desc:'Immediate food packs, temporary shelter, and medicine for coastal communities devastated by Typhoon Carina.',raised:'₱890,000',goal:'₱1,200,000',donors:1203,pct:74,badge:'DSWD Partner',daysLeft:'5d left',color:'var(--canopy)'},
-    {href:'/detail',bg:'linear-gradient(135deg,#3d2a10,#6b4a20)',Icon:BookOpen,urgency:null,title:'Juan dela Cruz — PUP Engineering Scholar from Samar',desc:'Top-performing student from Eastern Samar. Qualified for PUP Manila Engineering. Needs tuition and living allowance.',raised:'₱48,000',goal:'₱65,000',donors:87,pct:74,badge:'PUP Verified',daysLeft:'18d left',color:'var(--amber)'},
-    {href:'/detail',bg:'linear-gradient(135deg,#2a1a3a,#4a2d6b)',Icon:Handshake,urgency:{cls:'badge-blue',text:'Near You'},title:'Barangay Payatas Community Kitchen Rebuilding',desc:'Help rebuild the community kitchen that serves 200+ meals daily to malnourished children and elderly in Payatas.',raised:'₱34,500',goal:'₱80,000',donors:156,pct:43,badge:'2.3km away',daysLeft:'30d left',color:'var(--forest-light)'},
-    {href:'/detail',bg:'linear-gradient(135deg,#3a1a1a,#6b2020)',Icon:Hospital,urgency:{cls:'badge-red',text:'Critical'},title:'Baby Lila — Congenital Heart Defect Surgery Fund',desc:'8-month-old baby in Cebu diagnosed with VSD. Surgery scheduled at Vicente Sotto Memorial Medical Center.',raised:'₱285,000',goal:'₱400,000',donors:891,pct:71,badge:'VSMMC Verified',daysLeft:'8d left',color:'var(--canopy)'},
-    {href:'/detail',bg:'linear-gradient(135deg,#1a3a2a,#2d6b4a)',Icon:Anchor,urgency:null,title:'Mangrove Reforestation — Tacloban Coastal Restoration',desc:'Plant 10,000 mangrove trees to protect Tacloban communities from future storm surge. Partnership with DENR.',raised:'₱120,000',goal:'₱200,000',donors:312,pct:60,badge:'DENR Accredited',daysLeft:'45d left',color:'var(--canopy)'},
-  ];
+  const campaigns = CAMPAIGNS.map((c) => ({
+    href: `/detail?id=${c.id}`,
+    bg: c.heroGradient,
+    Icon: CATEGORY_ICON[c.category] ?? Hospital,
+    urgency: c.urgencyLabel ? { cls: c.urgencyClass!, text: c.urgencyLabel } : null,
+    title: c.title,
+    desc: c.description,
+    raised: c.raisedLabel,
+    goal: c.goalLabel,
+    donors: c.donors,
+    pct: c.pct,
+    badge: c.institutionDesc,
+    daysLeft: `${c.daysLeft}d left`,
+    color: c.accentColor,
+  }));
 
   const filters = [
     {label:'All Campaigns',Icon:null},

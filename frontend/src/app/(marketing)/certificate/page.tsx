@@ -36,13 +36,15 @@ type Certificate = {
   theme: "medical" | "relief" | "education" | "community";
 };
 
+import { CAMPAIGNS } from "@/lib/campaigns";
+
 const certificates: Certificate[] = [
   {
     id: "LNGP-CERT-0847",
     donor: "Jose Dela Cruz",
     amount: "₱5,000.00",
-    campaign: "Maria Santos — Stage 3 Cancer Treatment",
-    institution: "Philippine General Hospital",
+    campaign: CAMPAIGNS[0].title,
+    institution: CAMPAIGNS[0].institution,
     milestone: "Chemotherapy Cycle 3 — Completed",
     date: "November 28, 2025",
     timestamp: "Nov 28, 2025 14:32 PHT",
@@ -54,8 +56,8 @@ const certificates: Certificate[] = [
     id: "LNGP-CERT-0712",
     donor: "Jose Dela Cruz",
     amount: "₱2,500.00",
-    campaign: "Typhoon Carina Relief — Batangas Coastal Communities",
-    institution: "DSWD Batangas Relief Partner",
+    campaign: CAMPAIGNS[1].title,
+    institution: CAMPAIGNS[1].institution,
     milestone: "Emergency food packs released",
     date: "November 14, 2025",
     timestamp: "Nov 14, 2025 10:08 PHT",
@@ -67,8 +69,8 @@ const certificates: Certificate[] = [
     id: "LNGP-CERT-0635",
     donor: "Jose Dela Cruz",
     amount: "₱3,000.00",
-    campaign: "Juan dela Cruz — PUP Engineering Scholar from Samar",
-    institution: "Polytechnic University of the Philippines",
+    campaign: CAMPAIGNS[2].title,
+    institution: CAMPAIGNS[2].institution,
     milestone: "Tuition escrow funded",
     date: "November 5, 2025",
     timestamp: "Nov 5, 2025 16:41 PHT",

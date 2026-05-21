@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { volunteerApi, type VolunteerOpportunity } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
+import { CAMPAIGNS } from "@/lib/campaigns";
 import toast from "react-hot-toast";
 
 const CATEGORIES = [
@@ -32,12 +33,12 @@ const SAMPLE_OPPORTUNITIES: VolunteerOpportunity[] = [
   {
     id: "sample-1",
     organizer_name: "LINGAP Team",
-    campaign_name: "Maria Santos Cancer Fund",
+    campaign_name: CAMPAIGNS[0].shortTitle,
     title: "Medical Volunteer — Chemo Companion",
-    description: "Accompany cancer patients to their chemotherapy sessions at PGH. Provide emotional support and help coordinate logistics. No medical license required — just a kind heart.",
+    description: `Accompany cancer patients to their chemotherapy sessions at ${CAMPAIGNS[0].institution}. Provide emotional support and help coordinate logistics. No medical license required — just a kind heart.`,
     category: "medical",
     skills_needed: ["Empathy", "Patient Care", "Communication"],
-    location: "Philippine General Hospital, Manila",
+    location: `${CAMPAIGNS[0].institution}, ${CAMPAIGNS[0].location}`,
     schedule: "Weekdays · 8AM–2PM · Flexible",
     slots: 10,
     slots_filled: 4,
@@ -50,12 +51,12 @@ const SAMPLE_OPPORTUNITIES: VolunteerOpportunity[] = [
   {
     id: "sample-2",
     organizer_name: "LINGAP Team",
-    campaign_name: "Typhoon Carina Relief",
+    campaign_name: CAMPAIGNS[1].shortTitle,
     title: "Disaster Relief Logistics Coordinator",
-    description: "Help organize and distribute relief goods to affected families in Batangas. Coordinate with LGUs and volunteer groups.",
+    description: `Help organize and distribute relief goods to affected families in ${CAMPAIGNS[1].location}. Coordinate with LGUs and volunteer groups.`,
     category: "logistics",
     skills_needed: ["Project Management", "Driving", "Communication"],
-    location: "Batangas City, Batangas",
+    location: CAMPAIGNS[1].location,
     schedule: "Dec 7–10, 2025 · Full Day",
     slots: 15,
     slots_filled: 9,
@@ -68,7 +69,7 @@ const SAMPLE_OPPORTUNITIES: VolunteerOpportunity[] = [
   {
     id: "sample-3",
     organizer_name: "LINGAP Team",
-    campaign_name: "Juan dela Cruz Scholarship",
+    campaign_name: CAMPAIGNS[2].shortTitle,
     title: "Tutoring Volunteer — Math & Science",
     description: "Provide weekly tutoring sessions for scholar students preparing for entrance exams. Online or in-person in QC.",
     category: "teaching",

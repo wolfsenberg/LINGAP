@@ -1,6 +1,7 @@
 import {
   AlertCircle, CheckCircle2, AlertTriangle, ShieldCheck, Search, Link2, XCircle
 } from "lucide-react";
+import { CAMPAIGNS } from "@/lib/campaigns";
 
 export default function AdminPage() {
   return (
@@ -107,7 +108,7 @@ export default function AdminPage() {
                   <span className="badge badge-emerald" style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><CheckCircle2 size={10}/> LOW</span>
                   <span style={{fontSize:11,color:'var(--text3)'}}>2 hrs ago</span>
                 </div>
-                <div style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>All Clear — Maria Santos Campaign</div>
+                <div style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>All Clear — {CAMPAIGNS[0].shortTitle}</div>
                 <div style={{fontSize:12,color:'var(--text2)'}}>Documents verified. Spending pattern normal. Milestone 2 in progress.</div>
               </div>
             </div>
@@ -135,7 +136,7 @@ export default function AdminPage() {
               </thead>
               <tbody>
                 {[
-                  {time:'2025-11-28 14:32',id:'LNGP-0847',event:'Milestone Release — ₱75,000 to PGH',ref:'0x4a8f...3c2b',badge:'badge-emerald',Icon:CheckCircle2,status:'Confirmed'},
+                  {time:'2025-11-28 14:32',id:'LNGP-0847',event:`Milestone Release — ₱75,000 to ${CAMPAIGNS[0].institution}`,ref:'0x4a8f...3c2b',badge:'badge-emerald',Icon:CheckCircle2,status:'Confirmed'},
                   {time:'2025-11-28 12:01',id:'LNGP-0891',event:'Campaign Paused — Duplicate Detected',ref:'0x7d2e...9a1f',badge:'badge-red',Icon:XCircle,status:'Blocked'},
                   {time:'2025-11-27 18:44',id:'LNGP-0234',event:'Document Verified — Medical Certificate',ref:'0x2f9c...8e4a',badge:'badge-emerald',Icon:CheckCircle2,status:'Confirmed'},
                   {time:'2025-11-26 09:15',id:'LNGP-0612',event:'Milestone Flag — Invoice Mismatch',ref:'0x8c1a...4f9e',badge:'badge-gold',Icon:AlertTriangle,status:'Review'},
