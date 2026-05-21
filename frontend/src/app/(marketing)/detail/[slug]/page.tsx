@@ -85,7 +85,7 @@ export default function DetailPage() {
     }
   }, [campaign, slug]);
 
-  const activeCampaign: any = campaign || dbCampaign;
+  const activeCampaign = campaign || dbCampaign;
 
   if (loading) return <div style={{ padding: 100, textAlign: "center", color: "var(--forest)", fontWeight: 600 }}>Loading campaign details...</div>;
   if (!activeCampaign || error) return notFound();
@@ -112,7 +112,7 @@ export default function DetailPage() {
     }
     setDonating(true);
     try {
-      const xdrRes = await escrowApi.getDepositXdr(activeCampaign.id as any, publicKey, effectiveAmount);
+      const xdrRes = await escrowApi.getDepositXdr(campaign.id, publicKey, effectiveAmount);
       const unsignedXdr = xdrRes.data.data.xdr;
       const { signTransaction } = await import("@stellar/freighter-api");
       const signResult = await signTransaction(unsignedXdr, {
@@ -136,37 +136,37 @@ export default function DetailPage() {
         {/* LEFT */}
         <div>
           {/* Hero image */}
-          <div className="detail-img" style={{ background: activeCampaign.heroGradient }}>
+          <div className="detail-img" style={{ background: campaign.heroGradient }}>
             <Icon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />
           </div>
 
           {/* Badges */}
           <div className="flex gap-8 mb-16" style={{ flexWrap: "wrap" }}>
-            {activeCampaign.urgencyLabel && (
-              <span className={`badge ${activeCampaign.urgencyClass}`}>
-                <AlertCircle size={11} /> {activeCampaign.urgencyLabel}
+            {campaign.urgencyLabel && (
+              <span className={`badge ${campaign.urgencyClass}`}>
+                <AlertCircle size={11} /> {campaign.urgencyLabel}
               </span>
             )}
             <span className="badge badge-emerald"><CheckCircle2 size={11} /> Blockchain Verified</span>
             <span className="badge badge-navy"><Banknote size={11} /> Institution Bound</span>
-            <span className="badge badge-gold"><Star size={11} /> Credibility: {activeCampaign.credibility}/10</span>
+            <span className="badge badge-gold"><Star size={11} /> Credibility: {campaign.credibility}/10</span>
           </div>
 
           {/* Title */}
           <h1 style={{ fontSize: 32, fontWeight: 800, color: "var(--forest)", marginBottom: 12, lineHeight: 1.2 }}>
-            {activeCampaign.title}
+            {campaign.title}
           </h1>
 
           {/* Meta */}
           <div className="flex flex-center gap-16 mb-24" style={{ color: "var(--text2)", fontSize: 14, flexWrap: "wrap" }}>
             <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <Handshake size={14} /> Organized by: {activeCampaign.organizer}
+              <Handshake size={14} /> Organized by: {campaign.organizer}
             </span>
             <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <MapPin size={14} /> {activeCampaign.location}
+              <MapPin size={14} /> {campaign.location}
             </span>
             <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-              <Calendar size={14} /> Started: {activeCampaign.startDate}
+              <Calendar size={14} /> Started: {campaign.startDate}
             </span>
           </div>
 
@@ -175,8 +175,8 @@ export default function DetailPage() {
             <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--forest)", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
               <ShieldCheck size={20} color="var(--canopy)" strokeWidth={1.8} /> The Story
             </h3>
-            {activeCampaign.story.map((para: string, i: number) => (
-              <p key={i} style={{ color: "var(--text2)", lineHeight: 1.75, marginBottom: i < activeCampaign.story.length - 1 ? 14 : 0 }}>
+            {campaign.story.map((para, i) => (
+              <p key={i} style={{ color: "var(--text2)", lineHeight: 1.75, marginBottom: i < campaign.story.length - 1 ? 14 : 0 }}>
                 {para}
               </p>
             ))}
@@ -187,7 +187,7 @@ export default function DetailPage() {
             <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--forest)", marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
               <Target size={18} color="var(--canopy)" strokeWidth={1.8} /> Where Your Donation Goes
             </h3>
-            {activeCampaign.spending.map((s: any) => (
+            {campaign.spending.map((s) => (
               <div key={s.label} className="spend-bar">
                 <div className="spend-label">{s.label}</div>
                 <div className="spend-track">
@@ -200,7 +200,7 @@ export default function DetailPage() {
               <div className="flex gap-10 flex-center">
                 <ShieldCheck size={18} color="var(--forest-light)" strokeWidth={1.8} style={{ flexShrink: 0 }} />
                 <p className="disclaimer-text">
-                  <strong>LINGAP&apos;s Promise:</strong> Funds never enter organizer wallets. All donations are released directly to {activeCampaign.institution} through Soroban smart contracts.
+                  <strong>LINGAP&apos;s Promise:</strong> Funds never enter organizer wallets. All donations are released directly to {campaign.institution} through Soroban smart contracts.
                 </p>
               </div>
             </div>
@@ -212,7 +212,7 @@ export default function DetailPage() {
               <Target size={18} color="var(--canopy)" strokeWidth={1.8} /> Milestone Progress
             </h3>
             <div className="milestone-timeline">
-              {activeCampaign.milestones.map((m: any) => (
+              {campaign.milestones.map((m) => (
                 <div key={m.title} className="ml-item">
                   <div className={`ml-dot ${m.dot}`} />
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -234,24 +234,24 @@ export default function DetailPage() {
             <div className="flex flex-center flex-between mb-16">
               <div>
                 <div style={{ fontFamily: "Sora,sans-serif", fontSize: 28, fontWeight: 800, color: "var(--forest)" }}>
-                  {activeCampaign.raisedLabel}
+                  {campaign.raisedLabel}
                 </div>
-                <div style={{ fontSize: 13, color: "var(--text3)" }}>raised of {activeCampaign.goalLabel} goal</div>
+                <div style={{ fontSize: 13, color: "var(--text3)" }}>raised of {campaign.goalLabel} goal</div>
               </div>
               <div className="text-right">
-                <div style={{ fontSize: 22, fontWeight: 700, color: accentHex }}>{activeCampaign.pct}%</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: accentHex }}>{campaign.pct}%</div>
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>funded</div>
               </div>
             </div>
             <div className={`prog-track mb-8`} style={{ height: 12 }}>
-              <div className={`prog-fill ${progressColor}`} style={{ width: `${activeCampaign.pct}%` }} />
+              <div className={`prog-fill ${progressColor}`} style={{ width: `${campaign.pct}%` }} />
             </div>
             <div className="flex flex-center flex-between mb-24" style={{ fontSize: 13, color: "var(--text3)" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <Users size={13} /> {activeCampaign.donors.toLocaleString()} donors
+                <Users size={13} /> {campaign.donors.toLocaleString()} donors
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <Clock size={13} /> {activeCampaign.daysLeft} days left
+                <Clock size={13} /> {campaign.daysLeft} days left
               </span>
             </div>
 
@@ -324,7 +324,7 @@ export default function DetailPage() {
               {[
                 { Icon: CheckCircle2, text: "Blockchain Verified Transaction" },
                 { Icon: Lock, text: "Protected by Soroban Escrow" },
-                { Icon: ShieldCheck, text: `AI Risk Assessment: ${activeCampaign.credibility >= 9 ? "Low" : "Medium"} Risk` },
+                { Icon: ShieldCheck, text: `AI Risk Assessment: ${campaign.credibility >= 9 ? "Low" : "Medium"} Risk` },
                 { Icon: Banknote, text: "Institution-Bound Release" },
               ].map(({ Icon: I, text }) => (
                 <div key={text} className="flex flex-center gap-8" style={{ marginBottom: 6 }}>
@@ -338,10 +338,10 @@ export default function DetailPage() {
             <div style={{ marginTop: 16, padding: 14, background: "var(--bg2)", borderRadius: 10 }}>
               <div className="flex flex-center flex-between mb-8">
                 <span style={{ fontSize: 12, fontWeight: 600, color: "var(--text2)" }}>Transparency Score</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: accentHex }}>{activeCampaign.transparencyScore}/100</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: accentHex }}>{campaign.transparencyScore}/100</span>
               </div>
               <div className="transparency-meter">
-                <div className="tm-fill" style={{ width: `${activeCampaign.transparencyScore}%` }} />
+                <div className="tm-fill" style={{ width: `${campaign.transparencyScore}%` }} />
               </div>
             </div>
           </div>
@@ -350,15 +350,15 @@ export default function DetailPage() {
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 20, marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 12 }}>INSTITUTION RECEIVING FUNDS</div>
             <div className="flex gap-14 flex-center">
-              <div style={{ width: 48, height: 48, background: activeCampaign.heroGradient, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div style={{ width: 48, height: 48, background: campaign.heroGradient, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 <Icon size={22} color="rgba(255,255,255,.8)" strokeWidth={1.5} />
               </div>
               <div>
-                <div style={{ fontWeight: 700, color: "var(--forest)", fontSize: 15 }}>{activeCampaign.institution}</div>
-                <div style={{ fontSize: 12, color: "var(--text3)" }}>{activeCampaign.institutionBadge}</div>
+                <div style={{ fontWeight: 700, color: "var(--forest)", fontSize: 15 }}>{campaign.institution}</div>
+                <div style={{ fontSize: 12, color: "var(--text3)" }}>{campaign.institutionBadge}</div>
                 <div className="mt-8">
                   <span className="badge badge-emerald" style={{ fontSize: 11 }}>
-                    <CheckCircle2 size={10} /> {activeCampaign.institutionDesc}
+                    <CheckCircle2 size={10} /> {campaign.institutionDesc}
                   </span>
                 </div>
               </div>
@@ -381,7 +381,7 @@ export default function DetailPage() {
             </div>
           </div>
 
-          <VotingPanel campaignId={activeCampaign.id} campaignName={activeCampaign.title} />
+          <VotingPanel campaignId={campaign.id} campaignName={campaign.title} />
         </div>
       </div>
     </div>
