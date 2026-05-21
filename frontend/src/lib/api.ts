@@ -6,7 +6,6 @@ import type {
   AidRequest,
   ProvenanceRecord,
   DashboardStats,
-  DonationCertificate,
   ApiResponse,
   PaginatedResponse,
 } from "@/types";
@@ -138,6 +137,7 @@ export const escrowApi = {
     api.post<ApiResponse<{ tx_hash: string }>>(`/api/v1/stellar/escrow/clawback/${campaignId}`),
 };
 
+<<<<<<< HEAD
 export const certificatesApi = {
   get: (id: string) =>
     api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`),
@@ -154,4 +154,6 @@ export const certificatesApi = {
 };
 
 
+=======
+>>>>>>> 5c2540a1daf08152b08f5c2cce1a5e1da7b3d675
 export default api;

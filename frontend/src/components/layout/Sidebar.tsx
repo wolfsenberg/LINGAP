@@ -27,13 +27,13 @@ export default function Sidebar() {
   const { user, clearAuth } = useAuthStore();
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
+    <aside className="flex h-screen w-64 flex-col border-r bg-white" style={{borderColor:'var(--border)',background:'var(--surface)'}}>
       {/* Logo */}
-      <div className="flex items-center gap-2 border-b border-gray-200 px-6 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-600">
-          <Shield className="h-5 w-5 text-white" />
+      <div className="flex items-center gap-2 px-6 py-5" style={{borderBottom:'1px solid var(--border)'}}>
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{background:'var(--forest)'}}>
+          <Shield className="h-5 w-5" style={{color:'var(--canopy-light)'}} />
         </div>
-        <span className="text-lg font-bold text-brand-700">LINGAP</span>
+        <span className="text-lg font-bold" style={{color:'var(--forest)',fontFamily:'Sora,sans-serif'}}>LINGAP</span>
       </div>
 
       {/* Nav */}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { escrowApi } from "@/lib/api";
 import { useFreighter } from "@/hooks/useFreighter";
+import { Vote, ShieldAlert } from "lucide-react";
 
 const NETWORK_PASSPHRASE =
   process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet"
@@ -99,7 +100,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
   return (
     <div
       style={{
-        background: "#fff",
+        background: "var(--surface)",
         border: "1px solid var(--border)",
         borderRadius: "var(--r)",
         padding: 24,
@@ -107,9 +108,11 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
     >
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <span style={{ fontSize: 22 }}>🗳️</span>
+        <div style={{ width: 36, height: 36, background: "rgba(74,155,106,.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <Vote size={18} color="var(--canopy)" strokeWidth={1.8} />
+        </div>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--navy)" }}>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--forest)" }}>
             Donor Voting
           </div>
           {campaignName && (
@@ -119,16 +122,19 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
         <span
           style={{
             marginLeft: "auto",
-            background: "rgba(239,68,68,.1)",
-            color: "#EF4444",
-            border: "1px solid rgba(239,68,68,.3)",
+            background: "rgba(220,38,38,.1)",
+            color: "#DC2626",
+            border: "1px solid rgba(220,38,38,.25)",
             borderRadius: 20,
             padding: "3px 10px",
             fontSize: 11,
             fontWeight: 600,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
           }}
         >
-          Clawback Protection
+          <ShieldAlert size={10} /> Clawback Protection
         </span>
       </div>
 
@@ -144,15 +150,15 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
           Loading vote status…
         </div>
       ) : vote.error ? (
-        <div style={{ color: "#EF4444", fontSize: 13, marginBottom: 16 }}>{vote.error}</div>
+        <div style={{ color: "#DC2626", fontSize: 13, marginBottom: 16 }}>{vote.error}</div>
       ) : (
         <div
           style={{
-            background: "var(--bg)",
+            background: "var(--bg2)",
             borderRadius: 10,
             padding: "12px 16px",
             marginBottom: 20,
-            border: "1px solid var(--border2)",
+            border: "1px solid var(--border)",
           }}
         >
           <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>
@@ -164,11 +170,11 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
                 width: 10,
                 height: 10,
                 borderRadius: "50%",
-                background: hasVoted ? "#EF4444" : "var(--text3)",
+                background: hasVoted ? "#DC2626" : "var(--text3)",
                 display: "inline-block",
               }}
             />
-            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--navy)" }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--forest)" }}>
               {vote.hasVoted === null
                 ? "Connect wallet to check"
                 : hasVoted
@@ -182,8 +188,8 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
       {/* Threshold info */}
       <div
         style={{
-          background: "rgba(239,68,68,.05)",
-          border: "1px dashed rgba(239,68,68,.25)",
+          background: "rgba(220,38,38,.05)",
+          border: "1px dashed rgba(220,38,38,.25)",
           borderRadius: 8,
           padding: "10px 14px",
           marginBottom: 20,
@@ -191,7 +197,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
           color: "var(--text2)",
         }}
       >
-        <strong style={{ color: "#EF4444" }}>{PAUSE_THRESHOLD_PCT}% quorum</strong> of deposited
+        <strong style={{ color: "#DC2626" }}>{PAUSE_THRESHOLD_PCT}% quorum</strong> of deposited
         XLM weight required to trigger an auto-pause and unlock clawback.
       </div>
 
@@ -202,7 +208,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
           style={{
             width: "100%",
             padding: "10px 0",
-            background: "var(--navy)",
+            background: "var(--forest)",
             color: "#fff",
             border: "none",
             borderRadius: 8,
@@ -221,7 +227,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
               disabled={txLoading}
               style={{
                 padding: "10px 0",
-                background: txLoading ? "var(--text3)" : "#EF4444",
+                background: txLoading ? "var(--text3)" : "#DC2626",
                 color: "#fff",
                 border: "none",
                 borderRadius: 8,
@@ -240,8 +246,8 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
               style={{
                 padding: "10px 0",
                 background: txLoading ? "var(--text3)" : "transparent",
-                color: txLoading ? "#fff" : "#EF4444",
-                border: "1px solid #EF4444",
+                color: txLoading ? "#fff" : "#DC2626",
+                border: "1px solid #DC2626",
                 borderRadius: 8,
                 fontWeight: 600,
                 fontSize: 14,
@@ -259,9 +265,9 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
             disabled={clawbackLoading}
             style={{
               padding: "10px 0",
-              background: clawbackLoading ? "var(--text3)" : "rgba(239,68,68,.1)",
-              color: clawbackLoading ? "#fff" : "#EF4444",
-              border: "1px solid rgba(239,68,68,.3)",
+              background: clawbackLoading ? "var(--text3)" : "rgba(220,38,38,.1)",
+              color: clawbackLoading ? "#fff" : "#DC2626",
+              border: "1px solid rgba(220,38,38,.25)",
               borderRadius: 8,
               fontWeight: 600,
               fontSize: 13,
@@ -280,11 +286,11 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
           style={{
             marginTop: 14,
             padding: "10px 14px",
-            background: "rgba(16,184,145,.08)",
-            border: "1px solid rgba(16,184,145,.25)",
+            background: "rgba(74,155,106,.08)",
+            border: "1px solid rgba(74,155,106,.25)",
             borderRadius: 8,
             fontSize: 12,
-            color: "var(--emerald)",
+            color: "var(--canopy)",
           }}
         >
           Transaction confirmed:{" "}
@@ -296,11 +302,11 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
           style={{
             marginTop: 14,
             padding: "10px 14px",
-            background: "rgba(16,184,145,.08)",
-            border: "1px solid rgba(16,184,145,.25)",
+            background: "rgba(74,155,106,.08)",
+            border: "1px solid rgba(74,155,106,.25)",
             borderRadius: 8,
             fontSize: 12,
-            color: "var(--emerald)",
+            color: "var(--canopy)",
           }}
         >
           Clawback executed:{" "}
@@ -312,11 +318,11 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
           style={{
             marginTop: 14,
             padding: "10px 14px",
-            background: "rgba(239,68,68,.08)",
-            border: "1px solid rgba(239,68,68,.25)",
+            background: "rgba(220,38,38,.08)",
+            border: "1px solid rgba(220,38,38,.25)",
             borderRadius: 8,
             fontSize: 12,
-            color: "#EF4444",
+            color: "#DC2626",
           }}
         >
           {txError}

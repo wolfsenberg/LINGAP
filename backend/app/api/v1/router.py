@@ -21,9 +21,14 @@ from .risk import (
 )
 from .credibility import router as credibility_router
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 2b1fff9a23c4939c8cb985f1a13ca23360523f86
 =======
 >>>>>>> 53d2963129c62f8def465d37ded0cc8ef0e3c640
+=======
+from .leaderboard import router as leaderboard_router
+from .volunteer import router as volunteer_router
+>>>>>>> 5c2540a1daf08152b08f5c2cce1a5e1da7b3d675
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -48,6 +53,11 @@ api_router.include_router(aid_request_risk_router)
 api_router.include_router(aid_request_spending_router)
 api_router.include_router(credibility_router)
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 2b1fff9a23c4939c8cb985f1a13ca23360523f86
 =======
 >>>>>>> 53d2963129c62f8def465d37ded0cc8ef0e3c640
+=======
+api_router.include_router(leaderboard_router)
+api_router.include_router(volunteer_router)
+>>>>>>> 5c2540a1daf08152b08f5c2cce1a5e1da7b3d675

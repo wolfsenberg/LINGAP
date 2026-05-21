@@ -87,17 +87,3 @@ export interface PaginatedResponse<T> {
   size: number;
   pages: number;
 }
-
-export interface DonationCertificate {
-  id: string;
-  donationId: string;
-  s3Url: string;
-  isPublic: boolean;
-  donorName: string;
-  amount: number;
-  beneficiaryName: string;
-  milestoneDescription: string;
-  livesTouched: number;
-  totalDonated: number;
-  createdAt: string;
-}
