@@ -1,6 +1,7 @@
 import {
   AlertCircle, CheckCircle2, AlertTriangle, ShieldCheck, Search, Link2, XCircle
 } from "lucide-react";
+import { CAMPAIGNS } from "@/lib/campaigns";
 
 export default function AdminPage() {
   return (
@@ -107,7 +108,7 @@ export default function AdminPage() {
                   <span className="badge badge-emerald" style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><CheckCircle2 size={10}/> LOW</span>
                   <span style={{fontSize:11,color:'var(--text3)'}}>2 hrs ago</span>
                 </div>
-                <div style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>All Clear — Maria Santos Campaign</div>
+                <div style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>All Clear — {CAMPAIGNS[0].shortTitle}</div>
                 <div style={{fontSize:12,color:'var(--text2)'}}>Documents verified. Spending pattern normal. Milestone 2 in progress.</div>
               </div>
             </div>
