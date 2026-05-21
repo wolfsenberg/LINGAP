@@ -6,8 +6,6 @@ from .aid_requests import router as aid_requests_router
 from .dashboard import router as dashboard_router
 from .stellar import router as stellar_router
 from .proofs import router as proofs_router
-from .certificates import router as certificates_router
-from .onchain_certificates import router as onchain_certificates_router
 from .progress import progress_router, verify_router
 from .risk import (
     router as risk_router,
@@ -17,10 +15,6 @@ from .risk import (
 from .credibility import router as credibility_router
 from .leaderboard import router as leaderboard_router
 from .volunteer import router as volunteer_router
-from .geo import router as geo_router
-from .streaks import donor_router as streaks_donor_router
-from .streaks import admin_router as streaks_admin_router
-from .fund_release import router as fund_release_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -31,8 +25,6 @@ api_router.include_router(aid_requests_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(stellar_router)
 api_router.include_router(proofs_router)
-api_router.include_router(certificates_router)
-api_router.include_router(onchain_certificates_router)
 api_router.include_router(progress_router)
 api_router.include_router(verify_router)
 api_router.include_router(risk_router)
@@ -41,7 +33,3 @@ api_router.include_router(aid_request_spending_router)
 api_router.include_router(credibility_router)
 api_router.include_router(leaderboard_router)
 api_router.include_router(volunteer_router)
-api_router.include_router(geo_router)
-api_router.include_router(streaks_donor_router)
-api_router.include_router(streaks_admin_router)
-api_router.include_router(fund_release_router)

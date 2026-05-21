@@ -38,6 +38,21 @@ export interface Donation {
   createdAt: string;
 }
 
+export interface DonationCertificate {
+  id: string;
+  donationId: string;
+  donorName: string;
+  beneficiaryName: string;
+  amount: number;
+  milestoneDescription: string;
+  livesTouched: number;
+  totalDonated: number;
+  stellarTxHash?: string;
+  verificationHash?: string;
+  isPublic: boolean;
+  createdAt: string;
+}
+
 export interface AidRequest {
   id: string;
   beneficiaryId: string;
@@ -63,20 +78,6 @@ export interface ProvenanceRecord {
   stellarTxHash: string;
   ledger: number;
   timestamp: string;
-}
-
-export interface DonationCertificate {
-  id: string;
-  donationId: string;
-  s3Url: string;
-  isPublic: boolean;
-  donorName: string;
-  amount: number;
-  beneficiaryName: string;
-  milestoneDescription: string;
-  livesTouched: number;
-  totalDonated: number;
-  createdAt: string;
 }
 
 export interface DashboardStats {

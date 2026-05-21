@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   Heart,
@@ -24,7 +24,13 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, clearAuth } = useAuthStore();
+
+  function handleSignOut() {
+    clearAuth();
+    router.push("/login");
+  }
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r bg-white" style={{borderColor:'var(--border)',background:'var(--surface)'}}>
@@ -77,7 +83,7 @@ export default function Sidebar() {
             <Settings className="h-4 w-4" /> Settings
           </Link>
           <button
-            onClick={clearAuth}
+            onClick={handleSignOut}
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
           >
             <LogOut className="h-4 w-4" /> Sign Out

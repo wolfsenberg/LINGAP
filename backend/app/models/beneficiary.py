@@ -43,7 +43,5 @@ class Beneficiary(Base, TimestampMixin):
     credibility_recomputed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
-    latitude: Mapped[float | None] = mapped_column(Numeric(10, 7))
-    longitude: Mapped[float | None] = mapped_column(Numeric(10, 7))
 
     aid_requests: Mapped[list["AidRequest"]] = relationship(back_populates="beneficiary")  # noqa: F821
