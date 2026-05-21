@@ -197,4 +197,28 @@ export const volunteerApi = {
     api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/signups"),
 };
 
+export interface FundReleaseRequest {
+  organizer_id: string;
+  requested_amount: number;
+  total_pool_balance: number;
+  current_milestone_id?: string;
+}
+
+export interface FundReleaseResponse {
+  status: string;
+  tier: number;
+  released_amount: number;
+  message: string;
+  account_updates?: Record<string, any>;
+}
+
+export const fundReleaseApi = {
+  process: (data: FundReleaseRequest) =>
+    api.post<FundReleaseResponse>("/api/v1/fund-release/process", data),
+  verifyMilestone: (milestoneId: string, proofUrl: string) =>
+    api.post<any>(`/api/v1/fund-release/hooks/verify-milestone/${milestoneId}`, null, {
+      params: { proof_url: proofUrl }
+    }),
+};
+
 export default api;
