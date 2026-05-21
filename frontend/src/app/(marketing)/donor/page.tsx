@@ -19,12 +19,13 @@ import {
   Users,
 } from "lucide-react";
 import { organizedDrives } from "@/lib/mockCampaignDrives";
+import { CAMPAIGNS } from "@/lib/campaigns";
 
 const donationTimeline = [
   {
     amount: "₱5,000",
-    campaign: "Maria Santos Cancer Fund",
-    sub: "Nov 28 · Milestone 1 released to PGH",
+    campaign: CAMPAIGNS[0].shortTitle,
+    sub: `Nov 28 · Milestone 1 released to ${CAMPAIGNS[0].institution}`,
     badge: "badge-emerald",
     badgeText: "Impact Verified",
     escrow: "Released from escrow",
@@ -33,8 +34,8 @@ const donationTimeline = [
   },
   {
     amount: "₱2,500",
-    campaign: "Typhoon Carina Relief",
-    sub: "Nov 14 · Funds released to DSWD Batangas",
+    campaign: CAMPAIGNS[1].shortTitle,
+    sub: `Nov 14 · Funds released to ${CAMPAIGNS[1].institution}`,
     badge: "badge-emerald",
     badgeText: "Impact Verified",
     escrow: "Institution paid",
@@ -43,8 +44,8 @@ const donationTimeline = [
   },
   {
     amount: "₱3,000",
-    campaign: "Juan dela Cruz Scholarship",
-    sub: "Nov 5 · Tuition receipt pending PUP verification",
+    campaign: CAMPAIGNS[2].shortTitle,
+    sub: `Nov 5 · Tuition receipt pending ${CAMPAIGNS[2].institution} verification`,
     badge: "badge-gold",
     badgeText: "Pending Proof",
     escrow: "Locked in escrow",

@@ -90,6 +90,14 @@ export const stellarApi = {
     }),
 };
 
+export const paymongoApi = {
+  checkout: (amount_php: number, purpose: string) =>
+    api.post<ApiResponse<{ checkout_url: string; checkout_id: string; donation_id: string }>>(
+      "/api/v1/paymongo/checkout",
+      { amount_php, purpose }
+    ),
+};
+
 export const escrowApi = {
   // Donor: get unsigned XDR → sign with Freighter → submit
   getDepositXdr: (campaignId: number, donorPublicKey: string, amountXlm: number) =>
