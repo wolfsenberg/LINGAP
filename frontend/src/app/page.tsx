@@ -4,20 +4,9 @@ import Link from "next/link";
 import {
   Lock, CheckCircle2, Target, Hospital, Pill, School, Handshake, Anchor, Link2,
   ShieldCheck, FileCheck, Shield, Bot, Award, MapPin, Users, TrendingUp,
-  Facebook, MessageCircle, Music2, Twitter
+  Facebook, MessageCircle, Music2, Twitter, Home, Cat, PawPrint
 } from "lucide-react";
 import { CAMPAIGNS } from "@/lib/campaigns";
-
-const CATEGORY_ICON: Record<string, React.ElementType> = {
-  Medical: Hospital,
-  "Disaster Relief": Anchor,
-  Education: School,
-};
-const CATEGORY_CLASS: Record<string, string> = {
-  Medical: "featured-medical",
-  "Disaster Relief": "featured-relief",
-  Education: "featured-education",
-};
 
 export default function HomePage() {
   return (
@@ -192,26 +181,40 @@ export default function HomePage() {
           </div>
           <div className="campaign-grid">
             {CAMPAIGNS.map((c) => {
-              const Icon = CATEGORY_ICON[c.category] ?? Hospital;
-              const progClass = c.category === "Education" ? "prog-gold" : "prog-emerald";
+              const Icon = c.heroIcon === "🏠" ? Home : c.heroIcon === "🐱" ? Cat : PawPrint;
+              const progressColor = c.category === "Animal Rescue" ? "prog-gold" : "prog-emerald";
+              const accentHex = c.category === "Animal Rescue" ? "var(--amber)" : "var(--canopy)";
               return (
-                <Link key={c.id} href={`/detail?id=${c.id}`} className={`camp-card emerald-glow featured-camp ${CATEGORY_CLASS[c.category] ?? ""}`} style={{textDecoration:'none'}}>
-                  <div className="camp-img" style={{background:c.heroGradient}}>
-                    <div className="camp-img-inner"><Icon size={48} strokeWidth={1.8}/></div>
-                    {c.urgencyLabel && <div style={{position:'absolute',top:12,left:12}}><span className={`badge ${c.urgencyClass}`}>{c.urgencyLabel}</span></div>}
-                    <div style={{position:'absolute',top:12,right:12}}><span className="badge badge-emerald">Verified</span></div>
+                <Link key={c.id} href={`/detail/${c.slug}`} className="camp-card emerald-glow featured-camp" style={{ textDecoration: "none" }}>
+                  <div className="camp-img" style={{ background: c.heroGradient }}>
+                    <div className="camp-img-inner"><Icon size={48} strokeWidth={1.8} /></div>
+                    {c.urgencyLabel && (
+                      <div style={{ position: "absolute", top: 12, left: 12 }}>
+                        <span className={`badge ${c.urgencyClass}`}>{c.urgencyLabel}</span>
+                      </div>
+                    )}
+                    <div style={{ position: "absolute", top: 12, right: 12 }}>
+                      <span className="badge badge-emerald">Verified</span>
+                    </div>
                   </div>
                   <div className="camp-body">
                     <h3 className="camp-title">{c.title}</h3>
                     <p className="camp-desc">{c.description}</p>
                     <div className="camp-meta">
-                      <div><div className="camp-raised">{c.raisedLabel}</div><div className="camp-goal">of {c.goalLabel} goal</div></div>
-                      <div className="camp-donors"><Users size={12}/> {c.donors.toLocaleString()} donors</div>
+                      <div>
+                        <div className="camp-raised">{c.raisedLabel}</div>
+                        <div className="camp-goal">of {c.goalLabel} goal</div>
+                      </div>
+                      <div className="camp-donors"><Users size={12} /> {c.donors.toLocaleString()} donors</div>
                     </div>
-                    <div className="prog-track" style={{height:8}}><div className={`prog-fill ${progClass}`} style={{width:`${c.pct}%`}}/></div>
+                    <div className="prog-track" style={{ height: 8 }}>
+                      <div className={`prog-fill ${progressColor}`} style={{ width: `${c.pct}%` }} />
+                    </div>
                     <div className="camp-footer">
                       <span className="badge badge-navy">{c.institutionDesc}</span>
-                      <span style={{fontSize:12,color:c.accentColor,fontWeight:600}}>{c.pct}% funded · {c.daysLeft}d left</span>
+                      <span style={{ fontSize: 12, color: accentHex, fontWeight: 600 }}>
+                        {c.pct}% funded · {c.daysLeft}d left
+                      </span>
                     </div>
                   </div>
                 </Link>
