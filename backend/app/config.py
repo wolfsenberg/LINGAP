@@ -53,7 +53,6 @@ class Settings(BaseSettings):
     # Certificate generation
     CERTIFICATE_TITLE_FONT: str = "Helvetica-Bold"
     CERTIFICATE_BODY_FONT: str = "Helvetica"
-    CERTIFICATE_TEMPLATE_PATH: str = "/app/lingap-bg-cert.png"
 
     @property
     def cors_origins_list(self) -> list[str]:

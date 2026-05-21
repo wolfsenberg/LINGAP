@@ -2,7 +2,6 @@ import {
   Star, Lock, Search, TrendingUp, CheckCircle2, Clock, Flag,
   ArrowDownToLine, ShieldCheck, Link2
 } from "lucide-react";
-import { CAMPAIGNS } from "@/lib/campaigns";
 
 export default function EscrowPage() {
   return (
@@ -74,13 +73,13 @@ export default function EscrowPage() {
         <div style={{background:'#fff',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:28,marginBottom:24}}>
           <div className="flex flex-center flex-between mb-24">
             <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',display:'flex',alignItems:'center',gap:8}}>
-              <Link2 size={18} color="var(--canopy)" strokeWidth={1.8}/> Escrow Release Flow — {CAMPAIGNS[0].shortTitle}
+              <Link2 size={18} color="var(--canopy)" strokeWidth={1.8}/> Escrow Release Flow — Maria Santos Campaign
             </h3>
             <span className="badge badge-emerald"><span style={{width:6,height:6,background:'#DC2626',borderRadius:'50%',display:'inline-block'}}/> Live on Stellar</span>
           </div>
           <div className="chain-steps" style={{justifyContent:'center'}}>
             {[
-              {cls:'cs-done',Icon:ArrowDownToLine,label:'Donation\nReceived',sub:CAMPAIGNS[0].raisedLabel},
+              {cls:'cs-done',Icon:ArrowDownToLine,label:'Donation\nReceived',sub:'₱182,400'},
               {cls:'cs-done',Icon:Lock,label:'Escrow\nLocked',sub:'Contract Live'},
               {cls:'cs-done',Icon:CheckCircle2,label:'Milestone 1\nVerified',sub:'Nov 28'},
               {cls:'cs-done',Icon:TrendingUp,label:'₱75,000\nto PGH',sub:'Released'},
@@ -108,7 +107,7 @@ export default function EscrowPage() {
           </div>
           {[
             {Icon:CheckCircle2,iconBg:'rgba(74,155,106,.1)',iconColor:'var(--canopy)',title:'Milestone Release — PGH Billing',hash:'STELLAR:0x4a8f...3c2b • Nov 28, 2025 at 14:32 PHT',badge:'badge-emerald',badgeText:'Immutable Record',amount:'₱75,000',dest:'To: PGH Hospital',amountColor:'var(--canopy)'},
-            {Icon:ArrowDownToLine,iconBg:'rgba(200,134,10,.15)',iconColor:'var(--amber)',title:'Donation Received — Escrow Lock',hash:'STELLAR:0x7d2e...9a1f • Nov 24, 2025 at 09:15 PHT',badge:'badge-gold',badgeText:'Publicly Verifiable',amount:CAMPAIGNS[0].raisedLabel,dest:'Escrow Vault',amountColor:'var(--amber)'},
+            {Icon:ArrowDownToLine,iconBg:'rgba(200,134,10,.15)',iconColor:'var(--amber)',title:'Donation Received — Escrow Lock',hash:'STELLAR:0x7d2e...9a1f • Nov 24, 2025 at 09:15 PHT',badge:'badge-gold',badgeText:'Publicly Verifiable',amount:'₱182,400',dest:'Escrow Vault',amountColor:'var(--amber)'},
             {Icon:Lock,iconBg:'rgba(61,122,82,.1)',iconColor:'var(--forest-light)',title:'Campaign Verification — Smart Contract Deploy',hash:'STELLAR:0x2f9c...8e4a • Nov 12, 2025 at 16:44 PHT',badge:'badge-blue',badgeText:'Blockchain Verified',amount:'Contract Live',dest:'Soroban',amountColor:'var(--forest-light)'},
           ].map((tx)=>(
             <div key={tx.title} className="tx-card">

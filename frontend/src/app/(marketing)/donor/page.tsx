@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   ArrowRight,
@@ -19,13 +21,14 @@ import {
   Users,
 } from "lucide-react";
 import { organizedDrives } from "@/lib/mockCampaignDrives";
-import { CAMPAIGNS } from "@/lib/campaigns";
+import { getFirstName } from "@/lib/userName";
+import { useAuthStore } from "@/store/authStore";
 
 const donationTimeline = [
   {
     amount: "₱5,000",
-    campaign: CAMPAIGNS[0].shortTitle,
-    sub: `Nov 28 · Milestone 1 released to ${CAMPAIGNS[0].institution}`,
+    campaign: "Maria Santos Cancer Fund",
+    sub: "Nov 28 · Milestone 1 released to PGH",
     badge: "badge-emerald",
     badgeText: "Impact Verified",
     escrow: "Released from escrow",
@@ -34,8 +37,8 @@ const donationTimeline = [
   },
   {
     amount: "₱2,500",
-    campaign: CAMPAIGNS[1].shortTitle,
-    sub: `Nov 14 · Funds released to ${CAMPAIGNS[1].institution}`,
+    campaign: "Typhoon Carina Relief",
+    sub: "Nov 14 · Funds released to DSWD Batangas",
     badge: "badge-emerald",
     badgeText: "Impact Verified",
     escrow: "Institution paid",
@@ -44,8 +47,8 @@ const donationTimeline = [
   },
   {
     amount: "₱3,000",
-    campaign: CAMPAIGNS[2].shortTitle,
-    sub: `Nov 5 · Tuition receipt pending ${CAMPAIGNS[2].institution} verification`,
+    campaign: "Juan dela Cruz Scholarship",
+    sub: "Nov 5 · Tuition receipt pending PUP verification",
     badge: "badge-gold",
     badgeText: "Pending Proof",
     escrow: "Locked in escrow",
@@ -67,15 +70,20 @@ const donationTimeline = [
 export default function DonorPage() {
   const latestDrives = organizedDrives.slice(0, 3);
   const hasMoreDrives = organizedDrives.length > latestDrives.length;
+  const user = useAuthStore((state) => state.user);
+  const firstName = getFirstName(user?.name);
 
   return (
     <div>
       <div className="donor-hero">
         <div className="container">
-          <div className="grid-2" style={{ alignItems: "center" }}>
-            <div>
+          <div className="donor-hero-grid">
+            <div className="donor-hero-art">
+              <img className="donor-wave-img" src="/images/wave.png" alt="" />
+            </div>
+            <div className="donor-hero-content">
               <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, color: "var(--canopy)", marginBottom: 12 }}>MY IMPACT DASHBOARD</div>
-              <h1 style={{ fontSize: 36, fontWeight: 800, color: "#fff", marginBottom: 8 }}>Magandang araw, <span style={{ color: "var(--amber-pale)" }}>Jose!</span></h1>
+              <h1 style={{ fontSize: 36, fontWeight: 800, color: "#fff", marginBottom: 8 }}>Magandang araw, <span style={{ color: "var(--amber-pale)" }}>{firstName}!</span></h1>
               <p style={{ color: "rgba(255,255,255,.65)", fontSize: 16, marginBottom: 24 }}>You&apos;ve changed lives. Here&apos;s your verified impact story.</p>
               <div className="donor-stats-row">
                 {[
@@ -93,9 +101,6 @@ export default function DonorPage() {
                   </div>
                 ))}
               </div>
-            </div>
-            <div className="donor-hero-art">
-              <img className="donor-wave-img" src="/images/wave.png" alt="" />
             </div>
           </div>
         </div>
