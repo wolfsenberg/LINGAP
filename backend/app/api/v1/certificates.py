@@ -4,7 +4,6 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse, HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -18,8 +17,6 @@ from app.schemas.donation_certificate import (
     DonationCertificateUpdate,
 )
 from app.storage.s3 import generate_presigned_download_url
-from app.certificates.svg_generator import generate_html_certificate
-from app.config import settings
 
 router = APIRouter(prefix="/certificates", tags=["certificates"])
 
@@ -97,51 +94,13 @@ async def update_certificate_visibility(
     return DonationCertificateRead.model_validate(cert)
 
 
-@router.get("/{cert_id}/view")
-async def view_certificate(
-    cert_id: uuid.UUID,
-    db: AsyncSession = Depends(get_db),
-    user: User | None = Depends(get_current_user),
-):
-    """View certificate as HTML. Public certificates visible to all, private only to owner."""
-    cert = (
-        await db.execute(
-            select(DonationCertificate).where(DonationCertificate.id == cert_id)
-        )
-    ).scalar_one_or_none()
-
-    if not cert:
-        raise HTTPException(404, "Certificate not found")
-
-    if not cert.is_public and (not user or user.id != cert.donation.donor_id):
-        raise HTTPException(403, "Not authorized to view this certificate")
-
-    donation = cert.donation
-    
-    html_content = generate_html_certificate(
-        donor_name=cert.donor_name,
-        amount=cert.amount,
-        beneficiary_name=cert.beneficiary_name,
-        milestone_description=cert.milestone_description,
-        lives_touched=1, 
-        total_donated=cert.amount, 
-        donation_date=donation.created_at,
-        stellar_tx_hash=donation.stellar_tx_hash,
-        merkle_proof=getattr(donation, 'merkle_proof', None),
-        onchain_hash=getattr(donation, 'onchain_hash', None),
-        certificate_id=str(cert.id).split('-')[0].upper(),
-    )
-
-    return HTMLResponse(content=html_content)
-
-
 @router.get("/{cert_id}/download")
 async def download_certificate(
     cert_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
-    """Get dynamically generated PDF of the certificate."""
+    """Get presigned download URL for certificate PDF."""
     cert = (
         await db.execute(
             select(DonationCertificate).where(DonationCertificate.id == cert_id)
@@ -154,33 +113,10 @@ async def download_certificate(
     if not cert.is_public and (not user or user.id != cert.donation.donor_id):
         raise HTTPException(403, "Not authorized to download this certificate")
 
-    donation = cert.donation
-    
-    html_content = generate_html_certificate(
-        donor_name=cert.donor_name,
-        amount=cert.amount,
-        beneficiary_name=cert.beneficiary_name,
-        milestone_description=cert.milestone_description,
-        lives_touched=1,
-        total_donated=cert.amount,
-        donation_date=donation.created_at,
-        stellar_tx_hash=donation.stellar_tx_hash,
-        merkle_proof=getattr(donation, 'merkle_proof', None),
-        onchain_hash=getattr(donation, 'onchain_hash', None),
-        certificate_id=str(cert.id).split('-')[0].upper(),
-    )
-    
-    import weasyprint
-    import io
-    pdf_buffer = io.BytesIO()
-    weasyprint.HTML(string=html_content).write_pdf(pdf_buffer)
-    pdf_buffer.seek(0)
+    s3_key = f"certificates/{cert.donation_id}/{cert.pdf_hash[:16]}.pdf"
+    presigned_url = await generate_presigned_download_url(s3_key)
 
-    return StreamingResponse(
-        pdf_buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=certificate-{cert_id}.pdf"}
-    )
+    return {"download_url": presigned_url, "filename": f"certificate-{cert.donation_id}.pdf"}
 
 
 @router.get("/donor/{donor_id}/all", response_model=list[DonationCertificateRead])

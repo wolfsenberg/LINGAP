@@ -6,15 +6,44 @@ import type {
   AidRequest,
   ProvenanceRecord,
   DashboardStats,
-  DonationCertificate,
   ApiResponse,
   PaginatedResponse,
 } from "@/types";
+
+type ApiUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: User["role"];
+  stellar_public_key?: string | null;
+  kyc_verified: boolean;
+  created_at: string;
+};
+
+type RegisterRequest = {
+  email: string;
+  name: string;
+  password: string;
+  role?: User["role"];
+  stellarPublicKey?: string;
+};
+
+const normalizeUser = (user: ApiUser): User => ({
+  id: user.id,
+  email: user.email,
+  name: user.name,
+  role: user.role,
+  stellarPublicKey: user.stellar_public_key ?? undefined,
+  kycVerified: user.kyc_verified,
+  createdAt: user.created_at,
+});
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
   headers: { "Content-Type": "application/json" },
 });
+
+export { api };
 
 api.interceptors.request.use((config) => {
   const token = typeof window !== "undefined" ? localStorage.getItem("lingap_token") : null;
@@ -34,11 +63,45 @@ api.interceptors.response.use(
 );
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post<ApiResponse<{ token: string; user: User }>>("/api/v1/auth/login", { email, password }),
-  register: (data: Partial<User> & { password: string }) =>
-    api.post<ApiResponse<User>>("/api/v1/auth/register", data),
-  me: () => api.get<ApiResponse<User>>("/api/v1/auth/me"),
+  login: async (email: string, password: string) => {
+    const res = await api.post<ApiResponse<{ token: string; user: ApiUser }>>("/api/v1/auth/login", { email, password });
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: {
+          token: res.data.data.token,
+          user: normalizeUser(res.data.data.user),
+        },
+      },
+    };
+  },
+  register: async (data: RegisterRequest) => {
+    const res = await api.post<ApiResponse<ApiUser>>("/api/v1/auth/register", {
+      email: data.email,
+      name: data.name,
+      password: data.password,
+      role: data.role ?? "donor",
+      stellar_public_key: data.stellarPublicKey || null,
+    });
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: normalizeUser(res.data.data),
+      },
+    };
+  },
+  me: async () => {
+    const res = await api.get<ApiResponse<ApiUser>>("/api/v1/auth/me");
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: normalizeUser(res.data.data),
+      },
+    };
+  },
 };
 
 export const donationsApi = {
@@ -91,14 +154,6 @@ export const stellarApi = {
     }),
 };
 
-export const paymongoApi = {
-  checkout: (amount_php: number, purpose: string) =>
-    api.post<ApiResponse<{ checkout_url: string; checkout_id: string; donation_id: string }>>(
-      "/api/v1/paymongo/checkout",
-      { amount_php, purpose }
-    ),
-};
-
 export const escrowApi = {
   // Donor: get unsigned XDR → sign with Freighter → submit
   getDepositXdr: (campaignId: number, donorPublicKey: string, amountXlm: number) =>
@@ -146,28 +201,14 @@ export const escrowApi = {
     api.post<ApiResponse<{ tx_hash: string }>>(`/api/v1/stellar/escrow/clawback/${campaignId}`),
 };
 
-export const certificatesApi = {
-  get: (id: string) =>
-    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`),
-  getByDonation: (donationId: string) =>
-    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/donation/${donationId}`),
-  listByDonor: (donorId: string) =>
-    api.get<ApiResponse<DonationCertificate[]>>(`/api/v1/certificates/donor/${donorId}/all`),
-  updateVisibility: (id: string, isPublic: boolean) =>
-    api.patch<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`, {
-      is_public: isPublic,
-    }),
-  getDownloadUrl: (id: string) =>
-    api.get<ApiResponse<{ download_url: string; filename: string }>>(`/api/v1/certificates/${id}/download`),
-};
-
-export interface VolunteerOpportunity {
+export type VolunteerOpportunity = {
   id: string;
+  organizer_id?: string;
   organizer_name: string;
   campaign_name: string;
   title: string;
   description: string;
-  category: string;
+  category: "medical" | "legal" | "tech" | "logistics" | "teaching" | "counseling" | "construction" | "other";
   skills_needed: string[];
   location: string;
   schedule: string;
@@ -177,48 +218,26 @@ export interface VolunteerOpportunity {
   status: "open" | "filled" | "closed";
   urgent: boolean;
   my_signup_status: "pending" | "accepted" | "rejected" | null;
-  created_at: string;
   signup_id?: string;
-}
+  applied_at?: string | null;
+  created_at: string | null;
+};
 
 export const volunteerApi = {
   listOpportunities: (category?: string) =>
     api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/opportunities", {
-      params: { category },
+      params: category ? { category } : undefined,
     }),
   getStats: () =>
-    api.get<ApiResponse<{ open_opportunities: number; total_volunteers: number; slots_needed: number }>>("/api/v1/volunteer/stats"),
+    api.get<ApiResponse<{ open_opportunities: number; total_volunteers: number; slots_needed: number }>>(
+      "/api/v1/volunteer/stats"
+    ),
   apply: (opportunityId: string, message: string, skills: string[]) =>
-    api.post<ApiResponse<any>>(`/api/v1/volunteer/opportunities/${opportunityId}/apply`, {
+    api.post<ApiResponse<{ id: string; status: string }>>(`/api/v1/volunteer/opportunities/${opportunityId}/apply`, {
       message,
       skills,
     }),
-  mySignups: () =>
-    api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/signups"),
-};
-
-export interface FundReleaseRequest {
-  organizer_id: string;
-  requested_amount: number;
-  total_pool_balance: number;
-  current_milestone_id?: string;
-}
-
-export interface FundReleaseResponse {
-  status: string;
-  tier: number;
-  released_amount: number;
-  message: string;
-  account_updates?: Record<string, any>;
-}
-
-export const fundReleaseApi = {
-  process: (data: FundReleaseRequest) =>
-    api.post<FundReleaseResponse>("/api/v1/fund-release/process", data),
-  verifyMilestone: (milestoneId: string, proofUrl: string) =>
-    api.post<any>(`/api/v1/fund-release/hooks/verify-milestone/${milestoneId}`, null, {
-      params: { proof_url: proofUrl }
-    }),
+  mySignups: () => api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/me/signups"),
 };
 
 export default api;

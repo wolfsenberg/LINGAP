@@ -1,6 +1,6 @@
 "use client";
 
-import { Wallet } from "lucide-react";
+import { Unplug, Wallet } from "lucide-react";
 import { useFreighter } from "@/hooks/useFreighter";
 
 export default function WalletButton() {
@@ -25,8 +25,8 @@ export default function WalletButton() {
           <Wallet size={13} />
           <span>{short(publicKey)}</span>
         </div>
-        <button onClick={disconnect} className="wallet-disconnect">
-          Disconnect
+        <button onClick={disconnect} className="wallet-disconnect" aria-label="Disconnect wallet" title="Disconnect wallet">
+          <Unplug size={13} />
         </button>
       </div>
     );

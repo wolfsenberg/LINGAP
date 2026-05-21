@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DonationCertificate } from '@/types';
-import api from '@/lib/api';
+import { api } from '@/lib/api';
 
 interface CertificateCardProps {
   certificate: DonationCertificate;
@@ -77,10 +77,6 @@ export function CertificateCard({
       month: 'long',
       day: 'numeric',
     });
-  };
-
-  const handleViewCertificate = () => {
-    window.open(`/api/v1/certificates/${certificate.id}/view`, '_blank');
   };
 
   return (
@@ -208,26 +204,6 @@ export function CertificateCard({
         justifyContent: 'center',
       }}>
         <button
-          onClick={handleViewCertificate}
-          style={{
-            background: 'var(--emerald)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 6,
-            padding: '8px 16px',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-            flex: '1 1 auto',
-            minWidth: 120,
-            transition: 'opacity 0.2s',
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
-        >
-          👁️ View Certificate
-        </button>
-        <button
           onClick={handleDownload}
           style={{
             background: 'var(--emerald)',
@@ -245,7 +221,7 @@ export function CertificateCard({
           onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.85')}
           onMouseLeave={(e) => (e.currentTarget.style.opacity = '1')}
         >
-          📥 Download PNG
+          📥 Download PDF
         </button>
         <button
           onClick={handleCopyLink}

@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import WalletButton from "@/components/wallet/WalletButton";
-import { Compass, Heart, Home, ShieldCheck } from "lucide-react";
+import { Compass, Heart, Home, LogOut, ShieldCheck } from "lucide-react";
+import { useAuthStore } from "@/store/authStore";
 
 const links = [
   { href: "/", label: "Home", icon: Home },
@@ -12,6 +13,8 @@ const links = [
 
 export default function TopNav() {
   const pathname = usePathname();
+  const { user, isAuthenticated, clearAuth } = useAuthStore();
+
   return (
     <nav className="topnav">
       <Link className="nav-logo" href="/">
@@ -31,12 +34,26 @@ export default function TopNav() {
         ))}
       </div>
       <div className="nav-right">
-        <Link href="/donor" className={`nav-impact${pathname === "/donor" ? " active" : ""}`}>
-          <Heart size={14} strokeWidth={2}/>
-          My Impact
-        </Link>
-        <WalletButton />
-        <Link href="/discover" className="btn btn-emerald btn-sm">Donate Now</Link>
+        {isAuthenticated && user ? (
+          <>
+            <Link href="/donor" className={`nav-impact${pathname === "/donor" ? " active" : ""}`}>
+              <Heart size={14} strokeWidth={2}/>
+              My Impact
+            </Link>
+            <Link href="/discover" className="btn btn-emerald btn-sm">Donate Now</Link>
+            <WalletButton />
+            <button type="button" onClick={clearAuth} className="nav-logout" aria-label="Sign out" title="Sign out">
+              <LogOut size={13}/>
+            </button>
+          </>
+        ) : (
+          <>
+            <Link href="/login" className={`nav-login${pathname === "/login" ? " active" : ""}`}>
+              Sign In
+            </Link>
+            <Link href="/discover" className="btn btn-emerald btn-sm">Donate Now</Link>
+          </>
+        )}
       </div>
     </nav>
   );

@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useEffect } from "react";
-import { CAMPAIGNS } from "@/lib/campaigns";
+import { useMemo, useState } from "react";
 import {
   ArrowLeft,
   Award,
