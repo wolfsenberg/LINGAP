@@ -5,8 +5,7 @@ import hashlib
 from app.stellar.client import verify_transaction
 from app.certificates.svg_generator import (
     generate_svg_certificate,
-    get_svg_hash,
-    wrap_svg_with_png_fallback,
+    get_certificate_hash,
 )
 from app.storage.svg_s3 import (
     upload_svg_certificate,
@@ -85,14 +84,13 @@ class OnChainCertificateService:
             onchain_hash=onchain_hash,
         )
 
-        svg_hash = get_svg_hash(svg_content)
+        svg_hash = get_certificate_hash(svg_content)
 
         # Step 3: Generate HTML wrapper with embedded SVG for social previews
-        html_wrapper = wrap_svg_with_png_fallback(svg_content, donation_id)
-
-        # Step 4: Upload to public S3 bucket (async)
+        # Step 3 and 4: Upload to public S3 bucket (async)
+        # We no longer need the PNG fallback wrapper since the new generator handles HTML
         svg_stored = await upload_svg_certificate(svg_content, donation_id)
-        html_s3_url = await upload_certificate_html_wrapper(html_wrapper, donation_id)
+        html_s3_url = await upload_certificate_html_wrapper(svg_content, donation_id)
 
         # Step 5: Compute certificate integrity hash (for future merkle proofs)
         cert_integrity_hash = hashlib.sha256(
