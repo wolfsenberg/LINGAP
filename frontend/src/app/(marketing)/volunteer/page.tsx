@@ -74,7 +74,7 @@ const SAMPLE_OPPORTUNITIES: VolunteerOpportunity[] = [
     description: "Provide weekly tutoring sessions for scholar students preparing for entrance exams. Online or in-person in QC.",
     category: "teaching",
     skills_needed: ["Mathematics", "Science", "Teaching"],
-    location: "Quezon City (Remote OK)",
+    location: `${CAMPAIGNS[2].institution} area (Remote OK)`,
     schedule: "Saturdays · 9AM–12PM",
     slots: 5,
     slots_filled: 2,
