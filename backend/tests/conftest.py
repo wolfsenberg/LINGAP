@@ -138,9 +138,9 @@ async def seed_aid_request(db_session: AsyncSession):
 
     b = Beneficiary(
         id=uuid.uuid4(),
-        name="Maria Santos",
-        national_id=f"NID-{uuid.uuid4().hex[:8]}",
-        location="Manila",
+        name="Gino Reyes",
+        national_id=f"BPH-{uuid.uuid4().hex[:8]}",
+        location="Manila, Metro Manila, Philippines",
         category=BeneficiaryCategory.individual,
         need_level=NeedLevel.high,
         verified=True,
@@ -153,9 +153,9 @@ async def seed_aid_request(db_session: AsyncSession):
     req = AidRequest(
         id=uuid.uuid4(),
         beneficiary_id=b.id,
-        requested_amount=1000,
-        asset="XLM",
-        purpose="Hospital admission for chemotherapy",
+        requested_amount=15000,
+        asset="PHP",
+        purpose="Home repair — installation of doors, windows, and structural fixtures for a family dwelling in Manila.",
         status=AidRequestStatus.pending,
     )
     db_session.add(req)

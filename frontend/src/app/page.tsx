@@ -4,8 +4,9 @@ import Link from "next/link";
 import {
   Lock, CheckCircle2, Target, Hospital, Pill, School, Handshake, Anchor, Link2,
   ShieldCheck, FileCheck, Shield, Bot, Award, MapPin, Users, TrendingUp,
-  Facebook, MessageCircle, Music2, Twitter
+  Facebook, MessageCircle, Music2, Twitter, Home, Cat, PawPrint
 } from "lucide-react";
+import { CAMPAIGNS } from "@/lib/campaigns";
 
 export default function HomePage() {
   return (
@@ -179,65 +180,46 @@ export default function HomePage() {
             <Link href="/discover" className="btn btn-outline">See All Campaigns →</Link>
           </div>
           <div className="campaign-grid">
-            <div className="camp-card emerald-glow featured-camp featured-medical">
-              <div className="camp-img">
-                <div className="camp-img-inner"><Hospital size={48} strokeWidth={1.8}/></div>
-                <div style={{position:'absolute',top:12,left:12}}><span className="badge badge-red">URGENT</span></div>
-                <div style={{position:'absolute',top:12,right:12}}><span className="badge badge-emerald">Verified</span></div>
-              </div>
-              <div className="camp-body">
-                <h3 className="camp-title">Maria Santos — Stage 3 Ovarian Cancer Treatment</h3>
-                <p className="camp-desc">37-year-old mother of three from Quezon City. Diagnosed last March, currently undergoing chemo at Philippine General Hospital.</p>
-                <div className="camp-meta">
-                  <div><div className="camp-raised">₱182,400</div><div className="camp-goal">of ₱250,000 goal</div></div>
-                  <div className="camp-donors"><Users size={12}/> 342 donors</div>
-                </div>
-                <div className="prog-track" style={{height:8}}><div className="prog-fill prog-emerald" style={{width:'73%'}}/></div>
-                <div className="camp-footer">
-                  <span className="badge badge-navy">PGH Verified</span>
-                  <span style={{fontSize:12,color:'var(--canopy)',fontWeight:600}}>73% funded · 12d left</span>
-                </div>
-              </div>
-            </div>
-            <div className="camp-card emerald-glow featured-camp featured-relief">
-              <div className="camp-img">
-                <div className="camp-img-inner"><Anchor size={48} strokeWidth={1.8}/></div>
-                <div style={{position:'absolute',top:12,left:12}}><span className="badge badge-orange">Emergency</span></div>
-                <div style={{position:'absolute',top:12,right:12}}><span className="badge badge-emerald">Verified</span></div>
-              </div>
-              <div className="camp-body">
-                <h3 className="camp-title">Typhoon Carina Relief — Batangas Coastal Communities</h3>
-                <p className="camp-desc">Over 400 families displaced by Typhoon Carina in Batangas. Immediate food, shelter, and medicine needed for survivors.</p>
-                <div className="camp-meta">
-                  <div><div className="camp-raised">₱890,000</div><div className="camp-goal">of ₱1,200,000 goal</div></div>
-                  <div className="camp-donors"><Users size={12}/> 1,203 donors</div>
-                </div>
-                <div className="prog-track" style={{height:8}}><div className="prog-fill prog-emerald" style={{width:'74%'}}/></div>
-                <div className="camp-footer">
-                  <span className="badge badge-navy">DSWD Partner</span>
-                  <span style={{fontSize:12,color:'var(--canopy)',fontWeight:600}}>74% funded · 5d left</span>
-                </div>
-              </div>
-            </div>
-            <div className="camp-card emerald-glow featured-camp featured-education">
-              <div className="camp-img">
-                <div className="camp-img-inner"><School size={48} strokeWidth={1.8}/></div>
-                <div style={{position:'absolute',top:12,right:12}}><span className="badge badge-emerald">Verified</span></div>
-              </div>
-              <div className="camp-body">
-                <h3 className="camp-title">Juan dela Cruz — Scholar from Samar: Engineering Dream</h3>
-                <p className="camp-desc">19-year-old from Eastern Samar, top 1 in his barangay, qualified for PUP Manila Engineering but can&apos;t afford tuition and board.</p>
-                <div className="camp-meta">
-                  <div><div className="camp-raised">₱48,000</div><div className="camp-goal">of ₱65,000 goal</div></div>
-                  <div className="camp-donors"><Users size={12}/> 87 donors</div>
-                </div>
-                <div className="prog-track" style={{height:8}}><div className="prog-fill prog-gold" style={{width:'74%'}}/></div>
-                <div className="camp-footer">
-                  <span className="badge badge-navy">PUP Verified</span>
-                  <span style={{fontSize:12,color:'var(--amber)',fontWeight:600}}>74% funded · 18d left</span>
-                </div>
-              </div>
-            </div>
+            {CAMPAIGNS.map((c) => {
+              const Icon = c.heroIcon === "🏠" ? Home : c.heroIcon === "🐱" ? Cat : PawPrint;
+              const progressColor = c.category === "Animal Rescue" ? "prog-gold" : "prog-emerald";
+              const accentHex = c.category === "Animal Rescue" ? "var(--amber)" : "var(--canopy)";
+              return (
+                <Link key={c.id} href={`/detail/${c.slug}`} className="camp-card emerald-glow featured-camp" style={{ textDecoration: "none" }}>
+                  <div className="camp-img" style={{ background: c.heroGradient }}>
+                    <div className="camp-img-inner"><Icon size={48} strokeWidth={1.8} /></div>
+                    {c.urgencyLabel && (
+                      <div style={{ position: "absolute", top: 12, left: 12 }}>
+                        <span className={`badge ${c.urgencyClass}`}>{c.urgencyLabel}</span>
+                      </div>
+                    )}
+                    <div style={{ position: "absolute", top: 12, right: 12 }}>
+                      <span className="badge badge-emerald">Verified</span>
+                    </div>
+                  </div>
+                  <div className="camp-body">
+                    <h3 className="camp-title">{c.title}</h3>
+                    <p className="camp-desc">{c.description}</p>
+                    <div className="camp-meta">
+                      <div>
+                        <div className="camp-raised">{c.raisedLabel}</div>
+                        <div className="camp-goal">of {c.goalLabel} goal</div>
+                      </div>
+                      <div className="camp-donors"><Users size={12} /> {c.donors.toLocaleString()} donors</div>
+                    </div>
+                    <div className="prog-track" style={{ height: 8 }}>
+                      <div className={`prog-fill ${progressColor}`} style={{ width: `${c.pct}%` }} />
+                    </div>
+                    <div className="camp-footer">
+                      <span className="badge badge-navy">{c.institutionDesc}</span>
+                      <span style={{ fontSize: 12, color: accentHex, fontWeight: 600 }}>
+                        {c.pct}% funded · {c.daysLeft}d left
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>

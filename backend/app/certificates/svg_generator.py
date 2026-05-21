@@ -792,18 +792,18 @@ def generate_svg_certificate(
 
 if __name__ == "__main__":
     sample = generate_html_certificate(
-        donor_name="Maria Santos dela Cruz",
-        amount=25_000.00,
-        beneficiary_name="Jose & Elena Reyes Medical Fund",
-        milestone_description="Chemotherapy Cycle 3 of 6 Completed",
-        lives_touched=4,
-        total_donated=68_500.00,
-        donation_date=datetime(2024, 5, 21),
-        stellar_tx_hash="4a7b9c2e1f8d3a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b",
+        donor_name="Cameron Graham",
+        amount=7_498.00,
+        beneficiary_name="Gino Reyes — Home Repair, Manila",
+        milestone_description="Milestone 1: Materials Procurement — 50% Funded",
+        lives_touched=6,
+        total_donated=7_498.00,
+        donation_date=datetime(2026, 5, 17),
+        stellar_tx_hash="5b1f0ee8e8b1465dad6a747b0d030406a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6",
         merkle_proof="a3c7f2b9d1e4a6b8c3f0e2d5a8b1c4f7e2a9d6b3c8f5e1a4d7b2c9f6e3a0d8b5",
         onchain_hash="9f2e4a1c7b8d3e5f6a2b7c4d1e8f3a0b5c6d9e2f7a4b1c8d5e0f3a6b9c2d7e4f",
-        certificate_id="LNG-2024-00847",
-        block_number="47,821,093",
+        certificate_id="LNG-2026-BPH01",
+        block_number="52,031,847",
     )
 
     output_path = "lingap_certificate.html"
