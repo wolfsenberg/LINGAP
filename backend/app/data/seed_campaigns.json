@@ -1,0 +1,80 @@
+[
+  {
+    "_source": "https://www.bayanihanph.org/campaigns/5b1f0ee8-e8b1-465d-ad6a-747b0d030406",
+    "beneficiary": {
+      "id": "a1b2c3d4-0001-4000-8000-000000000001",
+      "name": "Gino Reyes",
+      "national_id": "BPH-5B1F0EE8-GINO",
+      "location": "Manila, Metro Manila, Philippines",
+      "category": "individual",
+      "need_level": "high",
+      "verified": true,
+      "stellar_public_key": null,
+      "total_received": 0
+    },
+    "aid_request": {
+      "id": "5b1f0ee8-e8b1-465d-ad6a-747b0d030406",
+      "title": "Help Kuya Gino Make His Home Safe",
+      "description": "Kuya Gino has sold taho seven days a week for ten years to support his partner and four children. Their house has no doors and no windows — just open frames. Funds raised will install doors, windows, and basic fixtures to make his home safe and secure for his family.",
+      "requested_amount": 15000.00,
+      "asset": "PHP",
+      "purpose": "Home repair — installation of doors, windows, and structural fixtures for a family dwelling in Manila.",
+      "status": "active",
+      "currency": "PHP",
+      "location": "Manila, Metro Manila, Philippines",
+      "category": "Community"
+    }
+  },
+  {
+    "_source": "https://www.gofundme.com/f/help-build-a-safe-shelter-for-31-rescue-cats",
+    "beneficiary": {
+      "id": "a1b2c3d4-0002-4000-8000-000000000002",
+      "name": "Thomas Dymek — 39 Rescue Cats Shelter Project",
+      "national_id": "GFM-99890205-CATS",
+      "location": "Philippines",
+      "category": "organization",
+      "need_level": "high",
+      "verified": true,
+      "stellar_public_key": null,
+      "total_received": 0
+    },
+    "aid_request": {
+      "id": "c2d3e4f5-0002-4000-8000-000000000002",
+      "title": "Help Build a Safe Shelter for 39 Rescue Cats",
+      "description": "A student rescuer is seeking funds to construct a dedicated, weatherproof shelter for 39 rescued cats currently living in inadequate conditions. Funds will cover materials for shelter construction, veterinary care, food, and ongoing maintenance for the rescued animals.",
+      "requested_amount": 900000.00,
+      "asset": "PHP",
+      "purpose": "Animal rescue shelter construction — structural build-out, veterinary expenses, and sustenance for 39 rescued cats.",
+      "status": "active",
+      "currency": "PHP",
+      "location": "Philippines",
+      "category": "Animal Rescue"
+    }
+  },
+  {
+    "_source": "https://www.gofundme.com/f/rescue-and-care-for-abandoned-dogs-and-cats-in-bulacan-ph",
+    "beneficiary": {
+      "id": "a1b2c3d4-0003-4000-8000-000000000003",
+      "name": "Eden Cayamanda — Pulilan Animal Rescue",
+      "national_id": "GFM-98027015-BULACAN",
+      "location": "Pulilan, Bulacan, Philippines",
+      "category": "organization",
+      "need_level": "critical",
+      "verified": true,
+      "stellar_public_key": null,
+      "total_received": 0
+    },
+    "aid_request": {
+      "id": "d3e4f5a6-0003-4000-8000-000000000003",
+      "title": "Rescue and Care for Abandoned Dogs and Cats in Bulacan",
+      "description": "In Pulilan, Bulacan, countless dogs and cats are abandoned and left without care. This rescue operation provides veterinary treatment, daily food, and shelter to rescued animals. Donations directly cover vet fees, food supplies, and basic shelter maintenance for animals in ongoing care.",
+      "requested_amount": 51300.00,
+      "asset": "PHP",
+      "purpose": "Animal rescue operations in Bulacan — veterinary care, food, and shelter costs for abandoned dogs and cats in Pulilan.",
+      "status": "active",
+      "currency": "PHP",
+      "location": "Pulilan, Bulacan, Philippines",
+      "category": "Animal Rescue"
+    }
+  }
+]
