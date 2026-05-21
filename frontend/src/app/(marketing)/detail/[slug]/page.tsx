@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
@@ -31,7 +31,7 @@ export default function DetailPage() {
   const [loading, setLoading] = useState(!campaign && !!slug);
   const [error, setError] = useState(false);
 
-  import { useEffect } from "react";
+
   useEffect(() => {
     if (!campaign && slug) {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
