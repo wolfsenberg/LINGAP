@@ -17,6 +17,9 @@ from .risk import (
 from .credibility import router as credibility_router
 from .leaderboard import router as leaderboard_router
 from .volunteer import router as volunteer_router
+from .geo import router as geo_router
+from .streaks import donor_router as streaks_donor_router
+from .streaks import admin_router as streaks_admin_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -37,3 +40,6 @@ api_router.include_router(aid_request_spending_router)
 api_router.include_router(credibility_router)
 api_router.include_router(leaderboard_router)
 api_router.include_router(volunteer_router)
+api_router.include_router(geo_router)
+api_router.include_router(streaks_donor_router)
+api_router.include_router(streaks_admin_router)

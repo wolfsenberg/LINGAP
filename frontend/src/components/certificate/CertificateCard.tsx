@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DonationCertificate } from '@/types';
-import { api } from '@/lib/api';
+import api from '@/lib/api';
 
 interface CertificateCardProps {
   certificate: DonationCertificate;

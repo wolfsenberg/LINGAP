@@ -161,4 +161,40 @@ export const certificatesApi = {
     api.get<ApiResponse<{ download_url: string; filename: string }>>(`/api/v1/certificates/${id}/download`),
 };
 
+export interface VolunteerOpportunity {
+  id: string;
+  organizer_name: string;
+  campaign_name: string;
+  title: string;
+  description: string;
+  category: string;
+  skills_needed: string[];
+  location: string;
+  schedule: string;
+  slots: number;
+  slots_filled: number;
+  slots_remaining: number;
+  status: "open" | "filled" | "closed";
+  urgent: boolean;
+  my_signup_status: "pending" | "accepted" | "rejected" | null;
+  created_at: string;
+  signup_id?: string;
+}
+
+export const volunteerApi = {
+  listOpportunities: (category?: string) =>
+    api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/opportunities", {
+      params: { category },
+    }),
+  getStats: () =>
+    api.get<ApiResponse<{ open_opportunities: number; total_volunteers: number; slots_needed: number }>>("/api/v1/volunteer/stats"),
+  apply: (opportunityId: string, message: string, skills: string[]) =>
+    api.post<ApiResponse<any>>(`/api/v1/volunteer/opportunities/${opportunityId}/apply`, {
+      message,
+      skills,
+    }),
+  mySignups: () =>
+    api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/signups"),
+};
+
 export default api;
