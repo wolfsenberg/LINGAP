@@ -41,3 +41,4 @@ class AidRequest(Base, TimestampMixin):
 
     beneficiary: Mapped["Beneficiary"] = relationship(back_populates="aid_requests")  # noqa: F821
     approver: Mapped["User | None"] = relationship("User", foreign_keys=[approved_by])  # noqa: F821
+    verification: Mapped["Verification | None"] = relationship("Verification", back_populates="aid_request", uselist=False)  # noqa: F821
