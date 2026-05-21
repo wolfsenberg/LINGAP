@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Compass, ShieldCheck, Heart } from "lucide-react";
+import { useAuthStore } from "@/store/authStore";
 
 const items = [
   { href: "/", label: "Home", icon: Home },
@@ -12,9 +13,12 @@ const items = [
 
 export default function MobileNav() {
   const pathname = usePathname();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const visibleItems = isAuthenticated ? items : items.filter((item) => item.href !== "/donor");
+
   return (
     <nav className="mobile-nav">
-      {items.map((item) => (
+      {visibleItems.map((item) => (
         <Link
           key={item.href}
           href={item.href}
