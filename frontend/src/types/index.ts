@@ -65,6 +65,20 @@ export interface ProvenanceRecord {
   timestamp: string;
 }
 
+export interface DonationCertificate {
+  id: string;
+  donationId: string;
+  s3Url: string;
+  isPublic: boolean;
+  donorName: string;
+  amount: number;
+  beneficiaryName: string;
+  milestoneDescription: string;
+  livesTouched: number;
+  totalDonated: number;
+  createdAt: string;
+}
+
 export interface DashboardStats {
   totalDonations: number;
   totalDisbursed: number;

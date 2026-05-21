@@ -6,6 +6,7 @@ import type {
   AidRequest,
   ProvenanceRecord,
   DashboardStats,
+  DonationCertificate,
   ApiResponse,
   PaginatedResponse,
 } from "@/types";
@@ -143,6 +144,81 @@ export const escrowApi = {
     ),
   executeClawback: (campaignId: number) =>
     api.post<ApiResponse<{ tx_hash: string }>>(`/api/v1/stellar/escrow/clawback/${campaignId}`),
+};
+
+export const certificatesApi = {
+  get: (id: string) =>
+    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`),
+  getByDonation: (donationId: string) =>
+    api.get<ApiResponse<DonationCertificate>>(`/api/v1/certificates/donation/${donationId}`),
+  listByDonor: (donorId: string) =>
+    api.get<ApiResponse<DonationCertificate[]>>(`/api/v1/certificates/donor/${donorId}/all`),
+  updateVisibility: (id: string, isPublic: boolean) =>
+    api.patch<ApiResponse<DonationCertificate>>(`/api/v1/certificates/${id}`, {
+      is_public: isPublic,
+    }),
+  getDownloadUrl: (id: string) =>
+    api.get<ApiResponse<{ download_url: string; filename: string }>>(`/api/v1/certificates/${id}/download`),
+};
+
+export interface VolunteerOpportunity {
+  id: string;
+  organizer_name: string;
+  campaign_name: string;
+  title: string;
+  description: string;
+  category: string;
+  skills_needed: string[];
+  location: string;
+  schedule: string;
+  slots: number;
+  slots_filled: number;
+  slots_remaining: number;
+  status: "open" | "filled" | "closed";
+  urgent: boolean;
+  my_signup_status: "pending" | "accepted" | "rejected" | null;
+  created_at: string;
+  signup_id?: string;
+}
+
+export const volunteerApi = {
+  listOpportunities: (category?: string) =>
+    api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/opportunities", {
+      params: { category },
+    }),
+  getStats: () =>
+    api.get<ApiResponse<{ open_opportunities: number; total_volunteers: number; slots_needed: number }>>("/api/v1/volunteer/stats"),
+  apply: (opportunityId: string, message: string, skills: string[]) =>
+    api.post<ApiResponse<any>>(`/api/v1/volunteer/opportunities/${opportunityId}/apply`, {
+      message,
+      skills,
+    }),
+  mySignups: () =>
+    api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/signups"),
+};
+
+export interface FundReleaseRequest {
+  organizer_id: string;
+  requested_amount: number;
+  total_pool_balance: number;
+  current_milestone_id?: string;
+}
+
+export interface FundReleaseResponse {
+  status: string;
+  tier: number;
+  released_amount: number;
+  message: string;
+  account_updates?: Record<string, any>;
+}
+
+export const fundReleaseApi = {
+  process: (data: FundReleaseRequest) =>
+    api.post<FundReleaseResponse>("/api/v1/fund-release/process", data),
+  verifyMilestone: (milestoneId: string, proofUrl: string) =>
+    api.post<any>(`/api/v1/fund-release/hooks/verify-milestone/${milestoneId}`, null, {
+      params: { proof_url: proofUrl }
+    }),
 };
 
 export default api;
