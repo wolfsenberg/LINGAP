@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     CONTRACT_BENEFICIARY_REGISTRY: str = "CDPQC74JGFZ5BUNUELBO7M5ZNO6EEPEG4QYATODEWLDEMCI6I7YMGJDT"
 
     CORS_ORIGINS: str = "http://localhost:3000,https://lingap-ledger.vercel.app"
+    CORS_ORIGIN_REGEX: str = r"https://.*\.vercel\.app|http://localhost:\d+"
 
     # Proof of Reality / file uploads
     UPLOAD_DIR: str = "/app/uploads/proofs"
