@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect, useMemo } from "react";
 import { Hospital, Anchor, BookOpen, Handshake, MapPin, Star, Sparkles, CheckCircle2, Search, Users, Home, Cat, PawPrint, ChevronDown, ShieldAlert, AlertTriangle } from "lucide-react";
-import { CAMPAIGNS } from "@/lib/campaigns";
+import { CAMPAIGNS, mergeCampaignSummaries, type PublicCampaignSummary } from "@/lib/campaigns";
+import { campaignsApi } from "@/lib/api";
 import AuthPromptLink from "@/components/auth/AuthPromptLink";
 
 // Major Philippine cities for the dropdown
@@ -35,48 +36,62 @@ const PH_CITIES = [
 
 export default function DiscoverPage() {
   const [selectedCity, setSelectedCity] = useState<string>("All Cities");
-  const [liveCampaigns, setLiveCampaigns] = useState<any[]>([]);
+  const [featuredCampaigns, setFeaturedCampaigns] = useState(CAMPAIGNS);
+  const [liveCampaigns, setLiveCampaigns] = useState<PublicCampaignSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch campaigns from backend API
+  // Fetch centralized campaign totals from the backend API.
   useEffect(() => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    let mounted = true;
+
+    async function loadCampaigns() {
+      try {
+        const res = await campaignsApi.publicList();
+        if (!mounted) return;
+        setLiveCampaigns(res.data.data);
+        setFeaturedCampaigns(mergeCampaignSummaries(res.data.data));
+      } catch {
+        if (!mounted) return;
+        setLiveCampaigns([]);
+        setFeaturedCampaigns(CAMPAIGNS);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
     setLoading(true);
-    fetch(`${baseUrl}/api/v1/aid-requests?page=1&size=200`)
-      .then((res) => (res.ok ? res.json() : { items: [] }))
-      .then((data) => {
-        setLiveCampaigns(data.items ?? []);
-      })
-      .catch(() => setLiveCampaigns([]))
-      .finally(() => setLoading(false));
+    loadCampaigns();
+    const timer = window.setInterval(loadCampaigns, 10000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
   }, []);
 
   // Filter campaigns by selected city
   const filteredCampaigns = useMemo(() => {
     if (selectedCity === "All Cities") return liveCampaigns;
     return liveCampaigns.filter((c) => {
-      const loc = (c.location || c.beneficiary_location || "").toLowerCase();
+      const loc = (c.location || "").toLowerCase();
       return loc.includes(selectedCity.toLowerCase());
     });
   }, [liveCampaigns, selectedCity]);
 
   // --- Dynamic stats computed from fetched campaigns ---
   const activeCampaigns = liveCampaigns.filter(
-    (c) => c.status === "active" || c.status === "approved" || c.status === "pending"
+    (c) => ["active", "funded"].includes((c.status || "").toLowerCase())
   ).length;
 
   const verifiedCampaigns = liveCampaigns.filter(
-    (c) => c.is_verified === true
+    (c) => ["seeded", "database"].includes(c.source)
   ).length;
 
   const totalRequested = liveCampaigns.reduce(
-    (sum: number, c: any) => sum + (c.requested_amount || 0),
+    (sum: number, c) => sum + (c.goal_amount || 0),
     0
   );
 
-  const confirmedFraud = liveCampaigns.filter(
-    (c) => c.status === "fraud" || c.classification === "fraud"
-  ).length;
+  const confirmedFraud = 0;
 
   const filters = [
     { label: "All Campaigns", Icon: null },
@@ -144,7 +159,7 @@ export default function DiscoverPage() {
           </div>
 
           <div className="campaign-grid">
-            {CAMPAIGNS.map((c) => {
+            {featuredCampaigns.map((c) => {
               const Icon = c.heroIcon === "🏠" ? Home : c.heroIcon === "🐱" ? Cat : PawPrint;
               const progressColor = c.category === "Animal Rescue" ? "prog-gold" : "prog-emerald";
               const accentHex = c.category === "Animal Rescue" ? "var(--amber)" : "var(--canopy)";
@@ -188,7 +203,7 @@ export default function DiscoverPage() {
                     </div>
                     <div className="camp-footer">
                       <span className="badge badge-navy">{c.institutionDesc}</span>
-                      <span style={{ fontSize: 12, color: accentHex, fontWeight: 600 }}>
+                      <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 600 }}>
                         {c.pct}% funded · {c.daysLeft}d left
                       </span>
                     </div>
@@ -321,24 +336,26 @@ export default function DiscoverPage() {
         ) : (
           <div className="campaign-grid">
             {filteredCampaigns.map((c) => {
-              const progressColor = "prog-emerald";
-              const accentHex = "var(--canopy)";
-              const pct = c.pct || 0;
-              const daysLeft = c.daysLeft || 30;
+              const pct = c.progress || 0;
+              const daysLeft = 30;
+              const raisedLabel = c.raised_label ?? `₱${Math.round(c.raised_amount).toLocaleString()}`;
+              const goalLabel = c.goal_label ?? `₱${Math.round(c.goal_amount).toLocaleString()}`;
               return (
-                <AuthPromptLink key={c.id || c.aid_request_id} href={`/detail/${c.id || c.aid_request_id}`} className="camp-card emerald-glow featured-camp" style={{ textDecoration: "none" }}>
-                  <div className="camp-img" style={{ background: "linear-gradient(135deg,#1a3a2a,#2d5a3d)" }}>
-                    <div className="camp-img-inner"><Hospital size={48} strokeWidth={1.8} /></div>
+                <AuthPromptLink key={c.id} href={`/detail/${c.slug}`} className="camp-card emerald-glow featured-camp" style={{ textDecoration: "none" }}>
+                  <div className={`camp-img ${c.image_src ? "has-photo" : ""}`} style={{ background: "linear-gradient(135deg,#1a3a2a,#2d5a3d)" }}>
+                    {c.image_src ? (
+                      <img className="camp-img-photo" src={c.image_src} alt={c.title} />
+                    ) : (
+                      <div className="camp-img-inner"><Hospital size={48} strokeWidth={1.8} /></div>
+                    )}
                     {c.status && (
                       <div style={{ position: "absolute", top: 12, left: 12 }}>
                         <span className="badge badge-blue" style={{ textTransform: "capitalize" }}>{c.status}</span>
                       </div>
                     )}
-                    {c.is_verified && (
-                      <div style={{ position: "absolute", top: 12, right: 12 }}>
-                        <span className="badge badge-emerald">Verified</span>
-                      </div>
-                    )}
+                    <div style={{ position: "absolute", top: 12, right: 12 }}>
+                      <span className="badge badge-emerald">Verified</span>
+                    </div>
                     {c.location && (
                       <div style={{ position: "absolute", bottom: 12, left: 12 }}>
                         <span className="badge badge-navy" style={{ fontSize: 10 }}>{c.location}</span>
@@ -346,21 +363,21 @@ export default function DiscoverPage() {
                     )}
                   </div>
                   <div className="camp-body">
-                    <h3 className="camp-title">{c.beneficiary_name}</h3>
-                    <p className="camp-desc">{c.purpose}</p>
+                    <h3 className="camp-title">{c.title}</h3>
+                    <p className="camp-desc">{c.description}</p>
                     <div className="camp-meta">
                       <div>
-                        <div className="camp-raised">&#8369;0</div>
-                        <div className="camp-goal">of &#8369;{c.requested_amount?.toLocaleString() || 0} goal</div>
+                        <div className="camp-raised">{raisedLabel}</div>
+                        <div className="camp-goal">of {goalLabel} goal</div>
                       </div>
-                      <div className="camp-donors"><Users size={12} /> {c.donors?.toLocaleString() || 0} donors</div>
+                      <div className="camp-donors"><Users size={12} /> {c.donors.toLocaleString()} donors</div>
                     </div>
                     <div className="prog-track" style={{ height: 8 }}>
-                      <div className={`prog-fill ${progressColor}`} style={{ width: `${pct}%` }} />
+                      <div className="prog-fill prog-emerald" style={{ width: `${pct}%` }} />
                     </div>
                     <div className="camp-footer">
-                      <span className="badge badge-navy">{c.is_verified ? "Platform Verified" : "Unverified"}</span>
-                      <span style={{ fontSize: 12, color: accentHex, fontWeight: 600 }}>
+                      <span className="badge badge-navy">{c.institution}</span>
+                      <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 600 }}>
                         {pct}% funded · {daysLeft}d left
                       </span>
                     </div>
