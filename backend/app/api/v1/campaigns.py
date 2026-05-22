@@ -141,7 +141,6 @@ async def _donation_totals(db: AsyncSession, campaign_id: str) -> tuple[float, i
                 func.count(distinct(Donation.donor_id)).label("donors"),
             ).where(
                 Donation.purpose == f"campaign:{campaign_id}",
-                Donation.blockchain_confirmed.is_(True),
             )
         )
     ).one()

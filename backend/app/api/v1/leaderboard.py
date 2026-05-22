@@ -23,7 +23,6 @@ async def donor_leaderboard(
                 func.count(Donation.id).label("count"),
                 func.max(Donation.updated_at).label("last_donation_at"),
             )
-            .where(Donation.blockchain_confirmed.is_(True))
             .group_by(Donation.donor_id)
             .order_by(func.sum(Donation.amount).desc())
             .limit(limit)
@@ -60,7 +59,6 @@ async def my_impact(
                 func.count(distinct(Donation.purpose)).label("count"),
             ).where(
                 Donation.donor_id == user.id,
-                Donation.blockchain_confirmed.is_(True),
             )
         )
     ).one()

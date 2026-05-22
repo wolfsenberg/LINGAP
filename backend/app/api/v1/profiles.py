@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from types import SimpleNamespace
 
 from app.api.v1.campaigns import DEMO_XLM_TO_PHP, STATIC_ORGANIZER_EMAIL, _serialize_drive, _static_drives_for_user
 from app.core.database import get_db
@@ -16,16 +17,6 @@ router = APIRouter(prefix="/profiles", tags=["profiles"])
 def _is_geinel_identity(user: User) -> bool:
     identity = f"{user.name or ''} {user.email or ''}".lower()
     return "geinel" in identity or "dungao" in identity or user.email.lower() == STATIC_ORGANIZER_EMAIL
-
-
-async def _resolve_my_profile_user(db: AsyncSession, user: User) -> User:
-    if not _is_geinel_identity(user):
-        return user
-
-    canonical_user = (
-        await db.execute(select(User).where(func.lower(User.email) == STATIC_ORGANIZER_EMAIL))
-    ).scalar_one_or_none()
-    return canonical_user or user
 
 
 def _badge_set(total_xlm: float, campaigns_count: int, cert_count: int) -> list[dict]:
@@ -66,6 +57,11 @@ async def _public_campaigns_for_user(db: AsyncSession, user: User) -> list[dict]
     ).scalars().all()
 
     items = await _static_drives_for_user(db, user)
+    if not items and _is_geinel_identity(user):
+        items = await _static_drives_for_user(
+            db,
+            SimpleNamespace(id=user.id, email=STATIC_ORGANIZER_EMAIL, name=user.name),
+        )
     for drive in drives:
         items.append(await _serialize_drive(db, drive))
     items.sort(key=lambda item: item["updated_at"], reverse=True)
@@ -100,7 +96,6 @@ async def _profile_payload(db: AsyncSession, user: User) -> dict:
                 func.max(Donation.created_at).label("last_activity_at"),
             ).where(
                 Donation.donor_id == user.id,
-                Donation.blockchain_confirmed.is_(True),
             )
         )
     ).one()
@@ -124,7 +119,6 @@ async def _profile_payload(db: AsyncSession, user: User) -> dict:
             select(Donation)
             .where(
                 Donation.donor_id == user.id,
-                Donation.blockchain_confirmed.is_(True),
                 Donation.purpose.like("campaign:%"),
             )
             .order_by(Donation.created_at.desc())
@@ -153,6 +147,7 @@ async def _profile_payload(db: AsyncSession, user: User) -> dict:
             "amount": float(donation.amount),
             "asset": donation.asset,
             "stellar_tx_hash": donation.stellar_tx_hash,
+            "blockchain_confirmed": donation.blockchain_confirmed,
             "created_at": donation.created_at,
         }
         for donation in activity_rows
@@ -224,8 +219,7 @@ async def my_public_profile(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    profile_user = await _resolve_my_profile_user(db, user)
-    return {"success": True, "data": await _profile_payload(db, profile_user)}
+    return {"success": True, "data": await _profile_payload(db, user)}
 
 
 @router.get("/{user_id}")
