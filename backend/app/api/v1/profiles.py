@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.campaigns import DEMO_XLM_TO_PHP, _serialize_drive, _static_drives_for_user
 from app.core.database import get_db
+from app.core.dependencies import get_current_user
 from app.models.campaign_drive import CampaignDrive, CampaignDriveStatus
 from app.models.donation import Donation
 from app.models.donation_certificate import DonationCertificate
@@ -201,6 +202,14 @@ async def search_profiles(
             }
         )
     return {"success": True, "data": items}
+
+
+@router.get("/me")
+async def my_public_profile(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return {"success": True, "data": await _profile_payload(db, user)}
 
 
 @router.get("/{user_id}")
