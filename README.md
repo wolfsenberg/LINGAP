@@ -91,13 +91,15 @@ docker-compose up --build (make sure docker is running in the background)
 - **Contract / App Address:** `CDZTFM2BHBLYQLIJSSF7UOSWCQMQMOUATXEJTDOHKBIZ6R4DFZKB7DDP`
 - 📸 Screenshot — Stellar Expert (Testnet)
 
-  ![Testnet Screenshot](./screenshots/testnet.png)
+ <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/f9c0ce6d-e86a-44bd-b178-0e8b23a953a7" />
+
 
 ### Mainnet
 - **Contract / App Address:** `GXXXX...`
 - 📸 Screenshot — Stellar Expert (Mainnet)
 
-  ![Mainnet Screenshot](./screenshots/mainnet.png)
+ <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/8b692d6e-7fe2-4e62-874a-30e42582d2eb" />
+
 
 ---
 
