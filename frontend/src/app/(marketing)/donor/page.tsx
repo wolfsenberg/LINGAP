@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowRight,
   Award,
+  BadgeDollarSign,
   CheckCircle2,
   Edit3,
   Flame,
@@ -20,11 +21,15 @@ import {
   Star,
   Trophy,
   Users,
+  Wallet,
 } from "lucide-react";
 import {
+  balanceApi,
   campaignsApi,
   donationsApi,
   donorsApi,
+  type BalanceApi,
+  type BalanceTransactionApi,
   type CampaignDriveApi,
   type LeaderboardDonorApi,
   profilesApi,
@@ -39,8 +44,16 @@ import { getFirstName } from "@/lib/userName";
 import { useAuthStore } from "@/store/authStore";
 import type { Donation } from "@/types";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
+import TopUpModal from "@/components/balance/TopUpModal";
 
 const XLM_TO_PHP = 10;
+
+const DEFAULT_BALANCE: BalanceApi = {
+  xlm_balance: 0,
+  php_equivalent: 0,
+  xlm_to_php_rate: XLM_TO_PHP,
+  transactions: [],
+};
 
 function formatPeso(value: number) {
   return `₱${Math.round(value).toLocaleString()}`;
@@ -48,6 +61,10 @@ function formatPeso(value: number) {
 
 function formatXlm(value: number) {
   return `${value.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM`;
+}
+
+function formatPhp(value: number) {
+  return `₱${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatDate(value?: string | null) {
@@ -72,6 +89,11 @@ function campaignNameFromPurpose(purpose?: string) {
   return CAMPAIGNS.find((campaign) => campaign.slug === slug)?.shortTitle || slug || "LINGAP campaign";
 }
 
+function transactionTitle(tx: BalanceTransactionApi) {
+  if (tx.kind === "top_up") return `${tx.payment_method.toUpperCase()} top-up`;
+  return `Donation to ${tx.campaign_id || "campaign"}`;
+}
+
 export default function DonorPage() {
   const user = useAuthStore((state) => state.user);
   const [profileName, setProfileName] = useState(user?.name ?? "");
@@ -79,6 +101,8 @@ export default function DonorPage() {
   const [drives, setDrives] = useState<CampaignDriveApi[]>([]);
   const [donations, setDonations] = useState<Donation[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardDonorApi[]>([]);
+  const [balance, setBalance] = useState<BalanceApi>(DEFAULT_BALANCE);
+  const [topUpOpen, setTopUpOpen] = useState(false);
   const [impact, setImpact] = useState({
     total_donated: 0,
     campaigns_helped: 0,
@@ -116,11 +140,12 @@ export default function DonorPage() {
         }
       }
 
-      const [profileResult, donationResult, leaderboardResult, campaignsResult] = await Promise.allSettled([
+      const [profileResult, donationResult, leaderboardResult, campaignsResult, balanceResult] = await Promise.allSettled([
         profilesApi.me(),
         donationsApi.mine(1, 25),
         donorsApi.leaderboard(10),
         campaignsApi.mine(),
+        balanceApi.mine(),
       ]);
 
       if (!active) return;
@@ -129,6 +154,7 @@ export default function DonorPage() {
       const backendDonations = donationResult.status === "fulfilled" ? donationResult.value.data.items : [];
       const backendDrives = campaignsResult.status === "fulfilled" ? campaignsResult.value.data.data : [];
       const liveLeaderboard = leaderboardResult.status === "fulfilled" ? leaderboardResult.value.data.data : [];
+      const liveBalance = balanceResult.status === "fulfilled" ? balanceResult.value.data.data : DEFAULT_BALANCE;
 
       if (publicProfile) {
         setProfileName(publicProfile?.user.display_name ?? user.name);
@@ -181,6 +207,7 @@ export default function DonorPage() {
       setDrives(mergedDrives);
       setDonations(syncedDonations);
       setLeaderboard(liveLeaderboard);
+      setBalance(liveBalance);
       setImpact({
         total_donated: totalXlm,
         campaigns_helped: donatedCampaigns.size,
@@ -196,10 +223,12 @@ export default function DonorPage() {
 
   const latestDrives = drives.slice(0, 3);
   const hasMoreDrives = drives.length > latestDrives.length;
-  const totalDonatedPhp = impact.total_donated * XLM_TO_PHP;
+  const conversionRate = balance.xlm_to_php_rate || XLM_TO_PHP;
+  const totalDonatedPhp = impact.total_donated * conversionRate;
   const verifiedDonations = donations.filter((donation) => donation.blockchainConfirmed);
-  const releasedPhp = verifiedDonations.reduce((sum, donation) => sum + donation.amount * XLM_TO_PHP, 0);
+  const releasedPhp = verifiedDonations.reduce((sum, donation) => sum + donation.amount * conversionRate, 0);
   const lockedPhp = Math.max(totalDonatedPhp - releasedPhp, 0);
+  const recentBalanceTransactions = balance.transactions.slice(0, 5);
 
   const donationTimeline = useMemo(
     () =>
@@ -209,6 +238,7 @@ export default function DonorPage() {
         sub: `${formatDate(donation.createdAt)} · ${
           donation.blockchainConfirmed ? "Stellar transaction confirmed" : "Waiting for Stellar verification"
         }`,
+        funding: donation.fundingSource ? donation.fundingSource.replace(/_/g, " ") : "direct wallet",
         badge: donation.blockchainConfirmed ? "badge-emerald" : "badge-gold",
         badgeText: donation.blockchainConfirmed ? "Verified" : "Pending",
         escrow: donation.disbursed ? "Released from escrow" : "Tracked in donation vault",
@@ -222,6 +252,18 @@ export default function DonorPage() {
 
   return (
     <div>
+      <TopUpModal
+        open={topUpOpen}
+        onClose={() => setTopUpOpen(false)}
+        rate={conversionRate}
+        onConfirmed={(nextBalance, tx) => {
+          setBalance((current) => ({
+            ...current,
+            ...nextBalance,
+            transactions: [tx, ...current.transactions].slice(0, 10),
+          }));
+        }}
+      />
       <div className="donor-hero">
         <div className="container">
           <div className="donor-hero-grid">
@@ -256,6 +298,59 @@ export default function DonorPage() {
       </div>
 
       <div className="page-inner">
+        <section id="balance" className="impact-panel impact-panel-focus" style={{ marginBottom: 22 }}>
+          <div className="impact-panel-head">
+            <div>
+              <div className="section-label">LINGAP BALANCE</div>
+              <h2 className="impact-panel-title">Your Available Balance</h2>
+              <p className="impact-panel-copy">
+                LINGAP supports PDAX, GCash, Maya, and Stellar Wallet to make giving accessible while keeping donations transparent through Stellar-powered tracking.
+              </p>
+            </div>
+            <button type="button" onClick={() => setTopUpOpen(true)} className="btn btn-emerald">
+              <BadgeDollarSign size={15} /> Top Up
+            </button>
+          </div>
+
+          <div className="transparency-grid">
+            <div className="transparency-card">
+              <div className="transparency-icon"><Wallet size={17} strokeWidth={1.8} /></div>
+              <div className="transparency-label">Available Balance</div>
+              <div className="transparency-value">{formatXlm(balance.xlm_balance)}</div>
+              <div className="transparency-sub">≈ {formatPhp(balance.php_equivalent)}</div>
+            </div>
+            <div className="transparency-card">
+              <div className="transparency-icon"><Network size={17} strokeWidth={1.8} /></div>
+              <div className="transparency-label">XLM / PHP Converter</div>
+              <div className="transparency-value">1 XLM = {formatPhp(conversionRate)}</div>
+              <div className="transparency-sub">Demo rate configured by backend</div>
+            </div>
+          </div>
+
+          {recentBalanceTransactions.length > 0 && (
+            <div className="donation-timeline" style={{ marginTop: 8 }}>
+              {recentBalanceTransactions.map((tx) => (
+                <div key={tx.id} className="donation-row">
+                  <div className={`donation-dot ${tx.kind === "top_up" ? "is-done" : "is-pending"}`} />
+                  <div className="donation-main">
+                    <div className="donation-title">{transactionTitle(tx)}</div>
+                    <div className="donation-sub">
+                      {formatDate(tx.created_at)} · {formatXlm(tx.amount_xlm)} ≈ {formatPhp(tx.amount_php)}
+                    </div>
+                    <div className="donation-proof-row">
+                      <span><Landmark size={12} /> {tx.payment_reference}</span>
+                      <span><CheckCircle2 size={12} /> {tx.payment_status}</span>
+                    </div>
+                  </div>
+                  <span className={`badge ${tx.kind === "top_up" ? "badge-emerald" : "badge-gold"}`}>
+                    {tx.kind === "top_up" ? "Credit" : "Debit"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         <div className="impact-dashboard-grid">
           <main className="impact-main-stack">
             <section id="my-donations" className="impact-panel impact-panel-focus">
@@ -296,6 +391,7 @@ export default function DonorPage() {
                       <div className="donation-proof-row">
                         <span><Landmark size={12} /> {item.escrow}</span>
                         <span><Network size={12} /> {item.stellar}</span>
+                        <span><Wallet size={12} /> {item.funding}</span>
                       </div>
                     </div>
                     <span className={`badge ${item.badge}`}>{item.badgeText}</span>

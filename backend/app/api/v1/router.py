@@ -18,6 +18,7 @@ from .volunteer import router as volunteer_router
 from .geo import router as geo_router
 from .campaigns import router as campaigns_router
 from .profiles import router as profiles_router
+from .balance import router as balance_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -39,3 +40,4 @@ api_router.include_router(leaderboard_router)
 api_router.include_router(volunteer_router)
 api_router.include_router(campaigns_router)
 api_router.include_router(profiles_router)
+api_router.include_router(balance_router)
