@@ -4,7 +4,7 @@ import QueryProvider from "@/components/providers/QueryProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "LINGAP — Aid Provenance & Protection",
+  title: "LINGAP | Ledger for Integrity, Need-based Giving, Aid Provenance, and Protection",
   description:
     "Ledger for Integrity, Need-based Giving, Aid Provenance, and Protection — powered by Stellar blockchain.",
   keywords: ["humanitarian", "aid", "blockchain", "stellar", "transparency", "donations"],
