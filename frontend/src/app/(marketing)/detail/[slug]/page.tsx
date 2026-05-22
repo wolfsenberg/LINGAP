@@ -3,8 +3,13 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
-import { escrowApi } from "@/lib/api";
-import { STELLAR_CONFIG } from "@/lib/stellar";
+import { donationsApi } from "@/lib/api";
+import {
+  STELLAR_CONFIG,
+  buildPaymentTransaction,
+  getStellarExpertTxUrl,
+  submitSignedTransactionXdr,
+} from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import { CAMPAIGNS } from "@/lib/campaigns";
@@ -15,6 +20,31 @@ import {
 } from "lucide-react";
 
 const AMOUNTS = [100, 250, 500, 1000, 5000];
+const DEMO_XLM_TO_PHP = 10;
+const LINGAP_RECEIVER_PUBLIC_KEY = process.env.NEXT_PUBLIC_LINGAP_RECEIVER_PUBLIC_KEY || "";
+
+type FreighterSignResult =
+  | string
+  | {
+      signedTxXdr?: string;
+      signedTxXDR?: string;
+      error?: string;
+    };
+
+function getDonationErrorMessage(error: unknown) {
+  const err = error as { message?: string; response?: { data?: { detail?: string } } };
+  return err.response?.data?.detail || err.message || "Donation failed";
+}
+
+function formatXlmAmount(amount: number) {
+  return amount.toFixed(7).replace(/\.?0+$/, "");
+}
+
+function getSignedXdr(signResult: FreighterSignResult) {
+  if (typeof signResult === "string") return signResult;
+  if (signResult.error) throw new Error(signResult.error);
+  return signResult.signedTxXdr ?? signResult.signedTxXDR;
+}
 
 export default function DetailPage() {
   const params = useParams();
@@ -26,6 +56,8 @@ export default function DetailPage() {
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
   const [donating, setDonating] = useState(false);
+  const [confirmedDonationXlm, setConfirmedDonationXlm] = useState(0);
+  const [lastTxHash, setLastTxHash] = useState("");
 
   const [dbCampaign, setDbCampaign] = useState<any>(null);
   const [loading, setLoading] = useState(!campaign && !!slug);
@@ -61,6 +93,7 @@ export default function DetailPage() {
             raised: 0,
             goal: data.requested_amount,
             goalLabel: `${data.requested_amount} ${data.asset}`,
+            asset: data.asset,
             donors: 0,
             daysLeft: 30,
             pct: 0,
@@ -100,6 +133,13 @@ export default function DetailPage() {
 
 
   const effectiveAmount = useCustom ? parseFloat(customAmount) || 0 : selectedAmount;
+  const usesXlmGoal = activeCampaign.asset === "XLM" || /XLM/i.test(activeCampaign.goalLabel || "");
+  const displayRaised = activeCampaign.raised + confirmedDonationXlm * (usesXlmGoal ? 1 : DEMO_XLM_TO_PHP);
+  const displayRaisedLabel = usesXlmGoal
+    ? `${displayRaised.toLocaleString()} XLM`
+    : `₱${Math.round(displayRaised).toLocaleString()}`;
+  const displayPct = Math.min(100, Math.round((displayRaised / activeCampaign.goal) * 100));
+  const displayDonors = activeCampaign.donors + (confirmedDonationXlm > 0 ? 1 : 0);
 
   async function handleDonate() {
     if (!connected || !publicKey) {
@@ -110,21 +150,39 @@ export default function DetailPage() {
       toast.error("Enter a valid amount.");
       return;
     }
+    if (!LINGAP_RECEIVER_PUBLIC_KEY) {
+      toast.error("LINGAP receiving wallet is not configured yet.");
+      return;
+    }
     setDonating(true);
     try {
-      const xdrRes = await escrowApi.getDepositXdr(activeCampaign.id, publicKey, effectiveAmount);
-      const unsignedXdr = xdrRes.data.data.xdr;
+      const memo = `LINGAP:${String(activeCampaign.id).slice(0, 20)}`;
+      const transaction = await buildPaymentTransaction(
+        publicKey,
+        LINGAP_RECEIVER_PUBLIC_KEY,
+        formatXlmAmount(effectiveAmount),
+        undefined,
+        memo
+      );
       const { signTransaction } = await import("@stellar/freighter-api");
-      const signResult = await signTransaction(unsignedXdr, {
+      const signResult = (await signTransaction(transaction.toXDR(), {
         networkPassphrase: STELLAR_CONFIG.network,
+      })) as FreighterSignResult;
+      const signedXdr = getSignedXdr(signResult);
+      if (!signedXdr) throw new Error("Freighter did not return a signed transaction.");
+      const submitRes = await submitSignedTransactionXdr(signedXdr);
+      const txHash = submitRes.hash;
+      await donationsApi.create({
+        amount: effectiveAmount,
+        asset: "XLM",
+        purpose: `campaign:${activeCampaign.slug || activeCampaign.id}`,
+        stellarTxHash: txHash,
       });
-      if (signResult.error) throw new Error(signResult.error);
-      const submitRes = await escrowApi.submitSignedXdr(signResult.signedTxXdr);
-      const txHash = submitRes.data.data.tx_hash;
+      setConfirmedDonationXlm((current) => current + effectiveAmount);
+      setLastTxHash(txHash);
       toast.success(`Donation confirmed! Tx: ${txHash.slice(0, 8)}…`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Donation failed";
-      toast.error(msg);
+      toast.error(getDonationErrorMessage(e));
     } finally {
       setDonating(false);
     }
@@ -234,21 +292,21 @@ export default function DetailPage() {
             <div className="flex flex-center flex-between mb-16">
               <div>
                 <div style={{ fontFamily: "Sora,sans-serif", fontSize: 28, fontWeight: 800, color: "var(--forest)" }}>
-                  {activeCampaign.raisedLabel}
+                  {displayRaisedLabel}
                 </div>
                 <div style={{ fontSize: 13, color: "var(--text3)" }}>raised of {activeCampaign.goalLabel} goal</div>
               </div>
               <div className="text-right">
-                <div style={{ fontSize: 22, fontWeight: 700, color: accentHex }}>{activeCampaign.pct}%</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: accentHex }}>{displayPct}%</div>
                 <div style={{ fontSize: 12, color: "var(--text3)" }}>funded</div>
               </div>
             </div>
             <div className={`prog-track mb-8`} style={{ height: 12 }}>
-              <div className={`prog-fill ${progressColor}`} style={{ width: `${activeCampaign.pct}%` }} />
+              <div className={`prog-fill ${progressColor}`} style={{ width: `${displayPct}%` }} />
             </div>
             <div className="flex flex-center flex-between mb-24" style={{ fontSize: 13, color: "var(--text3)" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <Users size={13} /> {activeCampaign.donors.toLocaleString()} donors
+                <Users size={13} /> {displayDonors.toLocaleString()} donors
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                 <Clock size={13} /> {activeCampaign.daysLeft} days left
@@ -311,6 +369,17 @@ export default function DetailPage() {
                   ? `Donate ${effectiveAmount} XLM`
                   : "Connect Wallet to Donate"}
             </button>
+            {lastTxHash && (
+              <a
+                href={getStellarExpertTxUrl(lastTxHash)}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-outline"
+                style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}
+              >
+                <CheckCircle2 size={14} /> View transaction on Stellar Explorer
+              </a>
+            )}
             <button className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
               <RefreshCw size={14} /> Set Monthly Donation
             </button>

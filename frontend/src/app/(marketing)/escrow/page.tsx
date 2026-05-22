@@ -5,6 +5,12 @@ import {
 import { CAMPAIGNS } from "@/lib/campaigns";
 
 export default function EscrowPage() {
+  const network = process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "public" : "testnet";
+  const donationVaultContract = process.env.NEXT_PUBLIC_CONTRACT_DONATION_VAULT;
+  const stellarExplorerUrl = donationVaultContract
+    ? `https://stellar.expert/explorer/${network}/contract/${donationVaultContract}`
+    : `https://stellar.expert/explorer/${network}`;
+
   return (
     <div>
       <div className="esc-hero" style={{position:'relative',overflow:'hidden'}}>
@@ -104,7 +110,9 @@ export default function EscrowPage() {
             <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',display:'flex',alignItems:'center',gap:8}}>
               <Search size={18} color="var(--canopy)" strokeWidth={1.8}/> Recent Blockchain Transactions
             </h3>
-            <button className="btn btn-outline btn-sm">View All on Stellar Explorer</button>
+            <a href={stellarExplorerUrl} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm">
+              View All on Stellar Explorer
+            </a>
           </div>
           {[
             {Icon:CheckCircle2,iconBg:'rgba(74,155,106,.1)',iconColor:'var(--canopy)',title:`Milestone Release — ${CAMPAIGNS[0].institution} Billing`,hash:'STELLAR:0x4a8f...3c2b • Nov 28, 2025 at 14:32 PHT',badge:'badge-emerald',badgeText:'Immutable Record',amount:'₱75,000',dest:`To: ${CAMPAIGNS[0].institution}`,amountColor:'var(--canopy)'},

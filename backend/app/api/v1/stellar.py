@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.stellar.client import verify_transaction, get_account_info
 from app.stellar import soroban
 from app.core.database import get_db
+from app.config import settings
 
 router = APIRouter(prefix="/stellar", tags=["stellar"])
 
@@ -33,6 +34,8 @@ class DepositXdrRequest(BaseModel):
 @router.post("/escrow/deposit-xdr")
 async def get_deposit_xdr(body: DepositXdrRequest):
     try:
+        if not settings.CONTRACT_DONATION_VAULT:
+            raise ValueError("Donation vault contract is not configured on the backend.")
         stroops = int(body.amount_xlm * 10_000_000)
         xdr = await soroban.build_deposit_xdr(
             campaign_id=body.campaign_id,
