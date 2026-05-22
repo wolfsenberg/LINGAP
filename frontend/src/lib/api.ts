@@ -388,6 +388,23 @@ export const campaignsApi = {
   escrow: (campaignId: string) =>
     api.get<ApiResponse<CampaignEscrowApi | null>>(`/api/v1/campaigns/public/${campaignId}/escrow`),
   mine: () => api.get<ApiResponse<CampaignDriveApi[]>>("/api/v1/campaigns/mine"),
+  uploadCover: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await api.post<ApiResponse<{ url: string }>>("/api/v1/campaigns/uploads/cover", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const url = res.data.data.url;
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: {
+          url: url.startsWith("http") ? url : `${getApiBaseUrl()}${url}`,
+        },
+      },
+    };
+  },
   create: (data: {
     title: string;
     description: string;

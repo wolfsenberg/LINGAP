@@ -58,11 +58,20 @@ export default function MyCampaignsPage() {
           <div className="campaign-grid">
             {drives.map((drive)=>(
               <div key={drive.id} className="camp-card" style={{cursor:'default'}}>
-                <div className="camp-body">
-                  <div className="flex flex-center flex-between mb-12">
+                <div className={`camp-img ${drive.image_src ? "has-photo" : ""}`}>
+                  {drive.image_src ? (
+                    <img className="camp-img-photo" src={drive.image_src} alt={drive.title} />
+                  ) : (
+                    <div className="camp-img-inner"><Megaphone size={44} strokeWidth={1.7} /></div>
+                  )}
+                  <div style={{position:'absolute',top:12,left:12}}>
                     <span className="badge badge-navy">{drive.category}</span>
+                  </div>
+                  <div style={{position:'absolute',top:12,right:12}}>
                     <span className={`badge ${drive.status === 'Active' || drive.status === 'Funded' ? 'badge-emerald' : drive.status === 'Draft' ? 'badge-navy' : 'badge-gold'}`}>{drive.status}</span>
                   </div>
+                </div>
+                <div className="camp-body">
                   <div style={{fontSize:12,color:'var(--text3)',fontFamily:'Space Mono,monospace',marginBottom:8}}>{drive.id.slice(0, 12)}</div>
                   <h3 className="camp-title">{drive.title}</h3>
                   <p className="camp-desc" style={{WebkitLineClamp:1}}>{drive.institution}</p>

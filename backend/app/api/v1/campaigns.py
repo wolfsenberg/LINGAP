@@ -1,10 +1,16 @@
+import hashlib
+import os
+import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+import aiofiles
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.aid_request import AidRequest
@@ -18,6 +24,13 @@ router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 STATIC_ORGANIZER_EMAIL = "geineldungao012@gmail.com"
 DEMO_XLM_TO_PHP = 10
+CAMPAIGN_UPLOAD_DIR = os.path.join(os.path.dirname(settings.UPLOAD_DIR), "campaigns")
+CAMPAIGN_IMAGE_MIME = {"image/png", "image/jpeg", "image/webp"}
+CAMPAIGN_IMAGE_EXT = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+}
 
 STATIC_CAMPAIGNS = [
     {
@@ -66,6 +79,57 @@ def _progress(raised: float, goal: float) -> int:
     if goal <= 0:
         return 0
     return min(100, round((raised / goal) * 100))
+
+
+async def _save_campaign_cover(upload: UploadFile, user: User) -> str:
+    mime = (upload.content_type or "").lower()
+    if mime not in CAMPAIGN_IMAGE_MIME:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Campaign cover must be a PNG, JPG, or WebP image.",
+        )
+
+    max_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
+    os.makedirs(CAMPAIGN_UPLOAD_DIR, exist_ok=True)
+
+    hasher = hashlib.sha256()
+    total = 0
+    temp_name = f".tmp-{uuid.uuid4().hex}"
+    temp_path = os.path.join(CAMPAIGN_UPLOAD_DIR, temp_name)
+
+    try:
+        async with aiofiles.open(temp_path, "wb") as out:
+            while True:
+                chunk = await upload.read(1024 * 64)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"Campaign cover exceeds {settings.MAX_UPLOAD_MB} MB.",
+                    )
+                hasher.update(chunk)
+                await out.write(chunk)
+    except Exception:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+        raise
+
+    digest = hasher.hexdigest()
+    ext = CAMPAIGN_IMAGE_EXT[mime]
+    final_name = f"{user.id}-{digest[:16]}{ext}"
+    final_path = os.path.join(CAMPAIGN_UPLOAD_DIR, final_name)
+
+    if os.path.exists(final_path):
+        os.remove(temp_path)
+    else:
+        os.replace(temp_path, final_path)
+
+    return f"/api/v1/campaigns/uploads/{final_name}"
 
 
 async def _donation_totals(db: AsyncSession, campaign_id: str) -> tuple[float, int]:
@@ -322,6 +386,33 @@ async def _confirmed_donation_proofs(db: AsyncSession, campaigns: list[dict], li
 @router.get("/public")
 async def public_campaigns(db: AsyncSession = Depends(get_db)):
     return {"success": True, "data": await _public_campaigns(db)}
+
+
+@router.post("/uploads/cover", status_code=201)
+async def upload_campaign_cover(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    url = await _save_campaign_cover(file, user)
+    return {"success": True, "data": {"url": url}}
+
+
+@router.get("/uploads/{filename}")
+async def get_campaign_upload(filename: str):
+    if "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    path = os.path.join(CAMPAIGN_UPLOAD_DIR, filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    media_type = "image/webp"
+    if filename.lower().endswith(".png"):
+        media_type = "image/png"
+    elif filename.lower().endswith((".jpg", ".jpeg")):
+        media_type = "image/jpeg"
+
+    return FileResponse(path, media_type=media_type)
 
 
 @router.get("/proof-center")

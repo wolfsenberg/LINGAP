@@ -300,17 +300,33 @@ export default function DiscoverPage() {
         .discover-carousel-shell {
           margin-inline: -16px;
           overflow: hidden;
-          padding: 20px 16px 28px;
+          padding: 8px 28px 28px;
           position: relative;
-          -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8%, #000 92%, transparent 100%);
-          mask-image: linear-gradient(to right, transparent 0, #000 8%, #000 92%, transparent 100%);
+          -webkit-mask-image: linear-gradient(
+            to right,
+            transparent 0,
+            rgba(0, 0, 0, 0.15) 3%,
+            #000 12%,
+            #000 88%,
+            rgba(0, 0, 0, 0.15) 97%,
+            transparent 100%
+          );
+          mask-image: linear-gradient(
+            to right,
+            transparent 0,
+            rgba(0, 0, 0, 0.15) 3%,
+            #000 12%,
+            #000 88%,
+            rgba(0, 0, 0, 0.15) 97%,
+            transparent 100%
+          );
         }
 
         .discover-carousel-track {
           display: flex;
           gap: 22px;
           width: max-content;
-          animation: discover-carousel 56s linear infinite;
+          animation: discover-carousel 52s linear infinite;
           will-change: transform;
         }
 
@@ -323,7 +339,14 @@ export default function DiscoverPage() {
           flex: 0 0 clamp(292px, calc((100vw - 148px) / 3), 378px);
           filter: grayscale(1);
           opacity: 0.92;
+          overflow: hidden;
           transition: filter 0.7s ease, opacity 0.7s ease, transform 0.7s ease;
+        }
+
+        .discover-carousel-card :global(.camp-card) {
+          display: block;
+          overflow: hidden;
+          contain: paint;
         }
 
         .discover-carousel-card:hover,
@@ -361,9 +384,9 @@ export default function DiscoverPage() {
         @media (max-width: 640px) {
           .discover-carousel-shell {
             margin-inline: -12px;
-            padding-inline: 12px;
-            -webkit-mask-image: linear-gradient(to right, transparent 0, #000 5%, #000 95%, transparent 100%);
-            mask-image: linear-gradient(to right, transparent 0, #000 5%, #000 95%, transparent 100%);
+            padding-inline: 20px;
+            -webkit-mask-image: linear-gradient(to right, transparent 0, rgba(0, 0, 0, 0.2) 4%, #000 10%, #000 90%, rgba(0, 0, 0, 0.2) 96%, transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, rgba(0, 0, 0, 0.2) 4%, #000 10%, #000 90%, rgba(0, 0, 0, 0.2) 96%, transparent 100%);
           }
 
           .discover-carousel-card {
@@ -406,24 +429,8 @@ export default function DiscoverPage() {
       </div>
 
       <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
-        <div className="filter-bar" role="list" aria-label="Campaign filters">
-          {FILTERS.map(({ label, Icon }) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => setActiveFilter(label)}
-              className={`filter-chip${activeFilter === label ? " active" : ""}`}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
-              aria-pressed={activeFilter === label}
-            >
-              {Icon && <Icon size={13} strokeWidth={2} />}
-              {label}
-            </button>
-          ))}
-        </div>
-
         <section style={{ marginBottom: 48 }}>
-          <div className="flex flex-center flex-between mb-24">
+          <div className="flex flex-center flex-between" style={{ marginBottom: 8 }}>
             <div>
               <div className="section-label" style={{ color: "var(--canopy)" }}>
                 FEATURED CAMPAIGNS
@@ -549,6 +556,22 @@ export default function DiscoverPage() {
           <div style={{ fontSize: 13, color: "var(--text3)" }}>
             {displayCount} campaign{displayCount !== 1 ? "s" : ""} found
           </div>
+        </div>
+
+        <div className="filter-bar" role="list" aria-label="Campaign filters">
+          {FILTERS.map(({ label, Icon }) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setActiveFilter(label)}
+              className={`filter-chip${activeFilter === label ? " active" : ""}`}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+              aria-pressed={activeFilter === label}
+            >
+              {Icon && <Icon size={13} strokeWidth={2} />}
+              {label}
+            </button>
+          ))}
         </div>
 
         {loading ? (
