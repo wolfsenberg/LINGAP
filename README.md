@@ -103,7 +103,7 @@ docker-compose up --build
 
 ## 🎥 Demo
 
-- 🔗 **Live App:** [link]
+- 🔗 **Live App:** [[link](https://lingap-ledger.vercel.app/)]
 - 🎬 **Demo Video:** [YouTube / Loom link]
 - 🖼️ **Pitch Deck:** [[Canva link](https://www.canva.com/design/DAHKOM-6DPY/InVZSRGdgDInMo4TDtR4Hw/edit)]
 
