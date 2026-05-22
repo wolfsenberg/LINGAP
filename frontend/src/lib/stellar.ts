@@ -6,6 +6,7 @@ import {
   Keypair,
   Horizon,
   BASE_FEE,
+  Memo,
 } from "@stellar/stellar-sdk";
 
 const NETWORK = process.env.NEXT_PUBLIC_STELLAR_NETWORK as "testnet" | "mainnet";
@@ -46,10 +47,20 @@ export async function buildPaymentTransaction(
     Operation.payment({ destination: destinationPublicKey, asset, amount })
   );
 
-  if (memo) txBuilder.addMemo({ type: "text", value: memo } as never);
+  if (memo) txBuilder.addMemo(Memo.text(memo));
 
   txBuilder.setTimeout(180);
   return txBuilder.build();
+}
+
+export async function submitSignedTransactionXdr(signedXdr: string) {
+  const transaction = TransactionBuilder.fromXDR(signedXdr, STELLAR_CONFIG.network);
+  return horizonServer.submitTransaction(transaction);
+}
+
+export function getStellarExpertTxUrl(txHash: string) {
+  const explorerNetwork = NETWORK === "mainnet" ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`;
 }
 
 export async function getTransactionDetails(txHash: string) {

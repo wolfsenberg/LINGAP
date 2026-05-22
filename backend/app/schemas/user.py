@@ -29,6 +29,11 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class AdminLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
 class TokenResponse(BaseModel):
     token: str
     user: UserRead

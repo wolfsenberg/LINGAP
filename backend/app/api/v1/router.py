@@ -15,6 +15,7 @@ from .risk import (
 from .credibility import router as credibility_router
 from .leaderboard import router as leaderboard_router
 from .volunteer import router as volunteer_router
+from .geo import router as geo_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -22,6 +23,7 @@ api_router.include_router(auth_router)
 api_router.include_router(donations_router)
 api_router.include_router(beneficiaries_router)
 api_router.include_router(aid_requests_router)
+api_router.include_router(geo_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(stellar_router)
 api_router.include_router(proofs_router)

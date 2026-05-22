@@ -1,65 +1,58 @@
 # LINGAP
-Ledger-Integrated Network for Giving, Accountability, and Protection
 
----
+## 🧩 Problem
+During crises, transparency in how donations are distributed is often lacking, leading to mistrust. Aid distribution can be slow, inefficient, and susceptible to fraud. Donors want absolute assurance that their funds directly reach the intended beneficiaries.
 
-## Quick Setup
+## 🌟 Vision
+To create a fully transparent, blockchain-powered ecosystem where every peso donated is tracked, verified, and efficiently disbursed to verified beneficiaries, restoring absolute trust in charitable giving.
 
-### Requirements
-- Docker Desktop installed and running
-- https://www.docker.com/products/docker-desktop/
+## 🎯 Purpose
+LINGAP was built to bridge the gap between donors and verifiable causes. By leveraging blockchain technology, we ensure that aid operations are immutable, auditable, and transparent, protecting both the donors and the beneficiaries.
 
----
+## 👥 Target Users
+- **Donors**: Individuals and organizations looking for transparent, verified campaigns to support without fear of fraud.
+- **Beneficiaries**: Filipinos in need of medical, educational, or disaster relief assistance.
+- **Aid Organizations/NGOs**: Groups needing a reliable, transparent platform to manage campaigns and disburse funds securely.
 
-### Step 1 - Create the .env file
+## ✨ Features
+- **Campaign Discovery & Filtering** — Browse and filter campaigns dynamically by Philippine cities and categories (e.g., Medical, Typhoon Relief, Education).
+- **Verified Causes & Fraud Detection** — Ensures that campaigns are strictly vetted and flagged as verified, explicitly preventing fraud.
+- **Transparent Dashboard & Metrics** — Real-time tracking of active campaigns, total requested amounts, and on-chain blockchain transactions.
 
-The backend/.env file is not included in the repo (gitignored for security).
-You need to create it manually before running docker-compose.
+## 🛠️ Tech Stack
+- **Frontend**: Next.js (React), Tailwind CSS, TanStack Query
+- **Backend**: Python, FastAPI, PostgreSQL
+- **Blockchain**: Stellar (Soroban / Horizon API / Stellar SDK)
+- **Other tools**: Docker, Docker Compose
 
-Mac/Linux:
-cp backend/.env.example backend/.env
-
-Windows:
-copy backend\.env.example backend\.env
-
----
-
-### Step 2 - Run Docker
-
-cd LINGAP-main
+## 🚀 How to Run Locally
+```bash
+git clone https://github.com/wolfsenberg/LINGAP.git
+cd LINGAP
 docker-compose up --build
+```
 
-First build takes 3-5 minutes.
+## 🌐 Deployment
 
----
+### Testnet
+- Contract / App Address: `GXXXX...`
+- 📸 Screenshot — Stellar Expert (Testnet)
+  ![Testnet Screenshot](./screenshots/testnet.png)
 
-## Common Errors
+### Mainnet
+- Contract / App Address: `GXXXX...`
+- 📸 Screenshot — Stellar Expert (Mainnet)
+  ![Mainnet Screenshot](./screenshots/mainnet.png)
 
-Port already in use:
+## 🎥 Demo
+- 🔗 Live App: [link]
+- 🎬 Demo Video: [YouTube / Loom link]
+- 🖼️ Pitch Deck: [Google Slides / Canva link]
 
-Mac/Linux:
-lsof -ti:3000 | xargs kill -9
-lsof -ti:8000 | xargs kill -9
-lsof -ti:5432 | xargs kill -9
+## 👨💻 Team
+| Name | Role | GitHub |
+|---|---|---|
+| Jimuelle | Full-Stack Developer | @Jimuelle07 |
 
-Windows:
-netstat -ano | findstr :3000
-taskkill /PID <PID number> /F
-
-Build fails:
-docker-compose down
-docker system prune -f
-docker-compose up --build
-
-Docker not running:
-- Open Docker Desktop app first
-- Wait for it to fully load (whale icon in taskbar)
-- Then run docker-compose up --build again
-
----
-
-## Deployed Contracts (Stellar Testnet)
-
-Donation Vault: CDZTFM2BHBLYQLIJSSF7UOSWCQMQMOUATXEJTDOHKBIZ6R4DFZKB7DDP
-
-Explorer: https://stellar.expert/explorer/testnet/contract/CDZTFM2BHBLYQLIJSSF7UOSWCQMQMOUATXEJTDOHKBIZ6R4DFZKB7DDP
+## 📜 License
+MIT

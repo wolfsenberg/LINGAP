@@ -1,9 +1,124 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+import Link from "next/link";
+import toast from "react-hot-toast";
 import {
-  AlertCircle, CheckCircle2, AlertTriangle, ShieldCheck, Search, Link2, XCircle
+  AlertCircle, ArrowLeft, CheckCircle2, AlertTriangle, Eye, EyeOff, Lock, Network, ShieldCheck, Search, Link2, XCircle
 } from "lucide-react";
 import { CAMPAIGNS } from "@/lib/campaigns";
+import { authApi } from "@/lib/api";
+import { useAuthStore } from "@/store/authStore";
 
 export default function AdminPage() {
+  const { user, isAuthenticated, setAuth } = useAuthStore();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isAdmin = isAuthenticated && user?.role === "admin";
+
+  async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const res = await authApi.adminLogin(email.trim(), password);
+      const { token, user: adminUser } = res.data.data;
+      setAuth(adminUser, token);
+      toast.success("Welcome back, admin.");
+    } catch {
+      toast.error("Invalid admin credentials.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (!isAdmin) {
+    return (
+      <main className="admin-auth-page">
+        <section className="admin-auth-brand">
+          <Link href="/" className="auth-back-link">
+            <ArrowLeft size={15} /> Back to home
+          </Link>
+
+          <div className="admin-auth-brand-main">
+            <div className="auth-logo-row">
+              <img src="/images/donate.png" alt="" />
+              <span>LIN<span>GAP</span></span>
+            </div>
+            <h1>Admin control starts with verified access.</h1>
+            <p>
+              Sign in to monitor campaign health, review fraud alerts, and inspect immutable audit records from one protected workspace.
+            </p>
+          </div>
+
+          <div className="admin-auth-visual">
+            <img src="/images/laptop.png" alt="" />
+          </div>
+        </section>
+
+        <section className="admin-auth-card-wrap">
+          <div className="auth-card admin-auth-card">
+            <div className="auth-card-head">
+              <div className="auth-card-icon">
+                <ShieldCheck size={22} />
+              </div>
+              <div>
+                <h2>Welcome back, admin</h2>
+                <p>Use the authorized LINGAP admin email to continue.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleAdminLogin} className="auth-form admin-login-form">
+              <label>
+                <span>Admin email</span>
+                <input
+                  className="form-input"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="lingap.admin@test.com"
+                  autoComplete="email"
+                />
+              </label>
+
+              <label>
+                <span>Password</span>
+                <div className="auth-password-field">
+                  <input
+                    className="form-input"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Enter admin password"
+                    autoComplete="current-password"
+                  />
+                  <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </label>
+
+              <div className="admin-auth-note">
+                <Lock size={14} />
+                <span>Admin sessions are role-checked by the backend before the dashboard is shown.</span>
+              </div>
+
+              <button className="btn btn-emerald btn-lg admin-login-submit" disabled={isSubmitting || !email.trim() || !password}>
+                {isSubmitting ? "Checking access..." : "Sign In as Admin"}
+              </button>
+            </form>
+
+            <div className="admin-auth-footer">
+              <Network size={14} />
+              Audit access is recorded under the LINGAP admin role.
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div>
       <div style={{background:'var(--forest)',padding:'48px 40px'}}>

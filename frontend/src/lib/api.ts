@@ -28,6 +28,14 @@ type RegisterRequest = {
   stellarPublicKey?: string;
 };
 
+type DonationCreateRequest = {
+  amount: number;
+  asset: string;
+  purpose?: string;
+  stellarTxHash?: string;
+  stellar_tx_hash?: string;
+};
+
 const normalizeUser = (user: ApiUser): User => ({
   id: user.id,
   email: user.email,
@@ -76,6 +84,22 @@ export const authApi = {
       },
     };
   },
+  adminLogin: async (email: string, password: string) => {
+    const res = await api.post<ApiResponse<{ token: string; user: ApiUser }>>("/api/v1/auth/admin-login", {
+      email,
+      password,
+    });
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: {
+          token: res.data.data.token,
+          user: normalizeUser(res.data.data.user),
+        },
+      },
+    };
+  },
   register: async (data: RegisterRequest) => {
     const res = await api.post<ApiResponse<ApiUser>>("/api/v1/auth/register", {
       email: data.email,
@@ -108,7 +132,13 @@ export const donationsApi = {
   list: (page = 1, size = 20) =>
     api.get<PaginatedResponse<Donation>>("/api/v1/donations", { params: { page, size } }),
   get: (id: string) => api.get<ApiResponse<Donation>>(`/api/v1/donations/${id}`),
-  create: (data: Partial<Donation>) => api.post<ApiResponse<Donation>>("/api/v1/donations", data),
+  create: (data: DonationCreateRequest) =>
+    api.post<ApiResponse<Donation>>("/api/v1/donations", {
+      amount: data.amount,
+      asset: data.asset,
+      purpose: data.purpose,
+      stellar_tx_hash: data.stellar_tx_hash ?? data.stellarTxHash,
+    }),
   getProvenance: (id: string) =>
     api.get<ApiResponse<ProvenanceRecord[]>>(`/api/v1/donations/${id}/provenance`),
 };
@@ -238,6 +268,17 @@ export const volunteerApi = {
       skills,
     }),
   mySignups: () => api.get<ApiResponse<VolunteerOpportunity[]>>("/api/v1/volunteer/me/signups"),
+};
+
+export const certificatesApi = {
+  listByDonor: (donorId: string) =>
+    api.get<ApiResponse<any[]>>(`/api/v1/certificates`, { params: { donor_id: donorId } }),
+  get: (id: string) => api.get<ApiResponse<any>>(`/api/v1/certificates/${id}`),
+};
+
+export const paymongoApi = {
+  checkout: (amount: number, description: string) =>
+    api.post<ApiResponse<{ checkout_url: string }>>("/api/v1/fiat/checkout", { amount, description }),
 };
 
 export default api;

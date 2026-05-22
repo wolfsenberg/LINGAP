@@ -8,16 +8,18 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     ALGORITHM: str = "HS256"
+    ADMIN_PASSWORD: str = "lingap12345678"
+    ADMIN_EMAIL: str = "lingap.admin@test.com"
 
     STELLAR_NETWORK: str = "testnet"
     STELLAR_HORIZON_URL: str = "https://horizon-testnet.stellar.org"
     STELLAR_SOURCE_SECRET_KEY: str = ""
 
-    CONTRACT_AID_PROVENANCE: str = ""
-    CONTRACT_DONATION_VAULT: str = ""
-    CONTRACT_BENEFICIARY_REGISTRY: str = ""
+    CONTRACT_AID_PROVENANCE: str = "CC5EBH4P72CSGGSDM22UJSBHPV7G5BFFSQCDPAOGACQNG6KJWVZ5GDSC"
+    CONTRACT_DONATION_VAULT: str = "CDZTFM2BHBLYQLIJSSF7UOSWCQMQMOUATXEJTDOHKBIZ6R4DFZKB7DDP"
+    CONTRACT_BENEFICIARY_REGISTRY: str = "CDPQC74JGFZ5BUNUELBO7M5ZNO6EEPEG4QYATODEWLDEMCI6I7YMGJDT"
 
-    CORS_ORIGINS: str = "http://localhost:3000"
+    CORS_ORIGINS: str = "http://localhost:3000,https://lingap-ledger.vercel.app"
 
     # Proof of Reality / file uploads
     UPLOAD_DIR: str = "/app/uploads/proofs"

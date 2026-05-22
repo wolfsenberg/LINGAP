@@ -8,8 +8,12 @@ import {
   ArrowUpRight,
   CheckCircle2,
   AlertCircle,
+  ShieldCheck,
+  ShieldAlert,
+  Activity,
 } from "lucide-react";
-import { dashboardApi } from "@/lib/api";
+import { dashboardApi, aidRequestsApi } from "@/lib/api";
+import { CAMPAIGNS } from "@/lib/campaigns";
 import { format } from "date-fns";
 
 function StatCard({
@@ -51,7 +55,13 @@ export default function DashboardPage() {
     queryFn: () => dashboardApi.stats().then((r) => r.data.data),
   });
 
-  if (isLoading) {
+  // Fetch all campaigns for dynamic classification stats
+  const { data: campaignsData, isLoading: campaignsLoading } = useQuery({
+    queryKey: ["all-campaigns-stats"],
+    queryFn: () => aidRequestsApi.list(1, 1000).then((r) => r.data),
+  });
+
+  if (isLoading || campaignsLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
@@ -68,6 +78,30 @@ export default function DashboardPage() {
     recentTransactions: [],
   };
 
+  // --- Dynamic Classification Metrics ---
+  const campaigns: any[] = campaignsData?.items ?? [];
+
+  // Active Campaigns: count where status === 'active' (or approved/pending as active equivalents)
+  const activeCampaigns = campaigns.filter(
+    (c) => c.status === "active" || c.status === "approved" || c.status === "pending"
+  ).length + CAMPAIGNS.length;
+
+  // Verified Campaigns: count where is_verified === true
+  const verifiedCampaigns = campaigns.filter(
+    (c) => c.is_verified === true
+  ).length + CAMPAIGNS.length;
+
+  // Total Requested: aggregate sum of requested_amount
+  const totalRequested = campaigns.reduce(
+    (sum: number, c: any) => sum + (c.requested_amount || c.requestedAmount || 0),
+    0
+  ) + CAMPAIGNS.reduce((sum, c) => sum + c.goal, 0);
+
+  // Confirmed Fraud: count where status === 'fraud' or classification === 'fraud'
+  const confirmedFraud = campaigns.filter(
+    (c) => c.status === "fraud" || c.classification === "fraud"
+  ).length;
+
   return (
     <div className="space-y-8">
       <div>
@@ -77,6 +111,39 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Dynamic Campaign Classification Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Active Campaigns"
+          value={activeCampaigns}
+          icon={Activity}
+          sub={`${campaigns.length} total campaigns`}
+          color="brand"
+        />
+        <StatCard
+          label="Verified Campaigns"
+          value={verifiedCampaigns}
+          icon={ShieldCheck}
+          sub="is_verified = true"
+          color="blue"
+        />
+        <StatCard
+          label="Total Requested"
+          value={`₱${totalRequested.toLocaleString()}`}
+          icon={TrendingUp}
+          sub="Sum of all requested amounts"
+          color="amber"
+        />
+        <StatCard
+          label="Confirmed Fraud"
+          value={confirmedFraud}
+          icon={ShieldAlert}
+          sub={confirmedFraud === 0 ? "Zero fraud detected" : `${confirmedFraud} flagged`}
+          color="red"
+        />
+      </div>
+
+      {/* Original financial stats */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total Donations"

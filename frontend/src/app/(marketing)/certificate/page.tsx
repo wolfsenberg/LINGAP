@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   ArrowLeft,
   Award,
@@ -61,7 +61,7 @@ export default function CertificatePage() {
         const data = res.data.data as any[];
         const mapped: Certificate[] = data.map((c: any) => ({
           id: c.id,
-          donor: c.donor_name || user.name,
+          donor: c.donor_name || user?.name || "Anonymous Donor",
           amount: `₱${parseFloat(c.amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
           campaign: c.milestone_description || "Campaign Milestone",
           institution: c.beneficiary_name || "LINGAP Verified Network",

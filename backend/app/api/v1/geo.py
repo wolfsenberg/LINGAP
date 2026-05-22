@@ -68,6 +68,8 @@ async def list_nearby_aid_requests(
                 "status": req.status.value if hasattr(req.status, "value") else req.status,
                 "latitude": float(ben.latitude),
                 "longitude": float(ben.longitude),
+                "location": ben.location,
+                "is_verified": ben.verified,
                 "distance_km": round(distance, 3),
             }
         )

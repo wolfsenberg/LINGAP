@@ -29,6 +29,8 @@ class Beneficiary(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(String(255))
     national_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     location: Mapped[str] = mapped_column(String(512))
+    latitude: Mapped[float | None] = mapped_column(Numeric(9, 6))
+    longitude: Mapped[float | None] = mapped_column(Numeric(9, 6))
     category: Mapped[BeneficiaryCategory] = mapped_column(
         Enum(BeneficiaryCategory), default=BeneficiaryCategory.individual
     )
