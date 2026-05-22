@@ -123,8 +123,12 @@ export default function EscrowPage() {
         <div style={{ position: "absolute", right: -40, top: -40, width: 300, height: 300, background: "radial-gradient(circle,rgba(16,184,145,.2),transparent 70%)", pointerEvents: "none" }} />
         <div className="container">
           <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
-            <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(16,184,145,.15)", border: "1px solid rgba(16,184,145,.3)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Lock size={24} color="var(--canopy-light)" strokeWidth={1.8} />
+            <div style={{ width: 72, height: 72, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <img
+                src="/images/protectingfunds.png"
+                alt=""
+                style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+              />
             </div>
             <div>
               <div className="section-label" style={{ color: "var(--canopy-light)" }}>ESCROW VAULT</div>

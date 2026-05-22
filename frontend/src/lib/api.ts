@@ -99,6 +99,39 @@ export type CampaignEscrowApi = {
   }>;
 };
 
+export type ProofCenterApi = {
+  stats: {
+    verified_documents: number;
+    confirmed_donations: number;
+    anchored_documents: number;
+    verified_amount_php: number;
+  };
+  risk_feed: Array<{
+    campaign_id: string;
+    campaign_title: string;
+    level: "LOW RISK" | "AWAITING PROOF" | string;
+    status: string;
+    confidence: number;
+    created_at: string;
+  }>;
+  documents: Array<{
+    id: string;
+    kind: string;
+    title: string;
+    filename?: string | null;
+    campaign_id?: string;
+    campaign_title: string;
+    donor_name?: string;
+    claimed_amount: number;
+    amount_xlm?: number;
+    sha256?: string | null;
+    stellar_tx_hash?: string | null;
+    created_at: string;
+    status: string;
+    source: "confirmed_donation" | "proof_artifact" | string;
+  }>;
+};
+
 export type LeaderboardDonorApi = {
   rank: number;
   user_id: string;
@@ -295,6 +328,7 @@ export const dashboardApi = {
 
 export const campaignsApi = {
   publicList: () => api.get<ApiResponse<PublicCampaignApi[]>>("/api/v1/campaigns/public"),
+  proofCenter: () => api.get<ApiResponse<ProofCenterApi>>("/api/v1/campaigns/proof-center"),
   publicOne: (campaignId: string) =>
     api.get<ApiResponse<PublicCampaignApi | null>>(`/api/v1/campaigns/public/${campaignId}`),
   escrow: (campaignId: string) =>

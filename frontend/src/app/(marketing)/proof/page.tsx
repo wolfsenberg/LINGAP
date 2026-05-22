@@ -1,113 +1,241 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
 import {
-  Bot, CheckCircle2, AlertTriangle, XCircle, Receipt, Pill, Camera,
-  Stethoscope, Ticket, FileWarning, Clock, ShieldCheck
+  AlertTriangle,
+  Bot,
+  Camera,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  FileText,
+  Receipt,
+  ShieldCheck,
+  XCircle,
 } from "lucide-react";
-import { CAMPAIGNS } from "@/lib/campaigns";
+import { campaignsApi, type ProofCenterApi } from "@/lib/api";
+import { getStellarExpertTxUrl } from "@/lib/stellar";
+
+type Filter = "All" | "Transactions" | "Receipts" | "Photos" | "Documents";
+
+function formatPeso(amount: number) {
+  return `₱${Math.round(amount).toLocaleString()}`;
+}
+
+function formatDate(value: string) {
+  return new Date(value).toLocaleString();
+}
+
+function shortHash(hash?: string | null) {
+  if (!hash) return "No Stellar anchor";
+  return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
+}
+
+function iconForKind(kind: string) {
+  if (kind === "stellar_transaction") return ShieldCheck;
+  if (kind === "receipt" || kind === "invoice") return Receipt;
+  if (kind === "photo") return Camera;
+  return FileText;
+}
+
+function matchesFilter(item: ProofCenterApi["documents"][number], filter: Filter) {
+  if (filter === "All") return true;
+  if (filter === "Transactions") return item.source === "confirmed_donation";
+  if (filter === "Receipts") return ["receipt", "invoice"].includes(item.kind);
+  if (filter === "Photos") return item.kind === "photo";
+  if (filter === "Documents") return !["stellar_transaction", "receipt", "invoice", "photo"].includes(item.kind);
+  return true;
+}
 
 export default function ProofPage() {
+  const [proofCenter, setProofCenter] = useState<ProofCenterApi | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<Filter>("All");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadProofCenter() {
+      try {
+        const res = await campaignsApi.proofCenter();
+        if (mounted) setProofCenter(res.data.data);
+      } catch {
+        if (mounted) setProofCenter(null);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    loadProofCenter();
+    const timer = window.setInterval(loadProofCenter, 10000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const documents = proofCenter?.documents ?? [];
+  const filteredDocuments = useMemo(
+    () => documents.filter((item) => matchesFilter(item, filter)),
+    [documents, filter]
+  );
+  const riskFeed = proofCenter?.risk_feed ?? [];
+  const stats = proofCenter?.stats;
+
   return (
     <div>
-      <div style={{background:'var(--forest)',padding:'48px 40px'}}>
+      <div style={{ background: "var(--forest)", padding: "48px 40px" }}>
         <div className="container">
-          <div className="section-label" style={{color:'var(--canopy-light)'}}>VERIFICATION CENTER</div>
-          <h1 style={{fontSize:36,fontWeight:800,color:'#fff',marginBottom:12}}>Proof of Progress & Reality</h1>
-          <p style={{color:'rgba(255,255,255,.65)',fontSize:16}}>Every document verified. Every claim proven. Powered by AI and community validators.</p>
+          <div className="section-label" style={{ color: "var(--canopy-light)" }}>VERIFICATION CENTER</div>
+          <h1 style={{ fontSize: 36, fontWeight: 800, color: "#fff", marginBottom: 12 }}>Proof of Progress & Reality</h1>
+          <p style={{ color: "rgba(255,255,255,.65)", fontSize: 16 }}>
+            Live verification records from confirmed Stellar transactions and anchored proof documents.
+          </p>
         </div>
       </div>
 
       <div className="page-inner">
-        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24,marginBottom:28}}>
-          <div className="flex flex-center gap-12 mb-20">
-            <div style={{width:40,height:40,background:'rgba(74,155,106,.1)',borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <Bot size={20} color="var(--canopy)" strokeWidth={1.8}/>
-            </div>
-            <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)'}}>AI Risk Assessment Feed</h3>
-          </div>
-          <div>
-            <div className="ai-alert ai-alert-low mb-8">
-              <div className="flex flex-center flex-between mb-4">
-                <div className="flex flex-center gap-8">
-                  <span className="badge badge-emerald" style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><CheckCircle2 size={10}/> LOW RISK</span>
-                  <span style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>{CAMPAIGNS[0].shortTitle}</span>
-                </div>
-                <span style={{fontSize:12,color:'var(--text3)'}}>2 min ago</span>
-              </div>
-              <div style={{fontSize:13,color:'var(--text2)'}}>All spending patterns normal. Institution verified. Documents match submitted receipts. Confidence: 97.2%</div>
-            </div>
-            <div className="ai-alert ai-alert-med mb-8">
-              <div className="flex flex-center flex-between mb-4">
-                <div className="flex flex-center gap-8">
-                  <span className="badge badge-gold" style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><AlertTriangle size={10}/> MEDIUM RISK</span>
-                  <span style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>Reyes Family — Rehab Center</span>
-                </div>
-                <span style={{fontSize:12,color:'var(--text3)'}}>15 min ago</span>
-              </div>
-              <div style={{fontSize:13,color:'var(--text2)'}}>Milestone 2 delayed by 8 days. Institution invoice amount ₱2,300 higher than campaign stated. Flagged for manual review.</div>
-            </div>
-            <div className="ai-alert ai-alert-high">
-              <div className="flex flex-center flex-between mb-4">
-                <div className="flex flex-center gap-8">
-                  <span className="badge badge-red" style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><XCircle size={10}/> HIGH RISK</span>
-                  <span style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>Unknown — &quot;Flood Relief Tondo&quot;</span>
-                </div>
-                <span style={{fontSize:12,color:'var(--text3)'}}>1 hr ago</span>
-              </div>
-              <div style={{fontSize:13,color:'var(--text2)'}}>Duplicate campaign detected. 94% image similarity to existing verified campaign. Account created 2 days ago. CAMPAIGN PAUSED pending investigation.</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-center flex-between mb-20">
-          <h3 style={{fontSize:20,fontWeight:700,color:'var(--forest)',display:'flex',alignItems:'center',gap:8}}>
-            <ShieldCheck size={20} color="var(--canopy)" strokeWidth={1.8}/> Verified Proof Documents
-          </h3>
-          <div className="flex gap-8">
-            {['All','Receipts','Medical','Photos'].map((f,i)=>(
-              <button key={f} className={`filter-chip${i===0?' active':''}`}>{f}</button>
-            ))}
-          </div>
-        </div>
-
-        <div className="proof-grid">
+        <div className="grid-4 mb-32">
           {[
-            {Icon:Receipt,bg:'linear-gradient(135deg,rgba(74,155,106,.1),rgba(61,122,82,.1))',badge:{cls:'badge-emerald',text:'Verified'},title:`${CAMPAIGNS[0].institution} Official Receipt — Chemo Cycle 3`,sub:`Nov 25, 2025 • Receipt #${CAMPAIGNS[0].institution.split(' ').map(w=>w[0]).join('')}-2025-00847`,leftBadge:{cls:'badge-navy',text:'₱25,000.00'},rightBadge:{cls:'badge-emerald',text:'AI Verified'}},
-            {Icon:Pill,bg:'linear-gradient(135deg,rgba(200,134,10,.1),rgba(160,113,74,.1))',badge:{cls:'badge-emerald',text:'Verified'},title:'Pharmacy Invoice — Chemotherapy Drugs',sub:'Nov 26, 2025 • Mercury Drug España Branch',leftBadge:{cls:'badge-navy',text:'₱12,400.00'},rightBadge:{cls:'badge-emerald',text:'AI Verified'}},
-            {Icon:Camera,bg:'linear-gradient(135deg,rgba(139,92,246,.1),rgba(109,40,217,.1))',badge:{cls:'badge-emerald',text:'Verified'},title:'Progress Photo — Patient Hospital Room',sub:`Nov 27, 2025 • ${CAMPAIGNS[0].institution} Ward 4, Bed 12`,leftBadge:{cls:'badge-blue',text:'Photo'},rightBadge:{cls:'badge-emerald',text:'Community Confirmed'}},
-            {Icon:Stethoscope,bg:'linear-gradient(135deg,rgba(74,155,106,.1),rgba(61,122,82,.1))',badge:{cls:'badge-emerald',text:'Verified'},title:'Medical Certificate — Oncologist Dr. Reyes',sub:`Nov 15, 2025 • ${CAMPAIGNS[0].institution} Oncology Dept.`,leftBadge:{cls:'badge-navy',text:'Official Doc'},rightBadge:{cls:'badge-emerald',text:'Immutable'}},
-            {Icon:Ticket,bg:'linear-gradient(135deg,rgba(61,122,82,.1),rgba(45,90,61,.1))',badge:{cls:'badge-blue',text:'Under Review'},title:`${CAMPAIGNS[2].institution} Enrollment Receipt — ${CAMPAIGNS[2].shortTitle}`,sub:`Nov 28, 2025 • ${CAMPAIGNS[2].institution} Registrar`,leftBadge:{cls:'badge-navy',text:'₱8,500.00'},rightBadge:{cls:'badge-gold',text:'Pending'}},
-            {Icon:FileWarning,bg:'linear-gradient(135deg,rgba(220,38,38,.08),rgba(185,28,28,.08))',badge:{cls:'badge-red',text:'Flagged'},title:'Invoice — Amount Discrepancy Detected',sub:'Nov 29, 2025 • Reyes Rehab Center',leftBadge:{cls:'badge-red',text:'High Risk'},rightBadge:{cls:'badge-red',text:'Manual Review'}},
-          ].map((p)=>(
-            <div key={p.title} className="proof-card">
-              <div className="proof-thumb" style={{background:p.bg}}>
-                <p.Icon size={48} strokeWidth={1.2}/>
-                <div style={{position:'absolute',top:10,right:10}}><span className={`badge ${p.badge.cls}`} style={{fontSize:11}}>{p.badge.text}</span></div>
-              </div>
-              <div className="proof-body">
-                <div style={{fontWeight:600,fontSize:14,color:'var(--forest)',marginBottom:4}}>{p.title}</div>
-                <div style={{fontSize:12,color:'var(--text3)',marginBottom:10}}>{p.sub}</div>
-                <div className="flex flex-center flex-between">
-                  <span className={`badge ${p.leftBadge.cls}`} style={{fontSize:11}}>{p.leftBadge.text}</span>
-                  <span className={`badge ${p.rightBadge.cls}`} style={{fontSize:11}}>{p.rightBadge.text}</span>
+            { label: "Verified Proofs", value: stats?.verified_documents ?? 0, sub: "confirmed txs + anchored docs", Icon: ShieldCheck, color: "var(--canopy)" },
+            { label: "Stellar Donations", value: stats?.confirmed_donations ?? 0, sub: "blockchain-confirmed", Icon: CheckCircle2, color: "var(--forest-light)" },
+            { label: "Anchored Docs", value: stats?.anchored_documents ?? 0, sub: "documents with tx anchors", Icon: FileText, color: "var(--amber)" },
+            { label: "Verified Amount", value: formatPeso(stats?.verified_amount_php ?? 0), sub: "from confirmed donations", Icon: Receipt, color: "var(--canopy)" },
+          ].map((item) => (
+            <div key={item.label} className="stat-card">
+              <div className="flex flex-center flex-between" style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 12, color: "var(--text3)", fontWeight: 700, letterSpacing: .4 }}>{item.label}</div>
+                <div style={{ width: 30, height: 30, borderRadius: 8, background: `color-mix(in srgb, ${item.color} 12%, white)`, color: item.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <item.Icon size={14} strokeWidth={1.9} />
                 </div>
               </div>
+              <div className="stat-value" style={{ color: "var(--forest)" }}>{item.value}</div>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginTop: 6 }}>{item.sub}</div>
             </div>
           ))}
         </div>
 
-        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:28,marginTop:28}}>
-          <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',marginBottom:20}}>Badge Verification System</h3>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:12}}>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 24, marginBottom: 28 }}>
+          <div className="flex flex-center gap-12 mb-20">
+            <div style={{ width: 40, height: 40, background: "rgba(74,155,106,.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <Bot size={20} color="var(--canopy)" strokeWidth={1.8} />
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--forest)" }}>Live Verification Feed</h3>
+          </div>
+
+          {loading ? (
+            <div style={{ padding: 24, color: "var(--text3)", textAlign: "center" }}>Loading proof records...</div>
+          ) : riskFeed.length === 0 ? (
+            <div className="ai-alert ai-alert-med">
+              <div className="flex flex-center gap-8 mb-4">
+                <span className="badge badge-gold" style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <Clock size={10} /> AWAITING PROOF
+                </span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--forest)" }}>No campaign proof records yet</span>
+              </div>
+              <div style={{ fontSize: 13, color: "var(--text2)" }}>
+                Once donations are confirmed or documents are anchored on-chain, they will appear here.
+              </div>
+            </div>
+          ) : (
+            riskFeed.map((item) => {
+              const isVerified = item.level === "LOW RISK";
+              return (
+                <div key={item.campaign_id} className={`ai-alert ${isVerified ? "ai-alert-low" : "ai-alert-med"} mb-8`}>
+                  <div className="flex flex-center flex-between mb-4">
+                    <div className="flex flex-center gap-8">
+                      <span className={`badge ${isVerified ? "badge-emerald" : "badge-gold"}`} style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        {isVerified ? <CheckCircle2 size={10} /> : <AlertTriangle size={10} />}
+                        {item.level}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--forest)" }}>{item.campaign_title}</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: "var(--text3)" }}>{formatDate(item.created_at)}</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "var(--text2)" }}>
+                    {item.status} {item.confidence > 0 ? `Confidence: ${item.confidence}%` : ""}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="flex flex-center flex-between mb-20">
+          <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--forest)", display: "flex", alignItems: "center", gap: 8 }}>
+            <ShieldCheck size={20} color="var(--canopy)" strokeWidth={1.8} /> Verified Proof Records
+          </h3>
+          <div className="flex gap-8">
+            {(["All", "Transactions", "Receipts", "Photos", "Documents"] as Filter[]).map((item) => (
+              <button key={item} onClick={() => setFilter(item)} className={`filter-chip${filter === item ? " active" : ""}`}>
+                {item}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text3)" }}>Loading proof records...</div>
+        ) : filteredDocuments.length === 0 ? (
+          <div style={{ background: "var(--surface)", border: "1px dashed var(--border2)", borderRadius: "var(--r)", padding: 36, textAlign: "center", color: "var(--text2)" }}>
+            <ShieldCheck size={34} color="var(--canopy)" style={{ marginBottom: 12 }} />
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--forest)", marginBottom: 8 }}>No verified proof records yet</h3>
+            <p style={{ maxWidth: 560, margin: "0 auto", lineHeight: 1.6 }}>
+              Proof Center only shows real backend records: confirmed Stellar donations and uploaded documents with on-chain anchors. Nothing is faked here.
+            </p>
+          </div>
+        ) : (
+          <div className="proof-grid">
+            {filteredDocuments.map((proof) => {
+              const Icon = iconForKind(proof.kind);
+              const isTx = proof.source === "confirmed_donation";
+              const txHref = proof.stellar_tx_hash ? getStellarExpertTxUrl(proof.stellar_tx_hash) : undefined;
+              return (
+                <div key={proof.id} className="proof-card">
+                  <div className="proof-thumb" style={{ background: isTx ? "linear-gradient(135deg,rgba(74,155,106,.1),rgba(61,122,82,.1))" : "linear-gradient(135deg,rgba(200,134,10,.1),rgba(160,113,74,.1))" }}>
+                    <Icon size={48} strokeWidth={1.2} />
+                    <div style={{ position: "absolute", top: 10, right: 10 }}>
+                      <span className="badge badge-emerald" style={{ fontSize: 11 }}>{proof.status}</span>
+                    </div>
+                  </div>
+                  <div className="proof-body">
+                    <div style={{ fontWeight: 600, fontSize: 14, color: "var(--forest)", marginBottom: 4 }}>{proof.title}</div>
+                    <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 10 }}>
+                      {proof.campaign_title} · {formatDate(proof.created_at)}
+                    </div>
+                    <div className="flex flex-center flex-between" style={{ gap: 8 }}>
+                      <span className="badge badge-navy" style={{ fontSize: 11 }}>{formatPeso(proof.claimed_amount)}</span>
+                      {txHref ? (
+                        <a href={txHref} target="_blank" rel="noreferrer" className="badge badge-emerald" style={{ fontSize: 11, textDecoration: "none" }}>
+                          {shortHash(proof.stellar_tx_hash)} <ExternalLink size={10} />
+                        </a>
+                      ) : (
+                        <span className="badge badge-gold" style={{ fontSize: 11 }}>No anchor</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28, marginTop: 28 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--forest)", marginBottom: 20 }}>Badge Verification System</h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 12 }}>
             {[
-              {Icon:CheckCircle2,text:'VERIFIED',bg:'rgba(74,155,106,.06)',border:'rgba(74,155,106,.2)',color:'var(--forest-light)'},
-              {Icon:Clock,text:'UNDER REVIEW',bg:'rgba(200,134,10,.06)',border:'rgba(200,134,10,.2)',color:'var(--amber)'},
-              {Icon:AlertTriangle,text:'FLAGGED',bg:'rgba(220,38,38,.06)',border:'rgba(220,38,38,.2)',color:'#991B1B'},
-              {Icon:CheckCircle2,text:'LOW RISK',bg:'rgba(74,155,106,.06)',border:'rgba(74,155,106,.2)',color:'var(--forest-light)'},
-              {Icon:AlertTriangle,text:'MEDIUM RISK',bg:'rgba(200,134,10,.06)',border:'rgba(200,134,10,.2)',color:'var(--amber)'},
-              {Icon:XCircle,text:'HIGH RISK',bg:'rgba(220,38,38,.06)',border:'rgba(220,38,38,.2)',color:'#991B1B'},
-            ].map((b)=>(
-              <div key={b.text} style={{textAlign:'center',padding:16,background:b.bg,border:`1px solid ${b.border}`,borderRadius:12}}>
-                <div style={{display:'flex',justifyContent:'center',marginBottom:8}}><b.Icon size={28} color={b.color} strokeWidth={1.5}/></div>
-                <div style={{fontSize:12,fontWeight:700,color:b.color}}>{b.text}</div>
+              { Icon: CheckCircle2, text: "VERIFIED", bg: "rgba(74,155,106,.06)", border: "rgba(74,155,106,.2)", color: "var(--forest-light)" },
+              { Icon: Clock, text: "AWAITING PROOF", bg: "rgba(200,134,10,.06)", border: "rgba(200,134,10,.2)", color: "var(--amber)" },
+              { Icon: AlertTriangle, text: "FLAGGED", bg: "rgba(220,38,38,.06)", border: "rgba(220,38,38,.2)", color: "#991B1B" },
+              { Icon: ShieldCheck, text: "STELLAR CONFIRMED", bg: "rgba(74,155,106,.06)", border: "rgba(74,155,106,.2)", color: "var(--forest-light)" },
+              { Icon: FileText, text: "DOC ANCHORED", bg: "rgba(200,134,10,.06)", border: "rgba(200,134,10,.2)", color: "var(--amber)" },
+              { Icon: XCircle, text: "NOT SHOWN IF FAKE", bg: "rgba(220,38,38,.06)", border: "rgba(220,38,38,.2)", color: "#991B1B" },
+            ].map((badge) => (
+              <div key={badge.text} style={{ textAlign: "center", padding: 16, background: badge.bg, border: `1px solid ${badge.border}`, borderRadius: 12 }}>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                  <badge.Icon size={28} color={badge.color} strokeWidth={1.5} />
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: badge.color }}>{badge.text}</div>
               </div>
             ))}
           </div>
