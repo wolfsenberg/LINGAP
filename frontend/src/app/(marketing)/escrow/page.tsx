@@ -122,7 +122,7 @@ export default function EscrowPage() {
       <div className="esc-hero" style={{ position: "relative", overflow: "hidden" }}>
         <div style={{ position: "absolute", right: -40, top: -40, width: 300, height: 300, background: "radial-gradient(circle,rgba(16,184,145,.2),transparent 70%)", pointerEvents: "none" }} />
         <div className="container">
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
+          <div className="esc-hero-head" style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 16 }}>
             <div style={{ width: 72, height: 72, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <img
                 src="/images/protectingfunds.png"
@@ -140,7 +140,7 @@ export default function EscrowPage() {
           <p style={{ color: "rgba(255,255,255,.65)", fontSize: 16, marginBottom: 24 }}>
             Campaign-specific escrow records. Totals below come from confirmed Stellar transaction hashes recorded by LINGAP.
           </p>
-          <div className="flex gap-12" style={{ flexWrap: "wrap" }}>
+          <div className="flex gap-12 esc-hero-badges" style={{ flexWrap: "wrap" }}>
             <span className="badge badge-emerald"><Star size={11} /> Stellar {network === "public" ? "Mainnet" : "Testnet"}</span>
             <a href={contractExplorerUrl} target="_blank" rel="noreferrer" style={{ background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)", borderRadius: 20, padding: "5px 12px", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,.85)", display: "inline-flex", alignItems: "center", gap: 5, textDecoration: "none" }}>
               <Link2 size={11} /> Donation Vault Contract
@@ -176,7 +176,7 @@ export default function EscrowPage() {
 
       <div className="blockchain-viz">
         <div style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28, marginBottom: 24 }}>
-          <div className="flex flex-center flex-between mb-24">
+          <div className="flex flex-center flex-between mb-24 panel-toolbar">
             <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--forest)", display: "flex", alignItems: "center", gap: 8 }}>
               <Link2 size={18} color="var(--canopy)" strokeWidth={1.8} /> Escrow Release Flow
             </h3>
@@ -201,7 +201,7 @@ export default function EscrowPage() {
                     <div className="cs-label" style={{ whiteSpace: "pre-line" }}>{step.label}</div>
                     <div style={{ fontSize: 10, color: step.cls === "cs-done" ? "var(--canopy)" : step.cls === "cs-active" ? "var(--forest-mid)" : "var(--text3)", marginTop: 4 }}>{step.sub}</div>
                   </div>
-                  {i < arr.length - 1 && <div style={{ flex: 1, height: 2, background: i < Math.max(transactions.length ? 2 : 0, 0) ? "var(--canopy)" : "var(--border)", alignSelf: "center", minWidth: 40 }} />}
+                  {i < arr.length - 1 && <div className="chain-connector" style={{ flex: 1, height: 2, background: i < Math.max(transactions.length ? 2 : 0, 0) ? "var(--canopy)" : "var(--border)", alignSelf: "center", minWidth: 40 }} />}
                 </div>
               ))}
             </div>
@@ -209,7 +209,7 @@ export default function EscrowPage() {
         </div>
 
         <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28 }}>
-          <div className="flex flex-center flex-between mb-20">
+          <div className="flex flex-center flex-between mb-20 panel-toolbar">
             <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--forest)", display: "flex", alignItems: "center", gap: 8 }}>
               <Search size={18} color="var(--canopy)" strokeWidth={1.8} /> Confirmed Stellar Transactions
             </h3>

@@ -110,7 +110,7 @@ export default function DiscoverPage() {
   return (
     <div>
       {/* ── HERO HEADER ── */}
-      <div style={{ background: "var(--forest)", padding: "48px 40px", color: "#fff" }}>
+      <div className="discover-hero" style={{ background: "var(--forest)", padding: "48px 40px", color: "#fff" }}>
         <div className="container">
           <div className="section-label" style={{ color: "var(--canopy-light)" }}>
             CAMPAIGN DISCOVERY
@@ -216,6 +216,7 @@ export default function DiscoverPage() {
 
         {/* ── CITY FILTER BANNER (Campaigns Near You) ── */}
         <div
+          className="city-filter-card"
           style={{
             background: "linear-gradient(135deg,rgba(74,155,106,.08),rgba(61,122,82,.08))",
             border: "1px solid rgba(74,155,106,.2)",
@@ -241,7 +242,7 @@ export default function DiscoverPage() {
             </div>
           </div>
           {/* City Dropdown */}
-          <div style={{ position: "relative", flexShrink: 0 }}>
+          <div className="city-select-wrap" style={{ position: "relative", flexShrink: 0 }}>
             <select
               id="city-filter-select"
               value={selectedCity}

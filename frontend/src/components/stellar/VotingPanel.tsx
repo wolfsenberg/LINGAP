@@ -99,6 +99,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
 
   return (
     <div
+      className="voting-panel"
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border)",
@@ -107,7 +108,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
       }}
     >
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+      <div className="voting-panel-head" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <div style={{ width: 36, height: 36, background: "rgba(74,155,106,.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <Vote size={18} color="var(--canopy)" strokeWidth={1.8} />
         </div>
@@ -120,6 +121,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
           )}
         </div>
         <span
+          className="voting-panel-badge"
           style={{
             marginLeft: "auto",
             background: "rgba(220,38,38,.1)",

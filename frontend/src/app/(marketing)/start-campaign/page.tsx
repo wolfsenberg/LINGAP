@@ -49,7 +49,7 @@ export default function StartCampaignPage() {
 
   return (
     <div>
-      <div style={{background:'var(--forest)',padding:'48px 40px'}}>
+      <div className="start-hero" style={{background:'var(--forest)',padding:'48px 40px'}}>
         <div className="container">
           <Link href="/donor#organized-drives" className="btn btn-outline btn-sm" style={{color:'#fff',borderColor:'rgba(255,255,255,.28)',background:'rgba(255,255,255,.08)',marginBottom:22}}>
             <ArrowLeft size={14}/> Back to My Impact
@@ -61,7 +61,7 @@ export default function StartCampaignPage() {
       </div>
 
       <div className="page-inner">
-        <form onSubmit={handleSubmit} className="grid-2" style={{alignItems:'start',gap:24}}>
+        <form onSubmit={handleSubmit} className="grid-2 start-campaign-form" style={{alignItems:'start',gap:24}}>
           <div style={{display:'flex',flexDirection:'column',gap:18}}>
             <section className="card">
               <h2 style={{fontSize:20,fontWeight:800,color:'var(--forest)',marginBottom:18,display:'flex',alignItems:'center',gap:8}}>
@@ -85,7 +85,7 @@ export default function StartCampaignPage() {
                     <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>Show donors who they are helping (PNG/JPG, max 4 photos)</div>
                   </div>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div className="form-two-col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                   <label style={{display:'grid',gap:6}}>
                     <span className="small semi muted">Category</span>
                     <select value={category} onChange={(e)=>setCategory(e.target.value)} className="form-input">
@@ -129,7 +129,7 @@ export default function StartCampaignPage() {
               </h2>
               <div style={{display:'grid',gap:12}}>
                 {["Initial verification", "Milestone 1 release", "Final proof and closeout"].map((m,i)=>(
-                  <div key={m} style={{display:'grid',gridTemplateColumns:'1.2fr .8fr',gap:12}}>
+                  <div key={m} className="milestone-row" style={{display:'grid',gridTemplateColumns:'1.2fr .8fr',gap:12}}>
                     <input defaultValue={m} className="form-input" aria-label={`Milestone ${i + 1} name`} />
                     <input placeholder="Amount" type="number" min="0" className="form-input" aria-label={`Milestone ${i + 1} amount`} />
                   </div>
@@ -139,7 +139,7 @@ export default function StartCampaignPage() {
             </section>
           </div>
 
-          <aside style={{display:'flex',flexDirection:'column',gap:18,position:'sticky',top:88}}>
+          <aside className="start-campaign-side" style={{display:'flex',flexDirection:'column',gap:18,position:'sticky',top:88}}>
             <section className="card">
               <h2 style={{fontSize:18,fontWeight:800,color:'var(--forest)',marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
                 <Upload size={18} color="var(--canopy)"/> Required Proofs

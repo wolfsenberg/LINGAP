@@ -84,7 +84,7 @@ export default function ProofPage() {
 
   return (
     <div>
-      <div style={{ background: "var(--forest)", padding: "48px 40px" }}>
+      <div className="proof-hero" style={{ background: "var(--forest)", padding: "48px 40px" }}>
         <div className="container">
           <div className="section-label" style={{ color: "var(--canopy-light)" }}>VERIFICATION CENTER</div>
           <h1 style={{ fontSize: 36, fontWeight: 800, color: "#fff", marginBottom: 12 }}>Proof of Progress & Reality</h1>
@@ -142,7 +142,7 @@ export default function ProofPage() {
               const isVerified = item.level === "LOW RISK";
               return (
                 <div key={item.campaign_id} className={`ai-alert ${isVerified ? "ai-alert-low" : "ai-alert-med"} mb-8`}>
-                  <div className="flex flex-center flex-between mb-4">
+                  <div className="flex flex-center flex-between mb-4 proof-feed-row">
                     <div className="flex flex-center gap-8">
                       <span className={`badge ${isVerified ? "badge-emerald" : "badge-gold"}`} style={{ fontSize: 11, display: "inline-flex", alignItems: "center", gap: 4 }}>
                         {isVerified ? <CheckCircle2 size={10} /> : <AlertTriangle size={10} />}
@@ -161,11 +161,11 @@ export default function ProofPage() {
           )}
         </div>
 
-        <div className="flex flex-center flex-between mb-20">
+        <div className="flex flex-center flex-between mb-20 proof-filter-head">
           <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--forest)", display: "flex", alignItems: "center", gap: 8 }}>
             <ShieldCheck size={20} color="var(--canopy)" strokeWidth={1.8} /> Verified Proof Records
           </h3>
-          <div className="flex gap-8">
+          <div className="flex gap-8 proof-filter-actions">
             {(["All", "Transactions", "Receipts", "Photos", "Documents"] as Filter[]).map((item) => (
               <button key={item} onClick={() => setFilter(item)} className={`filter-chip${filter === item ? " active" : ""}`}>
                 {item}
