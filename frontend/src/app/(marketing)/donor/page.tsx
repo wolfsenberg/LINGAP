@@ -374,7 +374,7 @@ export default function DonorPage() {
                         <Users size={16} color={isMe ? "var(--amber)" : "var(--text3)"} strokeWidth={1.8} />
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div className="lb-name" style={isMe ? { color: "var(--forest-light)" } : {}}>{lb.name}</div>
+                        <Link href={`/profile/${lb.user_id}`} className="lb-name" style={isMe ? { color: "var(--forest-light)", textDecoration: "none" } : { textDecoration: "none" }}>{lb.name}</Link>
                         <div style={{ fontSize: 12, color: "var(--text3)" }}>{isMe ? "You" : `${lb.donation_count} donation${lb.donation_count === 1 ? "" : "s"}`} · {formatDate(lb.last_donation_at)}</div>
                       </div>
                       <div className="lb-amount">{formatXlm(lb.total_donated)}</div>

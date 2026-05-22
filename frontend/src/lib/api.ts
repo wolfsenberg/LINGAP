@@ -69,6 +69,7 @@ export type CampaignDriveApi = {
 
 export type PublicCampaignApi = CampaignDriveApi & {
   slug: string;
+  organizer_id?: string | null;
   raised_label?: string;
   goal_label?: string;
   organizer_name?: string | null;
@@ -139,6 +140,59 @@ export type LeaderboardDonorApi = {
   total_donated: number;
   donation_count: number;
   last_donation_at?: string | null;
+};
+
+export type PublicProfileCampaignApi = PublicCampaignApi;
+
+export type PublicProfileApi = {
+  user: {
+    id: string;
+    display_name: string;
+    role: string;
+    kyc_verified: boolean;
+    joined_at: string;
+  };
+  impact: {
+    total_donated_xlm: number;
+    total_donated_php: number;
+    donation_count: number;
+    campaigns_organized: number;
+    active_campaigns: number;
+    completed_campaigns: number;
+    public_certificates: number;
+    community_rank?: number | null;
+    last_activity_at?: string | null;
+  };
+  campaigns: PublicProfileCampaignApi[];
+  certificates: Array<{
+    id: string;
+    beneficiary_name: string;
+    amount: number;
+    lives_touched: number;
+    stellar_tx_hash?: string | null;
+    verified: boolean;
+    created_at: string;
+  }>;
+  activity: Array<{
+    id: string;
+    campaign_id: string;
+    amount: number;
+    asset: string;
+    stellar_tx_hash: string;
+    created_at: string;
+  }>;
+  badges: Array<{
+    title: string;
+    description: string;
+    earned: boolean;
+  }>;
+};
+
+export type PublicProfileSearchResultApi = {
+  user: PublicProfileApi["user"];
+  impact: PublicProfileApi["impact"];
+  top_campaigns: PublicProfileCampaignApi[];
+  badges: PublicProfileApi["badges"];
 };
 
 const normalizeUser = (user: ApiUser): User => ({
@@ -354,6 +408,15 @@ export const donorsApi = {
     api.get<ApiResponse<{ name: string; total_donated: number; campaigns_helped: number; lives_impacted: number }>>(
       "/api/v1/donors/me/impact"
     ),
+};
+
+export const profilesApi = {
+  search: (q = "", limit = 8) =>
+    api.get<ApiResponse<PublicProfileSearchResultApi[]>>("/api/v1/profiles/search", {
+      params: { q, limit },
+    }),
+  get: (userId: string) =>
+    api.get<ApiResponse<PublicProfileApi | null>>(`/api/v1/profiles/${userId}`),
 };
 
 export const stellarApi = {

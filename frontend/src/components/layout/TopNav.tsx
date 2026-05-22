@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import WalletButton from "@/components/wallet/WalletButton";
-import { Compass, Heart, Home, LogOut, ShieldCheck } from "lucide-react";
+import { Compass, Heart, Home, LogOut, ShieldCheck, Users } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
 const links = [
   { href: "/", label: "Home", icon: Home },
   { href: "/discover", label: "Discover", icon: Compass },
   { href: "/proof", label: "Proof Center", icon: ShieldCheck },
+  { href: "/community", label: "Community", icon: Users },
 ];
 
 export default function TopNav() {
