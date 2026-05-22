@@ -1,5 +1,6 @@
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,12 +27,28 @@ SIMULATED_TOPUP_METHODS = {
 }
 
 
-def xlm_to_php(amount_xlm: float) -> float:
-    return round(amount_xlm * settings.XLM_TO_PHP_RATE, 2)
+async def current_xlm_to_php_rate() -> tuple[float, str]:
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            res = await client.get(
+                "https://api.coingecko.com/api/v3/simple/price",
+                params={"ids": "stellar", "vs_currencies": "php"},
+            )
+            res.raise_for_status()
+            rate = float(res.json()["stellar"]["php"])
+            if rate > 0:
+                return rate, "coingecko_live"
+    except Exception:
+        pass
+    return settings.XLM_TO_PHP_RATE, "demo_fallback"
 
 
-def php_to_xlm(amount_php: float) -> float:
-    return round(amount_php / settings.XLM_TO_PHP_RATE, 7)
+def xlm_to_php(amount_xlm: float, rate: float) -> float:
+    return round(amount_xlm * rate, 2)
+
+
+def php_to_xlm(amount_php: float, rate: float) -> float:
+    return round(amount_php / rate, 7)
 
 
 def _method_from_string(value: str) -> BalancePaymentMethod:
@@ -113,12 +130,13 @@ async def create_confirmed_top_up(
     user: User,
     method: BalancePaymentMethod,
     amount_xlm: float,
+    rate: float,
 ) -> BalanceTransaction:
     tx = BalanceTransaction(
         user_id=user.id,
         kind=BalanceTransactionKind.top_up,
         amount_xlm=amount_xlm,
-        amount_php=xlm_to_php(amount_xlm),
+        amount_php=xlm_to_php(amount_xlm, rate),
         payment_method=method,
         payment_reference=await next_demo_reference(db, method),
         payment_status=BalancePaymentStatus.confirmed,
@@ -133,12 +151,13 @@ async def create_confirmed_top_up(
 
 @router.get("/rates/xlm-php")
 async def get_xlm_php_rate():
+    rate, source = await current_xlm_to_php_rate()
     return {
         "success": True,
-        "message": "Demo conversion rate",
+        "message": "XLM/PHP conversion rate",
         "data": {
-            "xlm_to_php_rate": settings.XLM_TO_PHP_RATE,
-            "source": "demo_fixed_rate",
+            "xlm_to_php_rate": rate,
+            "source": source,
         },
     }
 
@@ -148,12 +167,13 @@ async def get_my_balance(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    rate, _ = await current_xlm_to_php_rate()
     balance = await get_user_xlm_balance(db, user.id)
     transactions = await get_recent_transactions(db, user.id, 10)
     payload = BalanceRead(
         xlm_balance=balance,
-        php_equivalent=xlm_to_php(balance),
-        xlm_to_php_rate=settings.XLM_TO_PHP_RATE,
+        php_equivalent=xlm_to_php(balance, rate),
+        xlm_to_php_rate=rate,
         transactions=[_read_transaction(tx) for tx in transactions],
     )
     return {"success": True, "message": "ok", "data": payload.model_dump()}
@@ -189,11 +209,12 @@ async def simulate_top_up(
     if body.amount_xlm is None and body.amount_php is None:
         raise HTTPException(status_code=422, detail="Enter an amount in XLM or PHP.")
 
-    amount_xlm = body.amount_xlm if body.amount_xlm is not None else php_to_xlm(float(body.amount_php or 0))
+    rate, _ = await current_xlm_to_php_rate()
+    amount_xlm = body.amount_xlm if body.amount_xlm is not None else php_to_xlm(float(body.amount_php or 0), rate)
     if amount_xlm <= 0:
         raise HTTPException(status_code=422, detail="Amount must be greater than 0.")
 
-    tx = await create_confirmed_top_up(db, user, method, round(float(amount_xlm), 7))
+    tx = await create_confirmed_top_up(db, user, method, round(float(amount_xlm), 7), rate)
     balance = await get_user_xlm_balance(db, user.id)
     return {
         "success": True,
@@ -202,8 +223,8 @@ async def simulate_top_up(
             "top_up": _read_transaction(tx).model_dump(),
             "balance": {
                 "xlm_balance": balance,
-                "php_equivalent": xlm_to_php(balance),
-                "xlm_to_php_rate": settings.XLM_TO_PHP_RATE,
+                "php_equivalent": xlm_to_php(balance, rate),
+                "xlm_to_php_rate": rate,
             },
         },
     }

@@ -24,7 +24,7 @@ from app.schemas.campaign_drive import CampaignDriveCreate, CampaignDriveUpdate
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 STATIC_ORGANIZER_EMAIL = "geineldungao012@gmail.com"
-DEMO_XLM_TO_PHP = 10
+DEMO_XLM_TO_PHP = settings.XLM_TO_PHP_RATE
 CAMPAIGN_UPLOAD_DIR = os.path.join(os.path.dirname(settings.UPLOAD_DIR), "campaigns")
 CAMPAIGN_IMAGE_MIME = {"image/png", "image/jpeg", "image/webp"}
 CAMPAIGN_IMAGE_EXT = {

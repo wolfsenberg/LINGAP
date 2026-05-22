@@ -63,6 +63,13 @@ export function getStellarExpertTxUrl(txHash: string) {
   return `https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`;
 }
 
+export function getStellarExpertContractUrl(contractId?: string | null) {
+  const id = contractId || process.env.NEXT_PUBLIC_CONTRACT_DONATION_VAULT;
+  if (!id) return null;
+  const explorerNetwork = NETWORK === "mainnet" ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${explorerNetwork}/contract/${id}`;
+}
+
 export async function getTransactionDetails(txHash: string) {
   return horizonServer.transactions().transaction(txHash).call();
 }

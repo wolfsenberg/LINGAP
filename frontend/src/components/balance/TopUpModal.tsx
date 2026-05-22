@@ -5,9 +5,13 @@ import { CheckCircle2, CreditCard, Landmark, Smartphone, Wallet, X, type LucideI
 import toast from "react-hot-toast";
 import { balanceApi, type BalanceApi, type BalanceTransactionApi } from "@/lib/api";
 import { useFreighter } from "@/hooks/useFreighter";
+import { getStellarExpertContractUrl } from "@/lib/stellar";
 
 type PaymentMethod = "pdax" | "gcash" | "maya" | "stellar_wallet";
 type AmountMode = "xlm" | "php";
+
+const XLM_PRESETS = [5, 10, 25, 50];
+const PHP_PRESETS = [100, 250, 500, 1000];
 
 type TopUpModalProps = {
   open: boolean;
@@ -44,6 +48,8 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
   const [amount, setAmount] = useState("10");
   const [submitting, setSubmitting] = useState(false);
   const [confirmedRef, setConfirmedRef] = useState("");
+  const stellarVaultUrl = getStellarExpertContractUrl();
+  const presets = mode === "xlm" ? XLM_PRESETS : PHP_PRESETS;
 
   const numericAmount = Number(amount) || 0;
   const amountXlm = useMemo(
@@ -58,17 +64,18 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
   if (!open) return null;
 
   async function handleConfirm() {
+    if (!connected || !publicKey) {
+      toast.error("Connect your Stellar Wallet before topping up.");
+      await connect();
+      return;
+    }
+
     if (amountXlm <= 0) {
       toast.error("Enter an amount greater than 0.");
       return;
     }
 
     if (method === "stellar_wallet") {
-      if (!connected) {
-        await connect();
-        toast("Connect Stellar Wallet to continue.");
-        return;
-      }
       toast("Direct Stellar Wallet top-up placeholder is ready for the on-chain flow.");
       return;
     }
@@ -111,7 +118,7 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
           Choose a payment channel to add XLM to your LINGAP balance. For this MVP, PDAX, GCash, and Maya use simulated confirmations, while Stellar Wallet represents a direct on-chain flow.
         </p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 10, marginBottom: 18 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 10, marginBottom: 16 }}>
           {methods.map(({ id, title, label, Icon, recommended }) => (
             <button
               key={id}
@@ -133,16 +140,27 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
         </div>
 
         <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 10, flexWrap: "wrap" }}>
-            <div style={{ fontWeight: 800, color: "var(--forest)" }}>XLM / PHP Converter</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" className={`btn btn-sm ${mode === "xlm" ? "btn-primary" : "btn-outline"}`} onClick={() => setMode("xlm")}>
+          <div style={{ fontWeight: 800, color: "var(--forest)", marginBottom: 10 }}>XLM / PHP Converter</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 8, marginBottom: 10 }}>
+              <button type="button" className={`btn btn-sm ${mode === "xlm" ? "btn-primary" : "btn-outline"}`} onClick={() => { setMode("xlm"); setAmount(String(XLM_PRESETS[1])); }}>
                 Enter amount in XLM
               </button>
-              <button type="button" className={`btn btn-sm ${mode === "php" ? "btn-primary" : "btn-outline"}`} onClick={() => setMode("php")}>
+              <button type="button" className={`btn btn-sm ${mode === "php" ? "btn-primary" : "btn-outline"}`} onClick={() => { setMode("php"); setAmount(String(PHP_PRESETS[2])); }}>
                 Enter amount in PHP
               </button>
-            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(96px,1fr))", gap: 8, marginBottom: 10 }}>
+            {presets.map((preset) => (
+              <button
+                key={`${mode}-${preset}`}
+                type="button"
+                onClick={() => setAmount(String(preset))}
+                className={`btn btn-sm ${Number(amount) === preset ? "btn-primary" : "btn-outline"}`}
+                style={{ justifyContent: "center" }}
+              >
+                {mode === "xlm" ? `${preset} XLM` : formatPhp(preset)}
+              </button>
+            ))}
           </div>
           <input
             type="number"
@@ -157,11 +175,14 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
           </div>
         </div>
 
-        {method === "stellar_wallet" && (
-          <div style={{ padding: 13, background: "rgba(74,155,106,.07)", border: "1px solid rgba(74,155,106,.2)", borderRadius: 10, color: "var(--forest)", fontSize: 13, marginBottom: 14 }}>
-            {connected && publicKey ? `Connected wallet: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}` : "Connect Stellar Wallet to continue."}
-          </div>
-        )}
+        <div style={{ padding: 13, background: "rgba(74,155,106,.07)", border: "1px solid rgba(74,155,106,.2)", borderRadius: 10, color: "var(--forest)", fontSize: 13, marginBottom: 14 }}>
+          {connected && publicKey ? `Connected wallet: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}` : "Connect Stellar Wallet to continue before any top-up is confirmed."}
+          {stellarVaultUrl && (
+            <a href={stellarVaultUrl} target="_blank" rel="noreferrer" style={{ display: "block", color: "var(--canopy)", fontWeight: 800, marginTop: 6, textDecoration: "none" }}>
+              View LINGAP vault reference on Stellar
+            </a>
+          )}
+        </div>
 
         {confirmedRef && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 13, borderRadius: 10, background: "rgba(74,155,106,.09)", color: "var(--forest)", fontSize: 13, marginBottom: 14 }}>
@@ -170,7 +191,7 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
         )}
 
         <button type="button" onClick={handleConfirm} disabled={submitting} className="btn btn-emerald btn-lg" style={{ width: "100%", justifyContent: "center" }}>
-          {submitting ? "Confirming..." : method === "stellar_wallet" ? "Connect Stellar Wallet" : "Confirm Simulated Top-up"}
+          {submitting ? "Confirming..." : !connected ? "Connect Wallet to Continue" : method === "stellar_wallet" ? "Continue with Stellar Wallet" : "Confirm Simulated Top-up"}
         </button>
       </div>
     </div>
