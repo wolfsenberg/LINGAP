@@ -36,6 +36,46 @@ type DonationCreateRequest = {
   stellar_tx_hash?: string;
 };
 
+type ApiDonation = {
+  id: string;
+  donor_id: string;
+  donor_name: string;
+  amount: number;
+  asset: string;
+  purpose?: string | null;
+  stellar_tx_hash: string;
+  blockchain_confirmed: boolean;
+  disbursed: boolean;
+  disbursed_amount: number;
+  created_at: string;
+};
+
+export type CampaignDriveApi = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  raised_amount: number;
+  goal_amount: number;
+  progress: number;
+  donors: number;
+  institution: string;
+  location: string;
+  image_src?: string | null;
+  updated_at: string;
+  source: string;
+};
+
+export type LeaderboardDonorApi = {
+  rank: number;
+  user_id: string;
+  name: string;
+  total_donated: number;
+  donation_count: number;
+  last_donation_at?: string | null;
+};
+
 const normalizeUser = (user: ApiUser): User => ({
   id: user.id,
   email: user.email,
@@ -44,6 +84,25 @@ const normalizeUser = (user: ApiUser): User => ({
   stellarPublicKey: user.stellar_public_key ?? undefined,
   kycVerified: user.kyc_verified,
   createdAt: user.created_at,
+});
+
+const normalizeDonation = (donation: ApiDonation): Donation => ({
+  id: donation.id,
+  donorId: donation.donor_id,
+  donorName: donation.donor_name,
+  amount: donation.amount,
+  asset: donation.asset,
+  purpose: donation.purpose ?? undefined,
+  stellarTxHash: donation.stellar_tx_hash,
+  blockchainConfirmed: donation.blockchain_confirmed,
+  disbursed: donation.disbursed,
+  disbursedAmount: donation.disbursed_amount,
+  createdAt: donation.created_at,
+});
+
+const normalizePaginatedDonations = (res: PaginatedResponse<ApiDonation>): PaginatedResponse<Donation> => ({
+  ...res,
+  items: res.items.map(normalizeDonation),
 });
 
 const api = axios.create({
@@ -129,16 +188,25 @@ export const authApi = {
 };
 
 export const donationsApi = {
-  list: (page = 1, size = 20) =>
-    api.get<PaginatedResponse<Donation>>("/api/v1/donations", { params: { page, size } }),
-  get: (id: string) => api.get<ApiResponse<Donation>>(`/api/v1/donations/${id}`),
+  list: async (page = 1, size = 20) => {
+    const res = await api.get<PaginatedResponse<ApiDonation>>("/api/v1/donations", { params: { page, size } });
+    return { ...res, data: normalizePaginatedDonations(res.data) };
+  },
+  mine: async (page = 1, size = 20) => {
+    const res = await api.get<PaginatedResponse<ApiDonation>>("/api/v1/donations/me", { params: { page, size } });
+    return { ...res, data: normalizePaginatedDonations(res.data) };
+  },
+  get: async (id: string) => {
+    const res = await api.get<ApiResponse<ApiDonation>>(`/api/v1/donations/${id}`);
+    return { ...res, data: { ...res.data, data: normalizeDonation(res.data.data) } };
+  },
   create: (data: DonationCreateRequest) =>
-    api.post<ApiResponse<Donation>>("/api/v1/donations", {
+    api.post<ApiResponse<ApiDonation>>("/api/v1/donations", {
       amount: data.amount,
       asset: data.asset,
       purpose: data.purpose,
       stellar_tx_hash: data.stellar_tx_hash ?? data.stellarTxHash,
-    }),
+    }).then((res) => ({ ...res, data: { ...res.data, data: normalizeDonation(res.data.data) } })),
   getProvenance: (id: string) =>
     api.get<ApiResponse<ProvenanceRecord[]>>(`/api/v1/donations/${id}/provenance`),
 };
@@ -171,6 +239,30 @@ export const aidRequestsApi = {
 
 export const dashboardApi = {
   stats: () => api.get<ApiResponse<DashboardStats>>("/api/v1/dashboard/stats"),
+};
+
+export const campaignsApi = {
+  mine: () => api.get<ApiResponse<CampaignDriveApi[]>>("/api/v1/campaigns/mine"),
+  create: (data: {
+    title: string;
+    description: string;
+    category: string;
+    institution: string;
+    location: string;
+    goal_amount: number;
+    image_src?: string | null;
+  }) => api.post<ApiResponse<CampaignDriveApi>>("/api/v1/campaigns", data),
+};
+
+export const donorsApi = {
+  leaderboard: (limit = 10) =>
+    api.get<ApiResponse<LeaderboardDonorApi[]>>("/api/v1/donors/leaderboard", {
+      params: { limit },
+    }),
+  myImpact: () =>
+    api.get<ApiResponse<{ name: string; total_donated: number; campaigns_helped: number; lives_impacted: number }>>(
+      "/api/v1/donors/me/impact"
+    ),
 };
 
 export const stellarApi = {
