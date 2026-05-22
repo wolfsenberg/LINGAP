@@ -4,10 +4,10 @@ import { ReactNode, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/authStore";
 
-const publicMarketingPaths = new Set(["/", "/admin", "/discover", "/proof"]);
+const publicMarketingPaths = new Set(["/", "/admin", "/discover", "/proof", "/community"]);
 
 function isPublicMarketingPath(pathname: string) {
-  return publicMarketingPaths.has(pathname);
+  return publicMarketingPaths.has(pathname) || pathname.startsWith("/profile/");
 }
 
 export default function MarketingAuthGate({ children }: { children: ReactNode }) {

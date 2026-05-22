@@ -1,13 +1,14 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Compass, ShieldCheck, Heart } from "lucide-react";
+import { Home, Compass, ShieldCheck, Heart, Users } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
 const items = [
   { href: "/", label: "Home", icon: Home },
   { href: "/discover", label: "Discover", icon: Compass },
   { href: "/proof", label: "Proof", icon: ShieldCheck },
+  { href: "/community", label: "Community", icon: Users },
   { href: "/donor", label: "My Impact", icon: Heart },
 ];
 

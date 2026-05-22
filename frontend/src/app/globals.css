@@ -369,6 +369,45 @@ select.form-input{appearance:none;background-image:linear-gradient(45deg,transpa
 .auth-prompt-modal p{font-size:14px;line-height:1.7;color:var(--text2);margin:0 auto 22px;max-width:350px}
 .auth-prompt-actions{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
 
+.community-hero,.profile-hero{background:linear-gradient(135deg,var(--forest) 0%,var(--forest-mid) 100%);padding:54px 40px;color:#fff}
+.community-hero h1,.profile-hero h1{font-size:clamp(32px,5vw,48px);font-weight:800;line-height:1.08;margin-bottom:14px;letter-spacing:0;color:#fff}
+.community-hero p{max-width:680px;color:rgba(255,255,255,.68);font-size:16px;line-height:1.65;margin-bottom:24px}
+.community-search{width:min(100%,680px);display:grid;grid-template-columns:22px minmax(0,1fr);align-items:center;gap:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:13px 15px;color:rgba(255,255,255,.72)}
+.community-search input{border:0;outline:0;background:transparent;color:#fff;font-family:'DM Sans',sans-serif;font-size:15px}
+.community-search input::placeholder{color:rgba(255,255,255,.52)}
+.community-stats,.profile-impact-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:28px}
+.profile-impact-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.profile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.profile-card{display:flex;flex-direction:column;gap:16px;background:linear-gradient(180deg,var(--surface),#fbf8ef);border:1px solid rgba(222,216,202,.92);border-radius:var(--r);padding:18px;text-decoration:none;color:inherit;box-shadow:var(--shadow);transition:transform .2s,border-color .2s,box-shadow .2s}
+.profile-card:hover{transform:translateY(-2px);border-color:rgba(74,155,106,.34);box-shadow:var(--shadow-lg)}
+.profile-card-head,.profile-identity{display:flex;align-items:center;gap:13px;min-width:0}
+.profile-card h3{font-size:18px;font-weight:800;color:var(--forest);margin-bottom:5px}
+.profile-avatar{width:46px;height:46px;border-radius:14px;background:rgba(74,155,106,.12);border:1px solid rgba(74,155,106,.22);color:var(--forest-light);display:flex;align-items:center;justify-content:center;font-family:'Sora',sans-serif;font-weight:800;flex-shrink:0}
+.profile-avatar-lg{width:66px;height:66px;border-radius:18px;font-size:28px;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.22);color:#fff}
+.profile-role,.profile-card-foot span,.profile-hero-meta span{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--text3);text-transform:capitalize}
+.profile-mini-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.profile-mini-stats div{background:#fbfaf5;border:1px solid rgba(222,216,202,.82);border-radius:10px;padding:10px}
+.profile-mini-stats strong{display:block;font-family:'Sora',sans-serif;font-size:16px;color:var(--forest);line-height:1.1}
+.profile-mini-stats span{display:block;font-size:11px;color:var(--text3);margin-top:4px}
+.profile-campaign-list{display:flex;flex-direction:column;gap:6px}
+.profile-campaign-list span{font-size:12px;color:var(--text2);line-height:1.35;background:rgba(26,58,42,.04);border:1px solid rgba(26,58,42,.07);border-radius:8px;padding:7px 9px}
+.profile-card-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid rgba(222,216,202,.82);padding-top:12px}
+.community-note{display:flex;gap:10px;align-items:flex-start;margin-top:24px;background:rgba(200,134,10,.07);border:1px solid rgba(200,134,10,.18);border-radius:var(--r-sm);padding:14px;color:var(--text2);font-size:13px;line-height:1.55}
+.community-note strong{color:var(--forest)}
+.profile-hero-grid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:28px;align-items:end}
+.profile-back{color:#fff;border-color:rgba(255,255,255,.26);background:rgba(255,255,255,.08);margin-bottom:26px}
+.profile-hero-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.profile-hero-meta span{color:rgba(255,255,255,.7);text-transform:none}
+.profile-hero-card{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:var(--r-sm);padding:16px;display:grid;gap:7px;color:rgba(255,255,255,.72);font-size:13px;line-height:1.5}
+.profile-hero-card strong{color:#fff;font-size:15px}
+.profile-layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:22px;align-items:start}
+.profile-campaign-card{display:block;text-decoration:none}
+.profile-activity-row{text-decoration:none;color:inherit}
+.profile-cert-list{display:flex;flex-direction:column;gap:8px}
+.profile-cert-item{background:#fbfaf5;border:1px solid rgba(222,216,202,.82);border-radius:10px;padding:12px}
+.profile-cert-item strong{display:block;color:var(--forest);font-size:13px;margin-bottom:4px}
+.profile-cert-item span{display:block;color:var(--text3);font-size:12px;line-height:1.4}
+
 .admin-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .admin-card{background:linear-gradient(180deg,var(--surface),#fbf8ef);border:1px solid rgba(222,216,202,.9);border-radius:var(--r-sm);padding:18px 20px;box-shadow:var(--shadow)}
 .admin-login-page{min-height:calc(100vh - 64px);background:linear-gradient(135deg,var(--forest) 0%,var(--forest-mid) 48%,#102419 100%);display:flex;align-items:center;justify-content:center;padding:48px 20px;position:relative;overflow:hidden}
@@ -571,6 +610,10 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-v
   .proof-filter-head{align-items:flex-start;gap:14px;flex-wrap:wrap}
   .proof-filter-actions{overflow-x:auto;max-width:100%;padding-bottom:4px}
   .proof-legend-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .community-hero,.profile-hero{padding:42px 28px}
+  .community-stats,.profile-impact-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .profile-hero-grid,.profile-layout{grid-template-columns:1fr}
+  .profile-hero-card{max-width:520px}
   .impact-dashboard-grid{grid-template-columns:1fr}
   .impact-sidebar{position:static}
   .donor-hero{padding:40px 28px}
@@ -652,6 +695,17 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-v
   .proof-legend{padding:12px;margin-bottom:18px}
   .proof-legend-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
   .proof-legend-item{min-height:40px;padding:7px}
+  .community-hero,.profile-hero{padding:34px 18px}
+  .community-search{padding:11px 13px}
+  .community-stats,.profile-impact-grid{grid-template-columns:1fr}
+  .profile-grid{grid-template-columns:1fr}
+  .profile-card{padding:16px}
+  .profile-card-foot{align-items:flex-start;flex-direction:column}
+  .profile-mini-stats{grid-template-columns:1fr}
+  .profile-identity{align-items:flex-start}
+  .profile-avatar-lg{width:54px;height:54px;border-radius:15px;font-size:22px}
+  .profile-hero h1{font-size:30px}
+  .profile-hero-meta{gap:7px}
   .donor-hero{padding:34px 18px}
   .donor-hero-content h1{font-size:30px!important}
   .donor-stats-row{grid-template-columns:1fr 1fr;gap:10px}
