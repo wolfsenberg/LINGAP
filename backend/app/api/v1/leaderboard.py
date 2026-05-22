@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import distinct, select, func
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
@@ -23,6 +23,7 @@ async def donor_leaderboard(
                 func.count(Donation.id).label("count"),
                 func.max(Donation.updated_at).label("last_donation_at"),
             )
+            .where(Donation.blockchain_confirmed.is_(True))
             .group_by(Donation.donor_id)
             .order_by(func.sum(Donation.amount).desc())
             .limit(limit)
@@ -56,8 +57,11 @@ async def my_impact(
         await db.execute(
             select(
                 func.coalesce(func.sum(Donation.amount), 0).label("total"),
-                func.count(Donation.id).label("count"),
-            ).where(Donation.donor_id == user.id)
+                func.count(distinct(Donation.purpose)).label("count"),
+            ).where(
+                Donation.donor_id == user.id,
+                Donation.blockchain_confirmed.is_(True),
+            )
         )
     ).one()
 
