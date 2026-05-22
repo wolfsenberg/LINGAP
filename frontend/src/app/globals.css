@@ -576,7 +576,7 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-v
   .hero-inner{padding-left:28px;padding-right:28px}
   .detail-grid,.esc-grid,.blockchain-viz{padding-left:28px;padding-right:28px}
   .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .campaign-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .campaign-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
   .donor-stats-row{grid-template-columns:repeat(4,minmax(135px,1fr))}
   .impact-dashboard-grid{grid-template-columns:minmax(0,1fr) 300px}
   .achievement-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
