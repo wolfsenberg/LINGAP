@@ -418,7 +418,7 @@ export default function DetailPage() {
 
         {/* RIGHT — sticky donate card */}
         <div>
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28, marginBottom: 20, position: "sticky", top: 84 }}>
+          <div className="detail-donate-card" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28, marginBottom: 20, position: "sticky", top: 84 }}>
             <div className="flex flex-center flex-between mb-16">
               <div>
                 <div style={{ fontFamily: "Sora,sans-serif", fontSize: 28, fontWeight: 800, color: "var(--forest)" }}>
@@ -446,7 +446,7 @@ export default function DetailPage() {
             {/* Amount picker */}
             <div style={{ marginBottom: 18 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 10 }}>Choose amount (XLM):</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
+              <div className="donation-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
                 {AMOUNTS.map((a) => (
                   <button
                     key={a}
@@ -545,6 +545,10 @@ export default function DetailPage() {
             </div>
           </div>
 
+          <div style={{ marginBottom: 16 }}>
+            <VotingPanel campaignId={activeCampaign.id} campaignName={activeCampaign.title} />
+          </div>
+
           {/* Institution card */}
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 20, marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text3)", marginBottom: 12 }}>INSTITUTION RECEIVING FUNDS</div>
@@ -567,7 +571,7 @@ export default function DetailPage() {
           {/* Share */}
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 20 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 12 }}>Share this campaign:</div>
-            <div className="flex gap-8">
+            <div className="flex gap-8 share-buttons">
               <button className="btn btn-sm" style={{ background: "#1877F2", color: "#fff", flex: 1, justifyContent: "center", gap: 6 }}>
                 <Facebook size={13} /> Facebook
               </button>
@@ -579,8 +583,6 @@ export default function DetailPage() {
               </button>
             </div>
           </div>
-
-          <VotingPanel campaignId={activeCampaign.id} campaignName={activeCampaign.title} />
         </div>
       </div>
     </div>

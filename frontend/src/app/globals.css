@@ -505,8 +505,12 @@ select.form-input{appearance:none;background-image:linear-gradient(45deg,transpa
 
 /* App-wide responsive hardening for tablet and mobile */
 img,svg,video,canvas{max-width:100%}
-h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
+input,select,textarea,button{max-width:100%}
+h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-value{overflow-wrap:anywhere}
 .btn,.badge,.filter-chip{max-width:100%}
+.container,.page-inner,.hero-inner,.detail-grid,.esc-grid,.blockchain-viz{width:100%}
+.card,.stat-card,.camp-card,.proof-card,.impact-panel,.auth-card,.admin-auth-card,.detail-donate-card,.voting-panel{min-width:0}
+.flex>*,.grid-2>*,.grid-3>*,.grid-4>*,.campaign-grid>*,.features-grid>*,.proof-grid>*,.esc-grid>*,.impact-dashboard-grid>*{min-width:0}
 
 @media(max-width:1180px){
   .topnav{padding:0 18px}
@@ -519,6 +523,9 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
   .detail-grid,.esc-grid,.blockchain-viz{padding-left:28px;padding-right:28px}
   .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
   .campaign-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+  .donor-stats-row{grid-template-columns:repeat(4,minmax(135px,1fr))}
+  .impact-dashboard-grid{grid-template-columns:minmax(0,1fr) 300px}
+  .achievement-grid{grid-template-columns:1fr}
 }
 
 @media(max-width:900px){
@@ -530,7 +537,7 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
   .nav-impact{display:none}
   .nav-login{display:inline-flex}
   .nav-right .wallet-button,.nav-right .wallet-pill,.nav-right .wallet-disconnect{display:none}
-  .nav-right .btn-emerald{display:inline-flex}
+  .nav-right .btn-emerald{display:none}
   .mobile-nav{display:flex;justify-content:space-around;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
   .mn-item{min-width:58px}
   .hero{min-height:auto}
@@ -539,14 +546,20 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
   .hero-title{font-size:clamp(34px,9vw,54px)}
   .hero-sub{font-size:16px;max-width:660px}
   .hero-cta .btn{flex:1 1 220px;justify-content:center}
+  .discover-hero,.proof-hero,.start-hero,.esc-hero{padding:40px 28px!important}
   .features-grid{grid-template-columns:1fr 1fr}
   .grid-2,.grid-3{grid-template-columns:1fr}
   .detail-grid{grid-template-columns:1fr;gap:22px;padding-top:28px}
-  .detail-grid>div:nth-child(2)>div:first-child{position:static!important;top:auto!important}
+  .detail-donate-card,.start-campaign-side{position:static!important;top:auto!important}
   .detail-img{height:clamp(220px,48vw,340px)}
+  .donation-amount-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
   .esc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .blockchain-viz{padding-top:24px}
+  .panel-toolbar{align-items:flex-start;flex-wrap:wrap;gap:12px}
+  .panel-toolbar .btn{width:auto}
   .proof-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .proof-filter-head{align-items:flex-start;gap:14px;flex-wrap:wrap}
+  .proof-filter-actions{overflow-x:auto;max-width:100%;padding-bottom:4px}
   .impact-dashboard-grid{grid-template-columns:1fr}
   .impact-sidebar{position:static}
   .donor-hero{padding:40px 28px}
@@ -554,6 +567,7 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
   .donor-hero-art{order:2;justify-content:center}
   .donor-hero-content{order:1}
   .donor-stats-row{grid-template-columns:repeat(2,minmax(0,1fr));max-width:none}
+  .start-campaign-form{grid-template-columns:1fr!important}
   .admin-auth-page,.auth-page{grid-template-columns:1fr}
   .admin-auth-brand,.auth-brand-panel{min-height:auto}
   .admin-auth-visual{display:none}
@@ -572,6 +586,7 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
   .section{padding:48px 0}
   .section-title{font-size:clamp(24px,8vw,32px)}
   .section-sub{font-size:15px}
+  .discover-hero,.proof-hero,.start-hero,.esc-hero{padding:34px 18px!important}
   .hero-inner{padding:54px 18px 46px}
   .hero-badge{margin-top:8px;margin-bottom:20px;padding:8px 12px}
   .hero-title{font-size:clamp(34px,11vw,46px);line-height:1.06}
@@ -586,15 +601,22 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
   .camp-img{height:160px}
   .camp-body{padding:18px}
   .camp-meta,.camp-footer{align-items:flex-start;flex-direction:column;gap:8px}
+  .camp-footer .badge,.camp-meta .camp-donors{max-width:100%;white-space:normal}
   .filter-bar{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-left:-2px;margin-right:-2px}
   .filter-chip{flex:0 0 auto;padding:8px 13px}
   .search-bar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:11px 13px}
   .search-bar .btn{grid-column:1 / -1;justify-content:center;width:100%}
+  .city-filter-card{display:grid!important;grid-template-columns:40px minmax(0,1fr)!important;gap:12px!important;padding:16px!important}
+  .city-select-wrap{grid-column:1 / -1;width:100%}
+  .city-select-wrap select{width:100%;min-width:0!important}
   .process-step{grid-template-columns:56px minmax(0,1fr);gap:12px}
   .process-icon{width:56px;height:56px}
   .detail-grid{padding:22px 18px 96px}
   .detail-img{height:220px;margin-bottom:18px}
   .detail-grid h1{font-size:26px!important}
+  .detail-donate-card{padding:20px!important}
+  .donation-amount-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .donation-amount-grid .btn{padding-left:8px;padding-right:8px;white-space:normal}
   .detail-grid [style*="padding: 28px"]{padding:20px!important}
   .detail-grid [style*="gridTemplateColumns: \"repeat(3,1fr)\""],
   .detail-grid [style*="grid-template-columns: repeat(3,1fr)"]{grid-template-columns:1fr 1fr!important}
@@ -609,9 +631,13 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
   .tx-amount{font-size:16px}
   .chain-steps{margin:12px 0;padding:16px 0;scroll-snap-type:x proximity}
   .chain-step{min-width:118px;scroll-snap-align:start}
+  .chain-connector{min-width:22px!important;flex:0 0 22px!important}
   .proof-thumb{height:138px}
   .ai-alert{padding:15px 14px 15px 30px}
   .ai-alert .flex-between{align-items:flex-start;gap:8px}
+  .proof-feed-row{display:grid!important;grid-template-columns:1fr;gap:8px}
+  .proof-filter-actions{width:100%;flex-wrap:nowrap}
+  .proof-filter-actions .filter-chip{flex:0 0 auto}
   .donor-hero{padding:34px 18px}
   .donor-hero-content h1{font-size:30px!important}
   .donor-stats-row{grid-template-columns:1fr 1fr;gap:10px}
@@ -620,10 +646,20 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
   .impact-panel-head,.impact-certificate-callout{display:grid;grid-template-columns:1fr;gap:14px}
   .impact-panel-head .btn,.impact-certificate-callout .btn{width:100%;justify-content:center}
   .transparency-grid{grid-template-columns:1fr}
+  .transparency-card{grid-template-columns:36px minmax(0,1fr);padding:14px}
+  .transparency-icon{width:34px;height:34px}
   .donation-row{grid-template-columns:14px minmax(0,1fr);gap:10px}
   .donation-row .badge{grid-column:2;justify-self:start}
   .leaderboard-item{gap:10px}
-  .lb-amount{font-size:13px}
+  .leaderboard-item{display:grid;grid-template-columns:28px 36px minmax(0,1fr);align-items:start}
+  .lb-amount{grid-column:3;font-size:13px;margin-left:0;white-space:normal}
+  .achievement-grid{grid-template-columns:1fr}
+  .share-buttons{display:grid!important;grid-template-columns:1fr;gap:8px}
+  .share-buttons .btn{width:100%}
+  .voting-panel{padding:18px!important}
+  .voting-panel-head{display:grid!important;grid-template-columns:36px minmax(0,1fr);align-items:start!important}
+  .voting-panel-badge{grid-column:1 / -1;margin-left:0!important;width:max-content;max-width:100%}
+  .form-two-col,.milestone-row{grid-template-columns:1fr!important}
   .auth-card,.admin-auth-card,.admin-login-panel{padding:18px}
   .auth-card-head{display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px}
   .auth-card-head h2{font-size:21px}
@@ -648,4 +684,9 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
   .detail-grid [style*="grid-template-columns: repeat(3,1fr)"]{grid-template-columns:1fr!important}
   .mobile-nav{padding-left:4px;padding-right:4px}
   .mn-item{font-size:9.5px;min-width:52px;padding-left:4px;padding-right:4px}
+  .donation-amount-grid{grid-template-columns:1fr!important}
+  .stat-value{font-size:24px}
+  .transparency-value{font-size:17px}
+  .esc-hero-head{display:grid!important;grid-template-columns:56px minmax(0,1fr);gap:12px!important}
+  .esc-hero-head h1{font-size:25px!important;line-height:1.16}
 }
