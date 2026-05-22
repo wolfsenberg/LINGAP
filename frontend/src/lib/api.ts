@@ -34,6 +34,9 @@ type DonationCreateRequest = {
   purpose?: string;
   stellarTxHash?: string;
   stellar_tx_hash?: string;
+  fundingSource?: string;
+  spendBalance?: boolean;
+  walletAddress?: string;
 };
 
 type ApiDonation = {
@@ -47,7 +50,31 @@ type ApiDonation = {
   blockchain_confirmed: boolean;
   disbursed: boolean;
   disbursed_amount: number;
+  funding_source?: string | null;
+  amount_php?: number | null;
   created_at: string;
+};
+
+export type BalanceTransactionApi = {
+  id: string;
+  kind: "top_up" | "donation" | string;
+  amount_xlm: number;
+  amount_php: number;
+  payment_method: "pdax" | "gcash" | "maya" | "stellar_wallet" | "lingap_balance" | string;
+  payment_reference: string;
+  payment_status: "pending" | "confirmed" | "failed" | string;
+  campaign_id?: string | null;
+  donation_id?: string | null;
+  stellar_tx_hash?: string | null;
+  note?: string | null;
+  created_at: string;
+};
+
+export type BalanceApi = {
+  xlm_balance: number;
+  php_equivalent: number;
+  xlm_to_php_rate: number;
+  transactions: BalanceTransactionApi[];
 };
 
 export type CampaignDriveApi = {
@@ -230,6 +257,8 @@ const normalizeDonation = (donation: ApiDonation): Donation => ({
   blockchainConfirmed: donation.blockchain_confirmed,
   disbursed: donation.disbursed,
   disbursedAmount: donation.disbursed_amount,
+  fundingSource: donation.funding_source ?? undefined,
+  amountPhp: donation.amount_php ?? undefined,
   createdAt: donation.created_at,
 });
 
@@ -387,9 +416,29 @@ export const donationsApi = {
       asset: data.asset,
       purpose: data.purpose,
       stellar_tx_hash: data.stellar_tx_hash ?? data.stellarTxHash,
+      funding_source: data.fundingSource,
+      spend_balance: data.spendBalance ?? false,
+      wallet_address: data.walletAddress,
     }).then((res) => ({ ...res, data: { ...res.data, data: normalizeDonation(res.data.data) } })),
   getProvenance: (id: string) =>
     api.get<ApiResponse<ProvenanceRecord[]>>(`/api/v1/donations/${id}/provenance`),
+};
+
+export const balanceApi = {
+  rate: () =>
+    api.get<ApiResponse<{ xlm_to_php_rate: number; source: string }>>("/api/v1/rates/xlm-php"),
+  mine: () => api.get<ApiResponse<BalanceApi>>("/api/v1/me/balance"),
+  transactions: (limit = 25) =>
+    api.get<ApiResponse<BalanceTransactionApi[]>>("/api/v1/me/transactions", { params: { limit } }),
+  simulateTopUp: (data: { paymentMethod: "pdax" | "gcash" | "maya"; amountXlm?: number; amountPhp?: number }) =>
+    api.post<ApiResponse<{ top_up: BalanceTransactionApi; balance: Omit<BalanceApi, "transactions"> }>>(
+      "/api/v1/topups/simulate",
+      {
+        payment_method: data.paymentMethod,
+        amount_xlm: data.amountXlm,
+        amount_php: data.amountPhp,
+      }
+    ),
 };
 
 export const beneficiariesApi = {

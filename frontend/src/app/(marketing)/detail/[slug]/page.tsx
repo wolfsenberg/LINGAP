@@ -3,18 +3,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
-import { campaignsApi, donationsApi } from "@/lib/api";
-import {
-  STELLAR_CONFIG,
-  buildPaymentTransaction,
-  getStellarExpertTxUrl,
-  submitSignedTransactionXdr,
-} from "@/lib/stellar";
+import { balanceApi, campaignsApi, donationsApi, type BalanceApi } from "@/lib/api";
+import { getStellarExpertTxUrl } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 import { applyCampaignSummary, CAMPAIGNS, type PublicCampaignSummary } from "@/lib/campaigns";
-import { addPendingDonation, removePendingDonation } from "@/lib/pendingDonations";
 import { useAuthStore } from "@/store/authStore";
 import {
   AlertCircle, CheckCircle2, Lock, Star, Handshake, MapPin, Calendar,
@@ -24,15 +18,12 @@ import {
 
 const AMOUNTS = [100, 250, 500, 1000, 5000];
 const DEMO_XLM_TO_PHP = 10;
-const LINGAP_RECEIVER_PUBLIC_KEY = process.env.NEXT_PUBLIC_LINGAP_RECEIVER_PUBLIC_KEY || "";
-
-type FreighterSignResult =
-  | string
-  | {
-      signedTxXdr?: string;
-      signedTxXDR?: string;
-      error?: string;
-    };
+const DEFAULT_BALANCE: BalanceApi = {
+  xlm_balance: 0,
+  php_equivalent: 0,
+  xlm_to_php_rate: DEMO_XLM_TO_PHP,
+  transactions: [],
+};
 
 function getDonationErrorMessage(error: unknown) {
   const err = error as { message?: string; response?: { data?: { detail?: string } } };
@@ -41,31 +32,6 @@ function getDonationErrorMessage(error: unknown) {
 
 function formatXlmAmount(amount: number) {
   return amount.toFixed(7).replace(/\.?0+$/, "");
-}
-
-function getSignedXdr(signResult: FreighterSignResult) {
-  if (typeof signResult === "string") return signResult;
-  if (signResult.error) throw new Error(signResult.error);
-  return signResult.signedTxXdr ?? signResult.signedTxXDR;
-}
-
-function truncateMemo(value: string) {
-  const maxBytes = 28;
-  const encoder = new TextEncoder();
-  if (encoder.encode(value).length <= maxBytes) return value;
-
-  const suffix = "...";
-  let output = "";
-  for (const char of value) {
-    if (encoder.encode(`${output}${char}${suffix}`).length > maxBytes) break;
-    output += char;
-  }
-  return `${output.trimEnd()}${suffix}`;
-}
-
-function getDonationMemo(campaignTitle: string, amount: number) {
-  const safeTitle = campaignTitle.replace(/[^a-zA-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-  return truncateMemo(`${formatXlmAmount(amount)}XLM ${safeTitle}`);
 }
 
 function publicSummaryToDetailCampaign(summary: PublicCampaignSummary) {
@@ -131,9 +97,11 @@ export default function DetailPage() {
   const [selectedAmount, setSelectedAmount] = useState(500);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
+  const [amountMode, setAmountMode] = useState<"xlm" | "php">("xlm");
   const [donating, setDonating] = useState(false);
   const [confirmedDonationXlm, setConfirmedDonationXlm] = useState(0);
   const [lastTxHash, setLastTxHash] = useState("");
+  const [balance, setBalance] = useState<BalanceApi>(DEFAULT_BALANCE);
 
   const [dbCampaign, setDbCampaign] = useState<any>(null);
   const [liveSummary, setLiveSummary] = useState<PublicCampaignSummary | null>(null);
@@ -227,6 +195,23 @@ export default function DetailPage() {
     };
   }, [campaign, slug]);
 
+  useEffect(() => {
+    let mounted = true;
+    async function loadBalance() {
+      if (!user?.id) return;
+      try {
+        const res = await balanceApi.mine();
+        if (mounted) setBalance(res.data.data);
+      } catch {
+        if (mounted) setBalance(DEFAULT_BALANCE);
+      }
+    }
+    loadBalance();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
   const activeCampaign: any = campaign ? applyCampaignSummary(campaign, liveSummary ?? undefined) : dbCampaign;
 
   if (loading) return <div style={{ padding: 100, textAlign: "center", color: "var(--forest)", fontWeight: 600 }}>Loading campaign details...</div>;
@@ -241,7 +226,10 @@ export default function DetailPage() {
   const accentHex = activeCampaign.category === "Animal Rescue" ? "var(--amber)" : "var(--canopy)";
 
 
-  const effectiveAmount = useCustom ? parseFloat(customAmount) || 0 : selectedAmount;
+  const conversionRate = balance.xlm_to_php_rate || DEMO_XLM_TO_PHP;
+  const rawInputAmount = useCustom ? parseFloat(customAmount) || 0 : selectedAmount;
+  const effectiveAmount = amountMode === "php" ? rawInputAmount / conversionRate : rawInputAmount;
+  const effectivePhp = effectiveAmount * conversionRate;
   const usesXlmGoal = activeCampaign.asset === "XLM" || /XLM/i.test(activeCampaign.goalLabel || "");
   const displayRaised = activeCampaign.raised + confirmedDonationXlm * (usesXlmGoal ? 1 : DEMO_XLM_TO_PHP);
   const displayRaisedLabel = usesXlmGoal
@@ -252,6 +240,7 @@ export default function DetailPage() {
 
   async function handleDonate() {
     if (!connected || !publicKey) {
+      toast.error("Connect your Stellar Wallet before donating.");
       await connect();
       return;
     }
@@ -259,55 +248,35 @@ export default function DetailPage() {
       toast.error("Enter a valid amount.");
       return;
     }
-    if (!LINGAP_RECEIVER_PUBLIC_KEY) {
-      toast.error("LINGAP receiving wallet is not configured yet.");
+    if (balance.xlm_balance < effectiveAmount) {
+      toast.error("You do not have enough XLM balance to complete this donation. Please top up first.");
       return;
     }
     setDonating(true);
     try {
-      const memo = getDonationMemo(activeCampaign.title, effectiveAmount);
-      const transaction = await buildPaymentTransaction(
-        publicKey,
-        LINGAP_RECEIVER_PUBLIC_KEY,
-        formatXlmAmount(effectiveAmount),
-        undefined,
-        memo
-      );
-      const { signTransaction } = await import("@stellar/freighter-api");
-      const signResult = (await signTransaction(transaction.toXDR(), {
-        networkPassphrase: STELLAR_CONFIG.network,
-      })) as FreighterSignResult;
-      const signedXdr = getSignedXdr(signResult);
-      if (!signedXdr) throw new Error("Freighter did not return a signed transaction.");
-      const submitRes = await submitSignedTransactionXdr(signedXdr);
-      const txHash = submitRes.hash;
       const donationPurpose = `campaign:${activeCampaign.slug || activeCampaign.id}`;
-      addPendingDonation({
-        userId: user?.id,
-        amount: effectiveAmount,
+      const donationRes = await donationsApi.create({
+        amount: Number(formatXlmAmount(effectiveAmount)),
         asset: "XLM",
         purpose: donationPurpose,
-        stellarTxHash: txHash,
-        createdAt: new Date().toISOString(),
+        fundingSource: "lingap_balance",
+        spendBalance: true,
+        walletAddress: publicKey,
       });
+      const txHash = donationRes.data.data.stellarTxHash;
       setConfirmedDonationXlm((current) => current + effectiveAmount);
       setLastTxHash(txHash);
-      toast.success(`Donation confirmed! Tx: ${txHash.slice(0, 8)}…`);
-      try {
-        await donationsApi.create({
-          amount: effectiveAmount,
-          asset: "XLM",
-          purpose: donationPurpose,
-          stellarTxHash: txHash,
-        });
-        removePendingDonation(txHash);
-        setConfirmedDonationXlm(0);
-        const latest = await campaignsApi.publicOne(activeCampaign.slug || activeCampaign.id);
-        if (latest.data.data) setLiveSummary(latest.data.data);
-        toast.success("Donation synced to LINGAP dashboard.");
-      } catch {
-        toast.error("Donation sent, but dashboard sync failed. Check API/CORS settings.");
-      }
+      setBalance((current) => ({
+        ...current,
+        xlm_balance: Math.max(current.xlm_balance - effectiveAmount, 0),
+        php_equivalent: Math.max((current.xlm_balance - effectiveAmount) * conversionRate, 0),
+      }));
+      setConfirmedDonationXlm(0);
+      const latest = await campaignsApi.publicOne(activeCampaign.slug || activeCampaign.id);
+      if (latest.data.data) setLiveSummary(latest.data.data);
+      const nextBalance = await balanceApi.mine();
+      setBalance(nextBalance.data.data);
+      toast.success(`Donation confirmed! Ref: ${txHash.slice(0, 12)}...`);
     } catch (e: unknown) {
       toast.error(getDonationErrorMessage(e));
     } finally {
@@ -449,15 +418,27 @@ export default function DetailPage() {
               </span>
             </div>
 
+            <div style={{ marginBottom: 14, padding: "12px 14px", background: "rgba(74,155,106,.06)", border: "1px solid rgba(74,155,106,.18)", borderRadius: 10 }}>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>Your available balance</div>
+              <div style={{ fontWeight: 800, color: "var(--forest)" }}>{formatXlmAmount(balance.xlm_balance)} XLM</div>
+              <div style={{ fontSize: 12, color: "var(--text2)" }}>≈ ₱{balance.php_equivalent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            </div>
+
             {/* Amount picker */}
             <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 10 }}>Choose amount (XLM):</div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>XLM / PHP Converter</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button type="button" onClick={() => setAmountMode("xlm")} className={`btn btn-sm ${amountMode === "xlm" ? "btn-primary" : "btn-outline"}`}>Enter amount in XLM</button>
+                  <button type="button" onClick={() => { setAmountMode("php"); setUseCustom(true); }} className={`btn btn-sm ${amountMode === "php" ? "btn-primary" : "btn-outline"}`}>Enter amount in PHP</button>
+                </div>
+              </div>
               <div className="donation-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
                 {AMOUNTS.map((a) => (
                   <button
                     key={a}
-                    onClick={() => { setSelectedAmount(a); setUseCustom(false); }}
-                    className={`btn btn-sm ${!useCustom && selectedAmount === a ? "btn-primary" : "btn-outline"}`}
+                    onClick={() => { setSelectedAmount(a); setUseCustom(false); setAmountMode("xlm"); }}
+                    className={`btn btn-sm ${!useCustom && amountMode === "xlm" && selectedAmount === a ? "btn-primary" : "btn-outline"}`}
                   >
                     {a} XLM
                   </button>
@@ -475,10 +456,13 @@ export default function DetailPage() {
                   min="1"
                   value={customAmount}
                   onChange={(e) => setCustomAmount(e.target.value)}
-                  placeholder="Enter XLM amount"
+                  placeholder={amountMode === "php" ? "Enter PHP amount" : "Enter XLM amount"}
                   style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }}
                 />
               )}
+              <div style={{ marginTop: 8, fontSize: 12, color: "var(--text3)" }}>
+                1 XLM = ₱{conversionRate.toFixed(2)} · Donation: {formatXlmAmount(effectiveAmount)} XLM ≈ ₱{effectivePhp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
             </div>
 
             {/* Wallet hint */}
@@ -500,21 +484,27 @@ export default function DetailPage() {
               style={{ width: "100%", justifyContent: "center", marginBottom: 12, opacity: donating ? 0.7 : 1 }}
             >
               {donating
-                ? "Submitting to Stellar…"
+                ? "Submitting to LINGAP..."
                 : connected
-                  ? `Donate ${effectiveAmount} XLM`
+                  ? `Donate ${formatXlmAmount(effectiveAmount)} XLM`
                   : "Connect Wallet to Donate"}
             </button>
             {lastTxHash && (
-              <a
-                href={getStellarExpertTxUrl(lastTxHash)}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-outline"
-                style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}
-              >
-                <CheckCircle2 size={14} /> View transaction on Stellar Explorer
-              </a>
+              lastTxHash.startsWith("LINGAP-DEMO") ? (
+                <div className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+                  <CheckCircle2 size={14} /> LINGAP reference: {lastTxHash.slice(0, 18)}...
+                </div>
+              ) : (
+                <a
+                  href={getStellarExpertTxUrl(lastTxHash)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn btn-outline"
+                  style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}
+                >
+                  <CheckCircle2 size={14} /> View transaction on Stellar Explorer
+                </a>
+              )
             )}
             <button className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
               <RefreshCw size={14} /> Set Monthly Donation
