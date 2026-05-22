@@ -331,7 +331,7 @@ export default function DonorPage() {
           </main>
 
           <aside className="impact-sidebar">
-            <section className="impact-panel">
+            <section className="impact-panel achievement-panel">
               <h3 className="sidebar-title">
                 <Trophy size={18} color="var(--amber)" strokeWidth={1.8} /> Achievement Badges
               </h3>
