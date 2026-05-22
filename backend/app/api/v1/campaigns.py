@@ -7,8 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.models.aid_request import AidRequest
 from app.models.campaign_drive import CampaignDrive, CampaignDriveStatus
 from app.models.donation import Donation
+from app.models.proof_artifact import ProofArtifact
 from app.models.user import User
 from app.schemas.campaign_drive import CampaignDriveCreate
 
@@ -240,9 +242,129 @@ async def _confirmed_campaign_donations(
     ]
 
 
+def _campaign_title_by_id(campaigns: list[dict]) -> dict[str, str]:
+    return {item["id"]: item["title"] for item in campaigns}
+
+
+async def _anchored_proof_documents(db: AsyncSession, limit: int = 25) -> list[dict]:
+    rows = (
+        await db.execute(
+            select(ProofArtifact, AidRequest)
+            .join(AidRequest, AidRequest.id == ProofArtifact.aid_request_id)
+            .where(
+                ProofArtifact.deleted_at.is_(None),
+                ProofArtifact.stellar_anchor_tx.is_not(None),
+            )
+            .order_by(ProofArtifact.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+
+    return [
+        {
+            "id": str(proof.id),
+            "kind": proof.kind.value if hasattr(proof.kind, "value") else proof.kind,
+            "title": proof.description or proof.filename,
+            "filename": proof.filename,
+            "campaign_title": aid_request.purpose,
+            "claimed_amount": float(proof.claimed_amount or 0),
+            "sha256": proof.sha256,
+            "stellar_tx_hash": proof.stellar_anchor_tx,
+            "created_at": proof.created_at,
+            "status": "Verified",
+            "source": "proof_artifact",
+        }
+        for proof, aid_request in rows
+        if proof.stellar_anchor_tx
+    ]
+
+
+async def _confirmed_donation_proofs(db: AsyncSession, campaigns: list[dict], limit: int = 25) -> list[dict]:
+    campaign_titles = _campaign_title_by_id(campaigns)
+    rows = (
+        await db.execute(
+            select(Donation, User)
+            .join(User, User.id == Donation.donor_id)
+            .where(
+                Donation.purpose.like("campaign:%"),
+                Donation.blockchain_confirmed.is_(True),
+            )
+            .order_by(Donation.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+
+    items = []
+    for donation, user in rows:
+        campaign_id = (donation.purpose or "").replace("campaign:", "", 1)
+        amount = float(donation.amount)
+        items.append(
+            {
+                "id": str(donation.id),
+                "kind": "stellar_transaction",
+                "title": f"Confirmed donation - {campaign_titles.get(campaign_id, campaign_id)}",
+                "filename": None,
+                "campaign_id": campaign_id,
+                "campaign_title": campaign_titles.get(campaign_id, campaign_id),
+                "donor_name": user.name,
+                "claimed_amount": amount * DEMO_XLM_TO_PHP,
+                "amount_xlm": amount,
+                "sha256": None,
+                "stellar_tx_hash": donation.stellar_tx_hash,
+                "created_at": donation.created_at,
+                "status": "Verified",
+                "source": "confirmed_donation",
+            }
+        )
+    return items
+
+
 @router.get("/public")
 async def public_campaigns(db: AsyncSession = Depends(get_db)):
     return {"success": True, "data": await _public_campaigns(db)}
+
+
+@router.get("/proof-center")
+async def public_proof_center(db: AsyncSession = Depends(get_db)):
+    campaigns = await _public_campaigns(db)
+    donation_proofs = await _confirmed_donation_proofs(db, campaigns)
+    document_proofs = await _anchored_proof_documents(db)
+    documents = sorted(
+        [*donation_proofs, *document_proofs],
+        key=lambda item: item["created_at"],
+        reverse=True,
+    )
+
+    verified_amount_php = sum(item.get("claimed_amount") or 0 for item in donation_proofs)
+    risk_feed = []
+    for campaign in campaigns:
+      has_confirmed_funds = campaign["raised_amount"] > 0
+      risk_feed.append(
+          {
+              "campaign_id": campaign["id"],
+              "campaign_title": campaign["title"],
+              "level": "LOW RISK" if has_confirmed_funds else "AWAITING PROOF",
+              "status": "Verified Stellar funding trail found."
+              if has_confirmed_funds
+              else "No confirmed donation or anchored proof has been recorded yet.",
+              "confidence": 97 if has_confirmed_funds else 0,
+              "created_at": campaign["updated_at"],
+          }
+      )
+
+    return {
+        "success": True,
+        "data": {
+            "stats": {
+                "verified_documents": len(documents),
+                "confirmed_donations": len(donation_proofs),
+                "anchored_documents": len(document_proofs),
+                "verified_amount_php": verified_amount_php,
+            },
+            "risk_feed": risk_feed,
+            "documents": documents,
+        },
+    }
 
 
 @router.get("/public/{campaign_id}/escrow")
