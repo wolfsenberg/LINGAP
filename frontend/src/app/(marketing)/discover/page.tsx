@@ -1,11 +1,25 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
-import { Hospital, Anchor, BookOpen, Handshake, MapPin, Star, Sparkles, CheckCircle2, Search, Users, Home, Cat, PawPrint, ChevronDown, ShieldAlert, AlertTriangle } from "lucide-react";
-import { CAMPAIGNS, mergeCampaignSummaries, type PublicCampaignSummary } from "@/lib/campaigns";
+
+import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
+import {
+  Anchor,
+  BookOpen,
+  CheckCircle2,
+  ChevronDown,
+  Handshake,
+  Hospital,
+  MapPin,
+  PawPrint,
+  Search,
+  Sparkles,
+  Star,
+  Users,
+} from "lucide-react";
+import { CAMPAIGNS, mergeCampaignSummaries, type Campaign, type PublicCampaignSummary } from "@/lib/campaigns";
 import { campaignsApi } from "@/lib/api";
 import AuthPromptLink from "@/components/auth/AuthPromptLink";
 
-// Major Philippine cities for the dropdown
 const PH_CITIES = [
   "All Cities",
   "Manila",
@@ -19,8 +33,8 @@ const PH_CITIES = [
   "Zamboanga City",
   "Antipolo",
   "Pasay",
-  "Parañaque",
-  "Las Piñas",
+  "Paranaque",
+  "Las Pinas",
   "Marikina",
   "Muntinlupa",
   "Valenzuela",
@@ -34,13 +48,196 @@ const PH_CITIES = [
   "Bulacan",
 ] as const;
 
+const FILTERS = [
+  { label: "All Campaigns", Icon: null },
+  { label: "Medical", Icon: Hospital },
+  { label: "Typhoon Relief", Icon: Anchor },
+  { label: "Education", Icon: BookOpen },
+  { label: "Community", Icon: Handshake },
+  { label: "Near Me", Icon: MapPin },
+  { label: "Trending", Icon: Star },
+  { label: "New", Icon: Sparkles },
+  { label: "Verified Only", Icon: CheckCircle2 },
+] as const;
+
+type FilterLabel = (typeof FILTERS)[number]["label"];
+
+type DiscoverCampaign = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  raisedLabel: string;
+  goalLabel: string;
+  raisedAmount: number;
+  goalAmount: number;
+  donors: number;
+  pct: number;
+  institution: string;
+  location: string;
+  imageSrc?: string | null;
+  updatedAt: string;
+  source: string;
+  urgencyLabel?: string | null;
+  urgencyClass?: string | null;
+  heroGradient?: string;
+  heroIcon?: string;
+  daysLeft?: number;
+};
+
+function pesoLabel(amount: number) {
+  return `PHP ${Math.round(amount).toLocaleString()}`;
+}
+
+function normalizeStaticCampaign(campaign: Campaign): DiscoverCampaign {
+  return {
+    id: String(campaign.id),
+    slug: campaign.slug,
+    title: campaign.title,
+    description: campaign.description,
+    category: campaign.category,
+    status: "active",
+    raisedLabel: campaign.raisedLabel,
+    goalLabel: campaign.goalLabel,
+    raisedAmount: campaign.raised,
+    goalAmount: campaign.goal,
+    donors: campaign.donors,
+    pct: campaign.pct,
+    institution: campaign.institutionDesc,
+    location: campaign.location,
+    imageSrc: campaign.imageSrc,
+    updatedAt: campaign.startDate,
+    source: "seeded",
+    urgencyLabel: campaign.urgencyLabel,
+    urgencyClass: campaign.urgencyClass,
+    heroGradient: campaign.heroGradient,
+    heroIcon: campaign.heroIcon,
+    daysLeft: campaign.daysLeft,
+  };
+}
+
+function normalizeLiveCampaign(campaign: PublicCampaignSummary, staticMatch?: Campaign): DiscoverCampaign {
+  return {
+    id: campaign.id,
+    slug: campaign.slug,
+    title: campaign.title,
+    description: campaign.description,
+    category: campaign.category,
+    status: campaign.status,
+    raisedLabel: campaign.raised_label ?? pesoLabel(campaign.raised_amount),
+    goalLabel: campaign.goal_label ?? pesoLabel(campaign.goal_amount),
+    raisedAmount: campaign.raised_amount,
+    goalAmount: campaign.goal_amount,
+    donors: campaign.donors,
+    pct: campaign.progress,
+    institution: campaign.institution,
+    location: campaign.location,
+    imageSrc: campaign.image_src ?? staticMatch?.imageSrc,
+    updatedAt: campaign.updated_at,
+    source: campaign.source,
+    urgencyLabel: staticMatch?.urgencyLabel ?? statusLabel(campaign.status),
+    urgencyClass: staticMatch?.urgencyClass ?? "badge-blue",
+    heroGradient: staticMatch?.heroGradient ?? "linear-gradient(135deg,#1a3a2a,#2d5a3d)",
+    heroIcon: staticMatch?.heroIcon,
+    daysLeft: staticMatch?.daysLeft ?? 30,
+  };
+}
+
+function statusLabel(status: string) {
+  if (!status) return null;
+  return status.replace(/_/g, " ");
+}
+
+function categoryIcon(campaign: DiscoverCampaign) {
+  if (campaign.category.toLowerCase().includes("animal")) return PawPrint;
+  if (campaign.category.toLowerCase().includes("education")) return BookOpen;
+  if (campaign.category.toLowerCase().includes("disaster")) return Anchor;
+  if (campaign.category.toLowerCase().includes("community")) return Handshake;
+  return Hospital;
+}
+
+function filterCampaigns(
+  campaigns: DiscoverCampaign[],
+  activeFilter: FilterLabel,
+  selectedCity: string,
+  searchQuery: string
+) {
+  const query = searchQuery.trim().toLowerCase();
+  let result = [...campaigns];
+
+  if (selectedCity !== "All Cities") {
+    result = result.filter((campaign) => campaign.location.toLowerCase().includes(selectedCity.toLowerCase()));
+  }
+
+  if (query) {
+    result = result.filter((campaign) => {
+      const haystack = [
+        campaign.title,
+        campaign.description,
+        campaign.category,
+        campaign.institution,
+        campaign.location,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }
+
+  if (activeFilter === "Medical") {
+    result = result.filter((campaign) => campaign.category.toLowerCase().includes("medical"));
+  }
+
+  if (activeFilter === "Typhoon Relief") {
+    result = result.filter((campaign) => {
+      const text = `${campaign.category} ${campaign.title} ${campaign.description}`.toLowerCase();
+      return text.includes("typhoon") || text.includes("relief") || text.includes("disaster");
+    });
+  }
+
+  if (activeFilter === "Education") {
+    result = result.filter((campaign) => campaign.category.toLowerCase().includes("education"));
+  }
+
+  if (activeFilter === "Community") {
+    result = result.filter((campaign) => campaign.category.toLowerCase().includes("community"));
+  }
+
+  if (activeFilter === "Near Me" && selectedCity === "All Cities") {
+    result = result.filter((campaign) => {
+      const location = campaign.location.toLowerCase();
+      return location.includes("manila") || location.includes("bulacan") || location.includes("philippines");
+    });
+  }
+
+  if (activeFilter === "Verified Only") {
+    result = result.filter((campaign) => {
+      const status = campaign.status.toLowerCase();
+      return campaign.source === "seeded" || campaign.source === "database" || ["active", "funded"].includes(status);
+    });
+  }
+
+  if (activeFilter === "Trending") {
+    result.sort((a, b) => b.donors - a.donors || b.pct - a.pct);
+  }
+
+  if (activeFilter === "New") {
+    result.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }
+
+  return result;
+}
+
 export default function DiscoverPage() {
   const [selectedCity, setSelectedCity] = useState<string>("All Cities");
+  const [activeFilter, setActiveFilter] = useState<FilterLabel>("All Campaigns");
+  const [searchQuery, setSearchQuery] = useState("");
   const [featuredCampaigns, setFeaturedCampaigns] = useState(CAMPAIGNS);
   const [liveCampaigns, setLiveCampaigns] = useState<PublicCampaignSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch centralized campaign totals from the backend API.
   useEffect(() => {
     let mounted = true;
 
@@ -68,48 +265,117 @@ export default function DiscoverPage() {
     };
   }, []);
 
-  // Filter campaigns by selected city
-  const filteredCampaigns = useMemo(() => {
-    if (selectedCity === "All Cities") return liveCampaigns;
-    return liveCampaigns.filter((c) => {
-      const loc = (c.location || "").toLowerCase();
-      return loc.includes(selectedCity.toLowerCase());
-    });
-  }, [liveCampaigns, selectedCity]);
+  const staticBySlug = useMemo(() => new Map(CAMPAIGNS.map((campaign) => [campaign.slug, campaign])), []);
 
-  // --- Dynamic stats computed from fetched campaigns ---
-  const activeCampaigns = liveCampaigns.filter(
-    (c) => ["active", "funded"].includes((c.status || "").toLowerCase())
-  ).length;
+  const allCampaigns = useMemo(() => {
+    if (!liveCampaigns.length) return featuredCampaigns.map(normalizeStaticCampaign);
+    return liveCampaigns.map((campaign) => normalizeLiveCampaign(campaign, staticBySlug.get(campaign.slug)));
+  }, [featuredCampaigns, liveCampaigns, staticBySlug]);
 
-  const verifiedCampaigns = liveCampaigns.filter(
-    (c) => ["seeded", "database"].includes(c.source)
-  ).length;
-
-  const totalRequested = liveCampaigns.reduce(
-    (sum: number, c) => sum + (c.goal_amount || 0),
-    0
+  const filteredCampaigns = useMemo(
+    () => filterCampaigns(allCampaigns, activeFilter, selectedCity, searchQuery),
+    [activeFilter, allCampaigns, searchQuery, selectedCity]
   );
 
+  const carouselBase = useMemo(() => {
+    const sorted = [...allCampaigns].sort((a, b) => b.donors - a.donors || b.pct - a.pct);
+    return sorted.slice(0, 10);
+  }, [allCampaigns]);
+
+  const carouselItems = useMemo(() => [...carouselBase, ...carouselBase], [carouselBase]);
+
+  const activeCampaigns = allCampaigns.filter((campaign) =>
+    ["active", "funded"].includes(campaign.status.toLowerCase())
+  ).length;
+  const verifiedCampaigns = allCampaigns.filter((campaign) =>
+    campaign.source === "seeded" || campaign.source === "database"
+  ).length;
+  const totalRequested = allCampaigns.reduce((sum, campaign) => sum + campaign.goalAmount, 0);
   const confirmedFraud = 0;
-
-  const filters = [
-    { label: "All Campaigns", Icon: null },
-    { label: "Medical", Icon: Hospital },
-    { label: "Typhoon Relief", Icon: Anchor },
-    { label: "Education", Icon: BookOpen },
-    { label: "Community", Icon: Handshake },
-    { label: "Near Me", Icon: MapPin },
-    { label: "Trending", Icon: Star },
-    { label: "New", Icon: Sparkles },
-    { label: "Verified Only", Icon: CheckCircle2 },
-  ];
-
   const displayCount = filteredCampaigns.length;
 
   return (
     <div>
-      {/* ── HERO HEADER ── */}
+      <style jsx>{`
+        .discover-carousel-shell {
+          margin-inline: -16px;
+          overflow: hidden;
+          padding: 20px 16px 28px;
+          position: relative;
+          -webkit-mask-image: linear-gradient(to right, transparent 0, #000 8%, #000 92%, transparent 100%);
+          mask-image: linear-gradient(to right, transparent 0, #000 8%, #000 92%, transparent 100%);
+        }
+
+        .discover-carousel-track {
+          display: flex;
+          gap: 22px;
+          width: max-content;
+          animation: discover-carousel 56s linear infinite;
+          will-change: transform;
+        }
+
+        .discover-carousel-shell:hover .discover-carousel-track,
+        .discover-carousel-track:focus-within {
+          animation-play-state: paused;
+        }
+
+        .discover-carousel-card {
+          flex: 0 0 clamp(292px, calc((100vw - 148px) / 3), 378px);
+          filter: grayscale(1);
+          opacity: 0.92;
+          transition: filter 0.7s ease, opacity 0.7s ease, transform 0.7s ease;
+        }
+
+        .discover-carousel-card:hover,
+        .discover-carousel-card:focus-within {
+          filter: grayscale(0);
+          opacity: 1;
+        }
+
+        .fixed-grid {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 22px;
+          align-items: stretch;
+        }
+
+        @keyframes discover-carousel {
+          from {
+            transform: translate3d(0, 0, 0);
+          }
+          to {
+            transform: translate3d(-50%, 0, 0);
+          }
+        }
+
+        @media (max-width: 900px) {
+          .discover-carousel-card {
+            flex-basis: clamp(280px, 62vw, 340px);
+          }
+
+          .fixed-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+        }
+
+        @media (max-width: 640px) {
+          .discover-carousel-shell {
+            margin-inline: -12px;
+            padding-inline: 12px;
+            -webkit-mask-image: linear-gradient(to right, transparent 0, #000 5%, #000 95%, transparent 100%);
+            mask-image: linear-gradient(to right, transparent 0, #000 5%, #000 95%, transparent 100%);
+          }
+
+          .discover-carousel-card {
+            flex-basis: min(82vw, 330px);
+          }
+
+          .fixed-grid {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
+
       <div className="discover-hero" style={{ background: "var(--forest)", padding: "48px 40px", color: "#fff" }}>
         <div className="container">
           <div className="section-label" style={{ color: "var(--canopy-light)" }}>
@@ -121,22 +387,34 @@ export default function DiscoverPage() {
           <p style={{ color: "rgba(255,255,255,.7)", fontSize: 17, marginBottom: 28 }}>
             Every campaign verified. Every peso tracked. Your trust protected.
           </p>
-          <div className="search-bar" style={{ maxWidth: 600, background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.2)" }}>
+          <div
+            className="search-bar"
+            style={{ maxWidth: 600, background: "rgba(255,255,255,.1)", borderColor: "rgba(255,255,255,.2)" }}
+          >
             <Search size={18} color="rgba(255,255,255,.6)" />
-            <input placeholder="Search campaigns, locations, or causes..." style={{ color: "#fff" }} />
-            <button className="btn btn-emerald btn-sm">Search</button>
+            <input
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search campaigns, locations, or causes..."
+              style={{ color: "#fff" }}
+            />
+            <button className="btn btn-emerald btn-sm" type="button">
+              Search
+            </button>
           </div>
         </div>
       </div>
 
       <div className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
-        {/* ── FILTER BAR ── */}
-        <div className="filter-bar">
-          {filters.map(({ label, Icon }, i) => (
+        <div className="filter-bar" role="list" aria-label="Campaign filters">
+          {FILTERS.map(({ label, Icon }) => (
             <button
               key={label}
-              className={`filter-chip${i === 0 ? " active" : ""}`}
+              type="button"
+              onClick={() => setActiveFilter(label)}
+              className={`filter-chip${activeFilter === label ? " active" : ""}`}
               style={{ display: "flex", alignItems: "center", gap: 6 }}
+              aria-pressed={activeFilter === label}
             >
               {Icon && <Icon size={13} strokeWidth={2} />}
               {label}
@@ -144,78 +422,32 @@ export default function DiscoverPage() {
           ))}
         </div>
 
-        {/* ── FEATURED CAMPAIGNS ── */}
-        <div style={{ marginBottom: 48 }}>
+        <section style={{ marginBottom: 48 }}>
           <div className="flex flex-center flex-between mb-24">
             <div>
-              <div className="section-label" style={{ color: "var(--canopy)" }}>FEATURED CAMPAIGNS</div>
+              <div className="section-label" style={{ color: "var(--canopy)" }}>
+                FEATURED CAMPAIGNS
+              </div>
               <h2 style={{ fontSize: 22, fontWeight: 700, color: "var(--forest)", marginBottom: 0 }}>
                 Real causes, real people
               </h2>
             </div>
             <span className="badge badge-emerald" style={{ fontSize: 12 }}>
-              ✓ All Verified
+              All Verified
             </span>
           </div>
 
-          <div className="campaign-grid">
-            {featuredCampaigns.map((c) => {
-              const Icon = c.heroIcon === "🏠" ? Home : c.heroIcon === "🐱" ? Cat : PawPrint;
-              const progressColor = c.category === "Animal Rescue" ? "prog-gold" : "prog-emerald";
-              const accentHex = c.category === "Animal Rescue" ? "var(--amber)" : "var(--canopy)";
-              return (
-                <AuthPromptLink
-                  key={c.id}
-                  href={`/detail/${c.slug}`}
-                  className="camp-card emerald-glow featured-camp"
-                  style={{ textDecoration: "none" }}
-                >
-                  <div className={`camp-img ${c.imageSrc ? "has-photo" : ""}`} style={{ background: c.heroGradient }}>
-                    {c.imageSrc ? (
-                      <img className="camp-img-photo" src={c.imageSrc} alt={c.title} />
-                    ) : (
-                      <div className="camp-img-inner"><Icon size={48} strokeWidth={1.8} /></div>
-                    )}
-                    {c.urgencyLabel && (
-                      <div style={{ position: "absolute", top: 12, left: 12 }}>
-                        <span className={`badge ${c.urgencyClass}`}>{c.urgencyLabel}</span>
-                      </div>
-                    )}
-                    <div style={{ position: "absolute", top: 12, right: 12 }}>
-                      <span className="badge badge-emerald">Verified</span>
-                    </div>
-                    <div style={{ position: "absolute", bottom: 12, left: 12 }}>
-                      <span className="badge badge-navy" style={{ fontSize: 10 }}>{c.category}</span>
-                    </div>
-                  </div>
-                  <div className="camp-body">
-                    <h3 className="camp-title">{c.title}</h3>
-                    <p className="camp-desc">{c.description}</p>
-                    <div className="camp-meta">
-                      <div>
-                        <div className="camp-raised">{c.raisedLabel}</div>
-                        <div className="camp-goal">of {c.goalLabel} goal</div>
-                      </div>
-                      <div className="camp-donors"><Users size={12} /> {c.donors.toLocaleString()} donors</div>
-                    </div>
-                    <div className="prog-track" style={{ height: 8 }}>
-                      <div className={`prog-fill ${progressColor}`} style={{ width: `${c.pct}%` }} />
-                    </div>
-                    <div className="camp-footer">
-                      <span className="badge badge-navy">{c.institutionDesc}</span>
-                      <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 600 }}>
-                        {c.pct}% funded · {c.daysLeft}d left
-                      </span>
-                    </div>
-                  </div>
-                </AuthPromptLink>
-              );
-            })}
+          <div className="discover-carousel-shell" aria-label="Featured campaign carousel">
+            <div className="discover-carousel-track">
+              {carouselItems.map((campaign, index) => (
+                <div key={`${campaign.slug}-${index}`} className="discover-carousel-card">
+                  <CampaignCard campaign={campaign} />
+                </div>
+              ))}
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* ── CITY FILTER BANNER (Campaigns Near You) ── */}
         <div
           className="city-filter-card"
           style={{
@@ -230,7 +462,18 @@ export default function DiscoverPage() {
             flexWrap: "wrap",
           }}
         >
-          <div style={{ width: 40, height: 40, background: "rgba(74,155,106,.15)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              background: "rgba(74,155,106,.15)",
+              borderRadius: 10,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
             <MapPin size={20} color="var(--canopy)" strokeWidth={1.8} />
           </div>
           <div style={{ flex: 1, minWidth: 200 }}>
@@ -238,16 +481,15 @@ export default function DiscoverPage() {
               Campaigns Near You
             </div>
             <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 4 }}>
-              Showing {displayCount} campaign{displayCount !== 1 ? "s" : ""} in{" "}
-              <strong>{selectedCity}</strong>
+              Showing {displayCount} campaign{displayCount !== 1 ? "s" : ""} in <strong>{selectedCity}</strong>
             </div>
           </div>
-          {/* City Dropdown */}
+
           <div className="city-select-wrap" style={{ position: "relative", flexShrink: 0 }}>
             <select
               id="city-filter-select"
               value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
+              onChange={(event) => setSelectedCity(event.target.value)}
               style={{
                 appearance: "none",
                 WebkitAppearance: "none",
@@ -261,15 +503,6 @@ export default function DiscoverPage() {
                 cursor: "pointer",
                 minWidth: 200,
                 outline: "none",
-                transition: "border-color .2s, box-shadow .2s",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "var(--canopy)";
-                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(74,155,106,.15)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "rgba(74,155,106,.35)";
-                e.currentTarget.style.boxShadow = "none";
               }}
             >
               {PH_CITIES.map((city) => (
@@ -281,33 +514,26 @@ export default function DiscoverPage() {
             <ChevronDown
               size={16}
               color="var(--canopy)"
-              style={{
-                position: "absolute",
-                right: 14,
-                top: "50%",
-                transform: "translateY(-50%)",
-                pointerEvents: "none",
-              }}
+              style={{ position: "absolute", right: 14, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" }}
             />
           </div>
         </div>
 
-        {/* ── DYNAMIC STATS ROW ── */}
         <div className="grid-4 mb-32">
           <div className="stat-card">
             <div className="stat-value">{activeCampaigns}</div>
             <div className="stat-label">Active Campaigns</div>
-            <div className="stat-change">↑ active</div>
+            <div className="stat-change">Active now</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">{verifiedCampaigns}</div>
             <div className="stat-label">Verified Campaigns</div>
-            <div className="stat-change">↑ verified</div>
+            <div className="stat-change">Identity checked</div>
           </div>
           <div className="stat-card">
-            <div className="stat-value">&#8369;{totalRequested.toLocaleString()}</div>
+            <div className="stat-value">PHP {totalRequested.toLocaleString()}</div>
             <div className="stat-label">Total Requested</div>
-            <div className="stat-change">↑ requested amount</div>
+            <div className="stat-change">Across listed drives</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">{confirmedFraud}</div>
@@ -316,77 +542,41 @@ export default function DiscoverPage() {
           </div>
         </div>
 
-        {/* ── FILTERED CAMPAIGN LIST (by city) ── */}
         <div className="flex flex-center flex-between mb-24">
           <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--forest)", display: "flex", alignItems: "center", gap: 8 }}>
-            <TrendingUpIcon /> {selectedCity === "All Cities" ? "All Campaigns" : `Campaigns in ${selectedCity}`}
+            <TrendingUpIcon /> {activeFilter === "All Campaigns" ? "All Campaigns" : activeFilter}
           </h3>
-          <div style={{ fontSize: 13, color: "var(--text3)" }}>{displayCount} campaign{displayCount !== 1 ? "s" : ""} found</div>
+          <div style={{ fontSize: 13, color: "var(--text3)" }}>
+            {displayCount} campaign{displayCount !== 1 ? "s" : ""} found
+          </div>
         </div>
 
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text3)" }}>
-            <div style={{ width: 32, height: 32, border: "3px solid var(--canopy-light)", borderTopColor: "var(--canopy)", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
+            <div
+              style={{
+                width: 32,
+                height: 32,
+                border: "3px solid var(--canopy-light)",
+                borderTopColor: "var(--canopy)",
+                borderRadius: "50%",
+                animation: "spin 0.8s linear infinite",
+                margin: "0 auto 12px",
+              }}
+            />
             Loading campaigns...
           </div>
         ) : displayCount === 0 ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text3)" }}>
             <MapPin size={32} color="var(--canopy)" style={{ margin: "0 auto 12px", display: "block", opacity: 0.5 }} />
             <div style={{ fontWeight: 600, color: "var(--forest)", marginBottom: 6 }}>No campaigns found</div>
-            <div style={{ fontSize: 14 }}>No campaigns match &ldquo;{selectedCity}&rdquo;. Try selecting a different city.</div>
+            <div style={{ fontSize: 14 }}>Try a different filter, city, or search term.</div>
           </div>
         ) : (
-          <div className="campaign-grid">
-            {filteredCampaigns.map((c) => {
-              const pct = c.progress || 0;
-              const daysLeft = 30;
-              const raisedLabel = c.raised_label ?? `₱${Math.round(c.raised_amount).toLocaleString()}`;
-              const goalLabel = c.goal_label ?? `₱${Math.round(c.goal_amount).toLocaleString()}`;
-              return (
-                <AuthPromptLink key={c.id} href={`/detail/${c.slug}`} className="camp-card emerald-glow featured-camp" style={{ textDecoration: "none" }}>
-                  <div className={`camp-img ${c.image_src ? "has-photo" : ""}`} style={{ background: "linear-gradient(135deg,#1a3a2a,#2d5a3d)" }}>
-                    {c.image_src ? (
-                      <img className="camp-img-photo" src={c.image_src} alt={c.title} />
-                    ) : (
-                      <div className="camp-img-inner"><Hospital size={48} strokeWidth={1.8} /></div>
-                    )}
-                    {c.status && (
-                      <div style={{ position: "absolute", top: 12, left: 12 }}>
-                        <span className="badge badge-blue" style={{ textTransform: "capitalize" }}>{c.status}</span>
-                      </div>
-                    )}
-                    <div style={{ position: "absolute", top: 12, right: 12 }}>
-                      <span className="badge badge-emerald">Verified</span>
-                    </div>
-                    {c.location && (
-                      <div style={{ position: "absolute", bottom: 12, left: 12 }}>
-                        <span className="badge badge-navy" style={{ fontSize: 10 }}>{c.location}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="camp-body">
-                    <h3 className="camp-title">{c.title}</h3>
-                    <p className="camp-desc">{c.description}</p>
-                    <div className="camp-meta">
-                      <div>
-                        <div className="camp-raised">{raisedLabel}</div>
-                        <div className="camp-goal">of {goalLabel} goal</div>
-                      </div>
-                      <div className="camp-donors"><Users size={12} /> {c.donors.toLocaleString()} donors</div>
-                    </div>
-                    <div className="prog-track" style={{ height: 8 }}>
-                      <div className="prog-fill prog-emerald" style={{ width: `${pct}%` }} />
-                    </div>
-                    <div className="camp-footer">
-                      <span className="badge badge-navy">{c.institution}</span>
-                      <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 600 }}>
-                        {pct}% funded · {daysLeft}d left
-                      </span>
-                    </div>
-                  </div>
-                </AuthPromptLink>
-              );
-            })}
+          <div className="fixed-grid">
+            {filteredCampaigns.map((campaign) => (
+              <CampaignCard key={campaign.id} campaign={campaign} />
+            ))}
           </div>
         )}
       </div>
@@ -394,15 +584,87 @@ export default function DiscoverPage() {
   );
 }
 
-function TrendingUpIcon() {
+function CampaignCard({ campaign }: { campaign: DiscoverCampaign }) {
+  const Icon = categoryIcon(campaign);
+  const progressColor = campaign.category.toLowerCase().includes("animal") ? "prog-gold" : "prog-emerald";
+
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--canopy)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
-      <polyline points="17 6 23 6 23 12" />
-    </svg>
+    <AuthPromptLink
+      href={`/detail/${campaign.slug}`}
+      className="camp-card emerald-glow featured-camp"
+      style={
+        {
+          "--camp-accent": campaign.category.toLowerCase().includes("animal") ? "var(--amber)" : "var(--canopy)",
+          "--camp-accent-2": "var(--forest-mid)",
+          textDecoration: "none",
+          width: "100%",
+          height: "100%",
+        } as CSSProperties
+      }
+    >
+      <div className={`camp-img ${campaign.imageSrc ? "has-photo" : ""}`} style={{ background: campaign.heroGradient }}>
+        {campaign.imageSrc ? (
+          <img className="camp-img-photo" src={campaign.imageSrc} alt={campaign.title} />
+        ) : (
+          <div className="camp-img-inner">
+            <Icon size={48} strokeWidth={1.8} />
+          </div>
+        )}
+        {campaign.urgencyLabel && (
+          <div style={{ position: "absolute", top: 12, left: 12 }}>
+            <span className={`badge ${campaign.urgencyClass ?? "badge-blue"}`}>{campaign.urgencyLabel}</span>
+          </div>
+        )}
+        <div style={{ position: "absolute", top: 12, right: 12 }}>
+          <span className="badge badge-emerald">Verified</span>
+        </div>
+        <div style={{ position: "absolute", bottom: 12, left: 12 }}>
+          <span className="badge badge-navy" style={{ fontSize: 10 }}>
+            {campaign.category}
+          </span>
+        </div>
+      </div>
+
+      <div className="camp-body">
+        <h3 className="camp-title">{campaign.title}</h3>
+        <p className="camp-desc">{campaign.description}</p>
+        <div className="camp-meta">
+          <div>
+            <div className="camp-raised">{campaign.raisedLabel}</div>
+            <div className="camp-goal">of {campaign.goalLabel} goal</div>
+          </div>
+          <div className="camp-donors">
+            <Users size={12} /> {campaign.donors.toLocaleString()} donors
+          </div>
+        </div>
+        <div className="prog-track" style={{ height: 8 }}>
+          <div className={`prog-fill ${progressColor}`} style={{ width: `${campaign.pct}%` }} />
+        </div>
+        <div className="camp-footer">
+          <span className="badge badge-navy">{campaign.institution}</span>
+          <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 600 }}>
+            {campaign.pct}% funded - {campaign.daysLeft ?? 30}d left
+          </span>
+        </div>
+      </div>
+    </AuthPromptLink>
   );
 }
-.5 15.5 8.5 10.5 1 18" />
+
+function TrendingUpIcon() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="var(--canopy)"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
       <polyline points="17 6 23 6 23 12" />
     </svg>
   );

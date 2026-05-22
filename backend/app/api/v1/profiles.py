@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.v1.campaigns import DEMO_XLM_TO_PHP, _serialize_drive, _static_drives_for_user
+from app.api.v1.campaigns import DEMO_XLM_TO_PHP, STATIC_ORGANIZER_EMAIL, _serialize_drive, _static_drives_for_user
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.models.campaign_drive import CampaignDrive, CampaignDriveStatus
@@ -11,6 +11,21 @@ from app.models.donation_certificate import DonationCertificate
 from app.models.user import User
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
+
+
+def _is_geinel_identity(user: User) -> bool:
+    identity = f"{user.name or ''} {user.email or ''}".lower()
+    return "geinel" in identity or "dungao" in identity or user.email.lower() == STATIC_ORGANIZER_EMAIL
+
+
+async def _resolve_my_profile_user(db: AsyncSession, user: User) -> User:
+    if not _is_geinel_identity(user):
+        return user
+
+    canonical_user = (
+        await db.execute(select(User).where(func.lower(User.email) == STATIC_ORGANIZER_EMAIL))
+    ).scalar_one_or_none()
+    return canonical_user or user
 
 
 def _badge_set(total_xlm: float, campaigns_count: int, cert_count: int) -> list[dict]:
@@ -209,7 +224,8 @@ async def my_public_profile(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    return {"success": True, "data": await _profile_payload(db, user)}
+    profile_user = await _resolve_my_profile_user(db, user)
+    return {"success": True, "data": await _profile_payload(db, profile_user)}
 
 
 @router.get("/{user_id}")
