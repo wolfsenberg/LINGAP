@@ -146,7 +146,7 @@ h1,h2,h3,h4,h5{font-family:'Sora',sans-serif;line-height:1.2}
 .feature-card:hover .feature-title,.feature-card:hover .feature-desc{color:#fff}
 .feature-card:hover .badge{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);color:#fff}
 
-.campaign-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:20px;align-items:stretch}
+.campaign-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;align-items:stretch}
 .camp-card{background:#fffdf8;border:1px solid rgba(222,216,202,.95);border-radius:var(--r);overflow:hidden;transition:transform .22s,box-shadow .22s,border-color .22s;cursor:pointer;box-shadow:0 1px 0 rgba(255,255,255,.7)}
 .camp-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-color:rgba(74,155,106,.34)}
 .camp-img{height:176px;position:relative;overflow:hidden;background:linear-gradient(180deg,#f8f6ee,#efeadf);border-bottom:1px solid rgba(222,216,202,.82)}
