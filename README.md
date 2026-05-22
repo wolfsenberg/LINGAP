@@ -80,7 +80,7 @@ A donor is no longer paying a person. **A donor is paying a contract.** And unli
 ```bash
 git clone https://github.com/wolfsenberg/LINGAP.git
 cd LINGAP
-docker-compose up --build
+docker-compose up --build (make sure docker is running in the background)
 ```
 
 ---
