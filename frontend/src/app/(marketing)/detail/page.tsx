@@ -3,8 +3,8 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useFreighter } from "@/hooks/useFreighter";
-import { balanceApi, campaignsApi, donationsApi, paymongoApi, type BalanceApi } from "@/lib/api";
-import { getStellarExpertContractUrl, getStellarExpertTxUrl } from "@/lib/stellar";
+import { balanceApi, campaignsApi, donationsApi, type BalanceApi } from "@/lib/api";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
 import { applyCampaignSummary, CAMPAIGNS, getCampaign, type PublicCampaignSummary } from "@/lib/campaigns";
 import { useAuthStore } from "@/store/authStore";
 import toast from "react-hot-toast";
@@ -32,7 +32,7 @@ function getDonationErrorMessage(error: unknown) {
 }
 
 function formatXlmAmount(amount: number) {
-  return amount.toFixed(7).replace(/\.?0+$/, "");
+  return amount.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 const CATEGORY_ICON: Record<string, React.ElementType> = {
@@ -49,16 +49,11 @@ function DetailContent() {
   const user = useAuthStore((state) => state.user);
 
   const { connected, publicKey, connect } = useFreighter();
-  const [tab, setTab] = useState<"stellar" | "php">("stellar");
   const [selectedAmount, setSelectedAmount] = useState(500);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
   const [amountMode, setAmountMode] = useState<"xlm" | "php">("xlm");
-  const [selectedPhp, setSelectedPhp] = useState(250);
-  const [customPhp, setCustomPhp] = useState("");
-  const [useCustomPhp, setUseCustomPhp] = useState(false);
   const [donating, setDonating] = useState(false);
-  const [payingPhp, setPayingPhp] = useState(false);
   const [confirmedDonationXlm, setConfirmedDonationXlm] = useState(0);
   const [lastTxHash, setLastTxHash] = useState("");
   const [liveSummary, setLiveSummary] = useState<PublicCampaignSummary | null>(null);
@@ -107,7 +102,6 @@ function DetailContent() {
   const effectiveAmountPhp = effectiveAmount * conversionRate;
   const donationPresets = amountMode === "php" ? PHP_AMOUNTS : AMOUNTS;
   const stellarVaultUrl = getStellarExpertContractUrl();
-  const effectivePhp = useCustomPhp ? parseFloat(customPhp) || 0 : selectedPhp;
   const activeCampaign = applyCampaignSummary(campaign, liveSummary ?? undefined);
   const displayRaised = activeCampaign.raised + confirmedDonationXlm * DEMO_XLM_TO_PHP;
   const displayRaisedLabel = `₱${Math.round(displayRaised).toLocaleString()}`;
@@ -129,7 +123,7 @@ function DetailContent() {
     try {
       const donationPurpose = `campaign:${campaign.slug}`;
       const donationRes = await donationsApi.create({
-        amount: Number(formatXlmAmount(effectiveAmount)),
+        amount: Number(effectiveAmount.toFixed(2)),
         asset: "XLM",
         purpose: donationPurpose,
         fundingSource: "lingap_balance",
@@ -145,27 +139,19 @@ function DetailContent() {
         php_equivalent: Math.max((current.xlm_balance - effectiveAmount) * conversionRate, 0),
       }));
       setConfirmedDonationXlm(0);
-      const latest = await campaignsApi.publicOne(campaign.slug);
-      if (latest.data.data) setLiveSummary(latest.data.data);
-      const nextBalance = await balanceApi.mine();
-      setBalance(nextBalance.data.data);
+      try {
+        const latest = await campaignsApi.publicOne(campaign.slug);
+        if (latest.data.data) setLiveSummary(latest.data.data);
+        const nextBalance = await balanceApi.mine();
+        setBalance(nextBalance.data.data);
+      } catch {
+        // Donation is already recorded; the polling loop will pick up fresh totals.
+      }
       toast.success(`Donation confirmed! Ref: ${txHash.slice(0, 12)}...`);
     } catch (e: unknown) {
       toast.error(getDonationErrorMessage(e));
     } finally {
       setDonating(false);
-    }
-  }
-
-  async function handlePhpPay() {
-    if (effectivePhp < 20) { toast.error("Minimum donation is ₱20."); return; }
-    setPayingPhp(true);
-    try {
-      const res = await paymongoApi.checkout(effectivePhp, campaign.title);
-      window.location.href = res.data.data.checkout_url;
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Payment failed");
-      setPayingPhp(false);
     }
   }
 
@@ -243,7 +229,7 @@ function DetailContent() {
           </div>
 
           <div style={{ marginTop: 24 }}>
-            <VotingPanel campaignId={campaign.id} campaignName={campaign.title} />
+            <VotingPanel campaignId={activeCampaign.sorobanCampaignId ?? campaign.slug} campaignName={campaign.title} />
           </div>
         </div>
 
@@ -273,20 +259,18 @@ function DetailContent() {
               <Link href="/donor#balance" style={{ display: "inline-flex", marginTop: 8, color: "var(--canopy)", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Top up balance</Link>
             </div>
 
-            {/* Tab switcher */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-              <button onClick={() => setTab("stellar")} className={`btn btn-sm ${tab === "stellar" ? "btn-primary" : "btn-outline"}`} style={{ flex: 1, justifyContent: "center" }}>⭐ Stellar (XLM)</button>
-              <button onClick={() => setTab("php")} className={`btn btn-sm ${tab === "php" ? "btn-primary" : "btn-outline"}`} style={{ flex: 1, justifyContent: "center" }}>📱 GCash / Maya</button>
+            <div style={{ marginBottom: 14, padding: "10px 14px", background: "rgba(200,134,10,.08)", border: "1px solid rgba(200,134,10,.22)", borderRadius: 10, fontSize: 12, color: "var(--text2)", lineHeight: 1.55 }}>
+              PDAX, GCash, and Maya are top-up channels. Donate here using your LINGAP XLM balance so every campaign record stays traceable.
             </div>
-
-            {tab === "stellar" && (
-              <>
                 <div style={{ marginBottom: 18 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>XLM / PHP Converter</div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      <button type="button" onClick={() => { setAmountMode("xlm"); setUseCustom(false); setSelectedAmount(AMOUNTS[0]); }} className={`btn btn-sm ${amountMode === "xlm" ? "btn-primary" : "btn-outline"}`}>Enter amount in XLM</button>
-                      <button type="button" onClick={() => { setAmountMode("php"); setUseCustom(false); setSelectedAmount(PHP_AMOUNTS[2]); }} className={`btn btn-sm ${amountMode === "php" ? "btn-primary" : "btn-outline"}`}>Enter amount in PHP</button>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "var(--forest)" }}>Amount</div>
+                      <div style={{ fontSize: 11, color: "var(--text3)" }}>1 XLM = ₱{conversionRate.toFixed(2)}</div>
+                    </div>
+                    <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 4, padding: 3, border: "1px solid var(--border)", borderRadius: 999, background: "var(--bg)" }}>
+                      <button type="button" onClick={() => { setAmountMode("xlm"); setUseCustom(false); setSelectedAmount(AMOUNTS[0]); }} className={`btn btn-sm ${amountMode === "xlm" ? "btn-primary" : "btn-ghost"}`} style={{ borderRadius: 999, minWidth: 58, justifyContent: "center" }}>XLM</button>
+                      <button type="button" onClick={() => { setAmountMode("php"); setUseCustom(false); setSelectedAmount(PHP_AMOUNTS[2]); }} className={`btn btn-sm ${amountMode === "php" ? "btn-primary" : "btn-ghost"}`} style={{ borderRadius: 999, minWidth: 58, justifyContent: "center" }}>PHP</button>
                     </div>
                   </div>
                   <div className="donation-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
@@ -301,7 +285,7 @@ function DetailContent() {
                     <input type="number" min="1" value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} placeholder={amountMode === "php" ? "Enter PHP amount" : "Enter XLM amount"} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
                   )}
                   <div style={{ marginTop: 8, fontSize: 12, color: "var(--text3)" }}>
-                    1 XLM = ₱{conversionRate.toFixed(2)} · Donation: {formatXlmAmount(effectiveAmount)} XLM ≈ ₱{effectiveAmountPhp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatXlmAmount(effectiveAmount)} XLM ≈ ₱{effectiveAmountPhp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                 </div>
                 {!connected && (
@@ -318,9 +302,9 @@ function DetailContent() {
                   {donating ? "Submitting to LINGAP..." : connected ? `Donate ${formatXlmAmount(effectiveAmount)} XLM` : "Connect Wallet to Donate"}
                 </button>
                 {lastTxHash && (
-                  lastTxHash.startsWith("LINGAP-DEMO") ? (
+                  !isStellarTxHash(lastTxHash) ? (
                     <div className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-                      <CheckCircle2 size={14} /> LINGAP reference: {lastTxHash.slice(0, 18)}...
+                      <CheckCircle2 size={14} /> Ledger reference: {formatLedgerReference(lastTxHash).slice(0, 22)}...
                       {stellarVaultUrl && (
                         <a href={stellarVaultUrl} target="_blank" rel="noreferrer" style={{ color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
                           View vault on Stellar
@@ -339,29 +323,6 @@ function DetailContent() {
                     </a>
                   )
                 )}
-              </>
-            )}
-
-            {tab === "php" && (
-              <>
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 10 }}>Choose amount (PHP ₱):</div>
-                  <div className="donation-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
-                    {PHP_AMOUNTS.map((a) => (
-                      <button key={a} onClick={() => { setSelectedPhp(a); setUseCustomPhp(false); }} className={`btn btn-sm ${!useCustomPhp && selectedPhp === a ? "btn-primary" : "btn-outline"}`}>₱{a}</button>
-                    ))}
-                    <button onClick={() => setUseCustomPhp(true)} className={`btn btn-sm ${useCustomPhp ? "btn-primary" : "btn-outline"}`}>Custom</button>
-                  </div>
-                  {useCustomPhp && (
-                    <input type="number" min="20" value={customPhp} onChange={(e) => setCustomPhp(e.target.value)} placeholder="Enter PHP amount" style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
-                  )}
-                </div>
-                <button onClick={handlePhpPay} disabled={payingPhp} className="btn btn-emerald btn-lg" style={{ width: "100%", justifyContent: "center", marginBottom: 12, opacity: payingPhp ? 0.7 : 1 }}>
-                  {payingPhp ? "⏳ Opening checkout…" : `📱 Pay ₱${effectivePhp} via GCash / Maya`}
-                </button>
-              </>
-            )}
-
             <button className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
               <RefreshCw size={14} /> Set Monthly Donation
             </button>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
 import { balanceApi, campaignsApi, donationsApi, type BalanceApi } from "@/lib/api";
-import { getStellarExpertContractUrl, getStellarExpertTxUrl } from "@/lib/stellar";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
@@ -32,7 +32,7 @@ function getDonationErrorMessage(error: unknown) {
 }
 
 function formatXlmAmount(amount: number) {
-  return amount.toFixed(7).replace(/\.?0+$/, "");
+  return amount.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 function publicSummaryToDetailCampaign(summary: PublicCampaignSummary) {
@@ -42,6 +42,7 @@ function publicSummaryToDetailCampaign(summary: PublicCampaignSummary) {
   return {
     id: summary.id,
     slug: summary.slug,
+    sorobanCampaignId: summary.soroban_campaign_id ?? null,
     category: summary.category,
     urgencyLabel: summary.status,
     urgencyClass: "badge-blue",
@@ -259,7 +260,7 @@ export default function DetailPage() {
     try {
       const donationPurpose = `campaign:${activeCampaign.slug || activeCampaign.id}`;
       const donationRes = await donationsApi.create({
-        amount: Number(formatXlmAmount(effectiveAmount)),
+        amount: Number(effectiveAmount.toFixed(2)),
         asset: "XLM",
         purpose: donationPurpose,
         fundingSource: "lingap_balance",
@@ -275,10 +276,14 @@ export default function DetailPage() {
         php_equivalent: Math.max((current.xlm_balance - effectiveAmount) * conversionRate, 0),
       }));
       setConfirmedDonationXlm(0);
-      const latest = await campaignsApi.publicOne(activeCampaign.slug || activeCampaign.id);
-      if (latest.data.data) setLiveSummary(latest.data.data);
-      const nextBalance = await balanceApi.mine();
-      setBalance(nextBalance.data.data);
+      try {
+        const latest = await campaignsApi.publicOne(activeCampaign.slug || activeCampaign.id);
+        if (latest.data.data) setLiveSummary(latest.data.data);
+        const nextBalance = await balanceApi.mine();
+        setBalance(nextBalance.data.data);
+      } catch {
+        // Donation is already recorded; the polling loop will pick up fresh totals.
+      }
       toast.success(`Donation confirmed! Ref: ${txHash.slice(0, 12)}...`);
     } catch (e: unknown) {
       toast.error(getDonationErrorMessage(e));
@@ -390,7 +395,7 @@ export default function DetailPage() {
           </div>
 
           <div style={{ marginTop: 24 }}>
-            <VotingPanel campaignId={activeCampaign.id} campaignName={activeCampaign.title} />
+            <VotingPanel campaignId={activeCampaign.sorobanCampaignId ?? activeCampaign.slug} campaignName={activeCampaign.title} />
           </div>
         </div>
 
@@ -430,10 +435,13 @@ export default function DetailPage() {
             {/* Amount picker */}
             <div style={{ marginBottom: 18 }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>XLM / PHP Converter</div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button type="button" onClick={() => { setAmountMode("xlm"); setUseCustom(false); setSelectedAmount(AMOUNTS[0]); }} className={`btn btn-sm ${amountMode === "xlm" ? "btn-primary" : "btn-outline"}`}>Enter amount in XLM</button>
-                  <button type="button" onClick={() => { setAmountMode("php"); setUseCustom(false); setSelectedAmount(PHP_AMOUNTS[2]); }} className={`btn btn-sm ${amountMode === "php" ? "btn-primary" : "btn-outline"}`}>Enter amount in PHP</button>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "var(--forest)" }}>Amount</div>
+                  <div style={{ fontSize: 11, color: "var(--text3)" }}>1 XLM = ₱{conversionRate.toFixed(2)}</div>
+                </div>
+                <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 4, padding: 3, border: "1px solid var(--border)", borderRadius: 999, background: "var(--bg)" }}>
+                  <button type="button" onClick={() => { setAmountMode("xlm"); setUseCustom(false); setSelectedAmount(AMOUNTS[0]); }} className={`btn btn-sm ${amountMode === "xlm" ? "btn-primary" : "btn-ghost"}`} style={{ borderRadius: 999, minWidth: 58, justifyContent: "center" }}>XLM</button>
+                  <button type="button" onClick={() => { setAmountMode("php"); setUseCustom(false); setSelectedAmount(PHP_AMOUNTS[2]); }} className={`btn btn-sm ${amountMode === "php" ? "btn-primary" : "btn-ghost"}`} style={{ borderRadius: 999, minWidth: 58, justifyContent: "center" }}>PHP</button>
                 </div>
               </div>
               <div className="donation-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
@@ -464,7 +472,7 @@ export default function DetailPage() {
                 />
               )}
               <div style={{ marginTop: 8, fontSize: 12, color: "var(--text3)" }}>
-                1 XLM = ₱{conversionRate.toFixed(2)} · Donation: {formatXlmAmount(effectiveAmount)} XLM ≈ ₱{effectivePhp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatXlmAmount(effectiveAmount)} XLM ≈ ₱{effectivePhp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
             </div>
 
@@ -493,9 +501,9 @@ export default function DetailPage() {
                   : "Connect Wallet to Donate"}
             </button>
             {lastTxHash && (
-                  lastTxHash.startsWith("LINGAP-DEMO") ? (
+                  !isStellarTxHash(lastTxHash) ? (
                     <div className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
-                      <CheckCircle2 size={14} /> LINGAP reference: {lastTxHash.slice(0, 18)}...
+                      <CheckCircle2 size={14} /> Ledger reference: {formatLedgerReference(lastTxHash).slice(0, 22)}...
                       {stellarVaultUrl && (
                         <a href={stellarVaultUrl} target="_blank" rel="noreferrer" style={{ color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
                           View vault on Stellar

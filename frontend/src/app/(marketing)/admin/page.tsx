@@ -17,19 +17,17 @@ export default function AdminPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [campaignChanges, setCampaignChanges] = useState<CampaignChangeLogApi[]>([]);
+  const [deleteRequests, setDeleteRequests] = useState<CampaignChangeLogApi[]>([]);
   const isAdmin = isAuthenticated && user?.role === "admin";
 
   useEffect(() => {
     if (!isAdmin) return;
     let active = true;
-    campaignsApi
-      .changeLog(8)
-      .then((res) => {
-        if (active) setCampaignChanges(res.data.data);
-      })
-      .catch(() => {
-        if (active) setCampaignChanges([]);
-      });
+    Promise.allSettled([campaignsApi.changeLog(8), campaignsApi.deleteRequests(8)]).then(([changes, deletes]) => {
+      if (!active) return;
+      setCampaignChanges(changes.status === "fulfilled" ? changes.value.data.data : []);
+      setDeleteRequests(deletes.status === "fulfilled" ? deletes.value.data.data : []);
+    });
     return () => {
       active = false;
     };
@@ -47,6 +45,19 @@ export default function AdminPage() {
       toast.error("Invalid admin credentials.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function reviewDeleteRequest(requestId: string, action: "approve" | "reject") {
+    try {
+      const res =
+        action === "approve"
+          ? await campaignsApi.approveDeleteRequest(requestId)
+          : await campaignsApi.rejectDeleteRequest(requestId);
+      setDeleteRequests((items) => items.map((item) => (item.id === requestId ? res.data.data : item)));
+      toast.success(action === "approve" ? "Campaign deletion approved." : "Campaign deletion rejected.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to review delete request.");
     }
   }
 
@@ -220,6 +231,46 @@ export default function AdminPage() {
           ) : (
             <div style={{padding:18,border:'1px dashed var(--border)',borderRadius:10,color:'var(--text2)',fontSize:13}}>
               No organizer campaign edits have been recorded yet.
+            </div>
+          )}
+        </div>
+
+        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24,marginBottom:24}}>
+          <div className="flex flex-center flex-between mb-20" style={{gap:16,flexWrap:'wrap'}}>
+            <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',display:'flex',alignItems:'center',gap:8}}>
+              <XCircle size={18} color="#DC2626" strokeWidth={1.8}/> Campaign Delete Requests
+            </h3>
+            <span className="badge badge-gold">{deleteRequests.filter((item)=>item.changes?.delete_request?.status === 'pending').length} pending</span>
+          </div>
+
+          {deleteRequests.length > 0 ? (
+            <div style={{display:'grid',gap:10}}>
+              {deleteRequests.map((request)=>{
+                const status = request.changes?.delete_request?.status || "pending";
+                const pending = status === "pending";
+                return (
+                  <div key={request.id} style={{border:'1px solid var(--border)',borderRadius:12,padding:14,display:'grid',gridTemplateColumns:'1fr auto',gap:14,alignItems:'center'}}>
+                    <div>
+                      <div style={{fontWeight:800,color:'var(--forest)',marginBottom:4}}>{request.campaign_title}</div>
+                      <div style={{fontSize:12,color:'var(--text2)'}}>{request.actor_name} requested deletion review · {new Date(request.created_at).toLocaleString('en-PH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</div>
+                      <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>{request.actor_email}</div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                      <span className={`badge ${pending ? 'badge-gold' : status === 'approved' ? 'badge-emerald' : 'badge-navy'}`}>{status}</span>
+                      {pending && (
+                        <>
+                          <button type="button" className="btn btn-sm btn-emerald" onClick={()=>reviewDeleteRequest(request.id, "approve")}>Approve</button>
+                          <button type="button" className="btn btn-sm btn-outline" onClick={()=>reviewDeleteRequest(request.id, "reject")}>Reject</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{padding:18,border:'1px dashed var(--border)',borderRadius:10,color:'var(--text2)',fontSize:13}}>
+              No campaign deletion requests are waiting for admin review.
             </div>
           )}
         </div>

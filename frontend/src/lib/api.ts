@@ -110,7 +110,7 @@ export type CampaignChangeLogApi = {
   actor_name: string;
   actor_email: string;
   changed_fields: string[];
-  changes: Record<string, { before: unknown; after: unknown }>;
+  changes: Record<string, any>;
   summary: string;
   created_at: string;
 };
@@ -289,7 +289,19 @@ function getApiBaseUrl() {
 
 function normalizeAssetUrl(url?: string | null) {
   if (!url) return url;
-  if (url.startsWith("http") || url.startsWith("data:") || url.startsWith("blob:")) return url;
+  if (url.startsWith("data:") || url.startsWith("blob:")) return url;
+  if (url.startsWith("http")) {
+    try {
+      const parsed = new URL(url);
+      const isLocalApi = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+      if (isLocalApi && parsed.pathname.startsWith("/api/")) {
+        return `${getApiBaseUrl()}${parsed.pathname}${parsed.search}`;
+      }
+    } catch {
+      return url;
+    }
+    return url;
+  }
   if (url.startsWith("/api/")) return `${getApiBaseUrl()}${url}`;
   return url;
 }
@@ -528,7 +540,7 @@ export const campaignsApi = {
     const res = await api.post<ApiResponse<{ url: string }>>("/api/v1/campaigns/uploads/cover", form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    const url = normalizeAssetUrl(res.data.data.url) ?? "";
+    const url = res.data.data.url ?? "";
     return {
       ...res,
       data: {
@@ -574,6 +586,16 @@ export const campaignsApi = {
         data: normalizeCampaignImage(res.data.data),
       },
     })),
+  requestDelete: (campaignId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/${campaignId}/delete-request`),
+  deleteRequests: (limit = 25) =>
+    api.get<ApiResponse<CampaignChangeLogApi[]>>("/api/v1/campaigns/admin/delete-requests", {
+      params: { limit },
+    }),
+  approveDeleteRequest: (requestId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/delete-requests/${requestId}/approve`),
+  rejectDeleteRequest: (requestId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/delete-requests/${requestId}/reject`),
 };
 
 export const donorsApi = {

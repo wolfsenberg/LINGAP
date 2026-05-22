@@ -25,7 +25,7 @@ function formatPeso(value: number) {
 }
 
 function formatXlm(value: number) {
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM`;
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`;
 }
 
 function formatRole(value: string) {
