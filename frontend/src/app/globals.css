@@ -502,3 +502,150 @@ select.form-input{appearance:none;background-image:linear-gradient(45deg,transpa
   .cert-inner{padding:30px 20px}
   .mobile-nav{display:flex;justify-content:space-around}
 }
+
+/* App-wide responsive hardening for tablet and mobile */
+img,svg,video,canvas{max-width:100%}
+h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash{overflow-wrap:anywhere}
+.btn,.badge,.filter-chip{max-width:100%}
+
+@media(max-width:1180px){
+  .topnav{padding:0 18px}
+  .nav-logo{margin-right:20px}
+  .nav-link{padding:8px 9px;font-size:12.5px}
+  .nav-right{gap:6px}
+  .container{padding:0 28px}
+  .page-inner{padding:32px 28px}
+  .hero-inner{padding-left:28px;padding-right:28px}
+  .detail-grid,.esc-grid,.blockchain-viz{padding-left:28px;padding-right:28px}
+  .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .campaign-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+}
+
+@media(max-width:900px){
+  body{padding-bottom:74px}
+  .topnav{height:60px;padding:0 18px}
+  .nav-links{display:none}
+  .nav-logo-mark{width:32px;height:32px}
+  .nav-logo-text{font-size:20px}
+  .nav-impact{display:none}
+  .nav-login{display:inline-flex}
+  .nav-right .wallet-button,.nav-right .wallet-pill,.nav-right .wallet-disconnect{display:none}
+  .nav-right .btn-emerald{display:inline-flex}
+  .mobile-nav{display:flex;justify-content:space-around;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+  .mn-item{min-width:58px}
+  .hero{min-height:auto}
+  .hero-inner{grid-template-columns:1fr;gap:34px;padding-top:72px;padding-bottom:56px}
+  .hero-right{display:none}
+  .hero-title{font-size:clamp(34px,9vw,54px)}
+  .hero-sub{font-size:16px;max-width:660px}
+  .hero-cta .btn{flex:1 1 220px;justify-content:center}
+  .features-grid{grid-template-columns:1fr 1fr}
+  .grid-2,.grid-3{grid-template-columns:1fr}
+  .detail-grid{grid-template-columns:1fr;gap:22px;padding-top:28px}
+  .detail-grid>div:nth-child(2)>div:first-child{position:static!important;top:auto!important}
+  .detail-img{height:clamp(220px,48vw,340px)}
+  .esc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .blockchain-viz{padding-top:24px}
+  .proof-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .impact-dashboard-grid{grid-template-columns:1fr}
+  .impact-sidebar{position:static}
+  .donor-hero{padding:40px 28px}
+  .donor-hero-grid{grid-template-columns:1fr;gap:22px}
+  .donor-hero-art{order:2;justify-content:center}
+  .donor-hero-content{order:1}
+  .donor-stats-row{grid-template-columns:repeat(2,minmax(0,1fr));max-width:none}
+  .admin-auth-page,.auth-page{grid-template-columns:1fr}
+  .admin-auth-brand,.auth-brand-panel{min-height:auto}
+  .admin-auth-visual{display:none}
+}
+
+@media(max-width:640px){
+  .topnav{padding:0 14px}
+  .nav-logo{gap:8px;margin-right:auto}
+  .nav-logo-mark{width:30px;height:30px}
+  .nav-logo-text{font-size:19px}
+  .nav-right{gap:6px}
+  .nav-right .btn-emerald{display:none}
+  .nav-login{padding:8px 11px;font-size:12.5px}
+  .container{padding:0 18px}
+  .page-inner{padding:22px 18px 96px}
+  .section{padding:48px 0}
+  .section-title{font-size:clamp(24px,8vw,32px)}
+  .section-sub{font-size:15px}
+  .hero-inner{padding:54px 18px 46px}
+  .hero-badge{margin-top:8px;margin-bottom:20px;padding:8px 12px}
+  .hero-title{font-size:clamp(34px,11vw,46px);line-height:1.06}
+  .hero-sub{font-size:15.5px;line-height:1.6;margin-bottom:26px}
+  .hero-cta{display:grid;grid-template-columns:1fr;margin-bottom:28px}
+  .hero-cta .btn{width:100%;justify-content:center}
+  .hero-stats{grid-template-columns:1fr}
+  .hero-stat{padding:14px 15px}
+  .features-grid,.campaign-grid,.proof-grid,.grid-4,.esc-grid,.admin-grid{grid-template-columns:1fr}
+  .card:not(.p-0),.card-body,.feature-card,.impact-panel,.impact-certificate-callout{padding:18px}
+  .stat-card{padding:16px}
+  .camp-img{height:160px}
+  .camp-body{padding:18px}
+  .camp-meta,.camp-footer{align-items:flex-start;flex-direction:column;gap:8px}
+  .filter-bar{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;margin-left:-2px;margin-right:-2px}
+  .filter-chip{flex:0 0 auto;padding:8px 13px}
+  .search-bar{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:11px 13px}
+  .search-bar .btn{grid-column:1 / -1;justify-content:center;width:100%}
+  .process-step{grid-template-columns:56px minmax(0,1fr);gap:12px}
+  .process-icon{width:56px;height:56px}
+  .detail-grid{padding:22px 18px 96px}
+  .detail-img{height:220px;margin-bottom:18px}
+  .detail-grid h1{font-size:26px!important}
+  .detail-grid [style*="padding: 28px"]{padding:20px!important}
+  .detail-grid [style*="gridTemplateColumns: \"repeat(3,1fr)\""],
+  .detail-grid [style*="grid-template-columns: repeat(3,1fr)"]{grid-template-columns:1fr 1fr!important}
+  .spend-bar{display:grid;grid-template-columns:1fr;gap:7px}
+  .spend-label{width:auto}
+  .spend-amount{margin-left:0}
+  .milestone-timeline{padding-left:24px}
+  .ml-dot{left:-28px}
+  .ml-item::before{left:-20px}
+  .tx-card{align-items:flex-start;gap:12px;padding:15px;display:grid;grid-template-columns:40px minmax(0,1fr)}
+  .tx-card .text-right{grid-column:2;text-align:left}
+  .tx-amount{font-size:16px}
+  .chain-steps{margin:12px 0;padding:16px 0;scroll-snap-type:x proximity}
+  .chain-step{min-width:118px;scroll-snap-align:start}
+  .proof-thumb{height:138px}
+  .ai-alert{padding:15px 14px 15px 30px}
+  .ai-alert .flex-between{align-items:flex-start;gap:8px}
+  .donor-hero{padding:34px 18px}
+  .donor-hero-content h1{font-size:30px!important}
+  .donor-stats-row{grid-template-columns:1fr 1fr;gap:10px}
+  .donor-stat-card{min-height:104px;padding:14px 12px}
+  .donor-wave-img{height:220px;max-width:220px}
+  .impact-panel-head,.impact-certificate-callout{display:grid;grid-template-columns:1fr;gap:14px}
+  .impact-panel-head .btn,.impact-certificate-callout .btn{width:100%;justify-content:center}
+  .transparency-grid{grid-template-columns:1fr}
+  .donation-row{grid-template-columns:14px minmax(0,1fr);gap:10px}
+  .donation-row .badge{grid-column:2;justify-self:start}
+  .leaderboard-item{gap:10px}
+  .lb-amount{font-size:13px}
+  .auth-card,.admin-auth-card,.admin-login-panel{padding:18px}
+  .auth-card-head{display:grid;grid-template-columns:42px minmax(0,1fr);gap:12px}
+  .auth-card-head h2{font-size:21px}
+  .auth-mode-tabs button{font-size:12px;padding:9px 8px}
+  .auth-prompt-modal{padding:24px 18px}
+  .cert-wrap{margin:18px auto;padding:14px}
+  .cert-inner{padding:28px 16px;border-width:5px}
+  .cert-name{font-size:24px;min-width:0;width:100%}
+  .admin-auth-brand,.auth-brand-panel{padding:22px 18px}
+  .admin-auth-brand-main{margin-top:28px}
+}
+
+@media(max-width:420px){
+  .nav-logo-text{font-size:17px}
+  .nav-login{padding:7px 10px}
+  .btn{padding:10px 14px}
+  .btn-lg{padding:13px 16px;font-size:15px}
+  .hero-title{font-size:34px}
+  .hero-badge-text{font-size:12px}
+  .donor-stats-row{grid-template-columns:1fr}
+  .detail-grid [style*="gridTemplateColumns: \"repeat(3,1fr)\""],
+  .detail-grid [style*="grid-template-columns: repeat(3,1fr)"]{grid-template-columns:1fr!important}
+  .mobile-nav{padding-left:4px;padding-right:4px}
+  .mn-item{font-size:9.5px;min-width:52px;padding-left:4px;padding-right:4px}
+}
