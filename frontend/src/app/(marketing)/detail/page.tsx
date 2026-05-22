@@ -15,6 +15,7 @@ import { addPendingDonation, removePendingDonation } from "@/lib/pendingDonation
 import { useAuthStore } from "@/store/authStore";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
+import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 import {
   AlertCircle, CheckCircle2, Lock, Star, Handshake, MapPin, Calendar,
   Hospital, Anchor, School, ShieldCheck, Clock, Users,
@@ -196,13 +197,14 @@ function DetailContent() {
       <div className="detail-grid">
         {/* LEFT */}
         <div>
-          <div className={`detail-img ${campaign.imageSrc ? "has-photo" : ""}`} style={{ background: campaign.heroGradient }}>
-            {campaign.imageSrc ? (
-              <img className="detail-img-photo" src={campaign.imageSrc} alt={campaign.title} />
-            ) : (
-              <CampaignIcon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />
-            )}
-          </div>
+          <SafeImageFrame
+            src={campaign.imageSrc}
+            alt={campaign.title}
+            className="detail-img"
+            photoClassName="detail-img-photo"
+            style={{ background: campaign.heroGradient }}
+            fallback={<CampaignIcon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />}
+          />
           <div className="flex gap-8 mb-16" style={{ flexWrap: "wrap" }}>
             {campaign.urgencyLabel && (
               <span className={`badge ${campaign.urgencyClass}`}><AlertCircle size={11} /> {campaign.urgencyLabel}</span>

@@ -19,6 +19,7 @@ import {
 import { CAMPAIGNS, mergeCampaignSummaries, type Campaign, type PublicCampaignSummary } from "@/lib/campaigns";
 import { campaignsApi } from "@/lib/api";
 import AuthPromptLink from "@/components/auth/AuthPromptLink";
+import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 
 const PH_CITIES = [
   "All Cities",
@@ -625,14 +626,18 @@ function CampaignCard({ campaign }: { campaign: DiscoverCampaign }) {
         } as CSSProperties
       }
     >
-      <div className={`camp-img ${campaign.imageSrc ? "has-photo" : ""}`} style={{ background: campaign.heroGradient }}>
-        {campaign.imageSrc ? (
-          <img className="camp-img-photo" src={campaign.imageSrc} alt={campaign.title} />
-        ) : (
+      <SafeImageFrame
+        src={campaign.imageSrc}
+        alt={campaign.title}
+        className="camp-img"
+        photoClassName="camp-img-photo"
+        style={{ background: campaign.heroGradient }}
+        fallback={
           <div className="camp-img-inner">
             <Icon size={48} strokeWidth={1.8} />
           </div>
-        )}
+        }
+      >
         {campaign.urgencyLabel && (
           <div style={{ position: "absolute", top: 12, left: 12 }}>
             <span className={`badge ${campaign.urgencyClass ?? "badge-blue"}`}>{campaign.urgencyLabel}</span>
@@ -646,7 +651,7 @@ function CampaignCard({ campaign }: { campaign: DiscoverCampaign }) {
             {campaign.category}
           </span>
         </div>
-      </div>
+      </SafeImageFrame>
 
       <div className="camp-body">
         <h3 className="camp-title">{campaign.title}</h3>

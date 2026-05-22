@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { CAMPAIGNS, mergeCampaignSummaries } from "@/lib/campaigns";
 import { campaignsApi } from "@/lib/api";
+import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 
 export default function HomePage() {
   const [campaigns, setCampaigns] = useState(CAMPAIGNS);
@@ -212,12 +213,14 @@ export default function HomePage() {
               const accentHex = c.category === "Animal Rescue" ? "var(--amber)" : "var(--canopy)";
               return (
                 <Link key={c.id} href={`/detail/${c.slug}`} className="camp-card emerald-glow featured-camp" style={{ textDecoration: "none" }}>
-                  <div className={`camp-img ${c.imageSrc ? "has-photo" : ""}`} style={{ background: c.heroGradient }}>
-                    {c.imageSrc ? (
-                      <img className="camp-img-photo" src={c.imageSrc} alt={c.title} />
-                    ) : (
-                      <div className="camp-img-inner"><Icon size={48} strokeWidth={1.8} /></div>
-                    )}
+                  <SafeImageFrame
+                    src={c.imageSrc}
+                    alt={c.title}
+                    className="camp-img"
+                    photoClassName="camp-img-photo"
+                    style={{ background: c.heroGradient }}
+                    fallback={<div className="camp-img-inner"><Icon size={48} strokeWidth={1.8} /></div>}
+                  >
                     {c.urgencyLabel && (
                       <div style={{ position: "absolute", top: 12, left: 12 }}>
                         <span className={`badge ${c.urgencyClass}`}>{c.urgencyLabel}</span>
@@ -226,7 +229,7 @@ export default function HomePage() {
                     <div style={{ position: "absolute", top: 12, right: 12 }}>
                       <span className="badge badge-emerald">Verified</span>
                     </div>
-                  </div>
+                  </SafeImageFrame>
                   <div className="camp-body">
                     <h3 className="camp-title">{c.title}</h3>
                     <p className="camp-desc">{c.description}</p>

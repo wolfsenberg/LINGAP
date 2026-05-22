@@ -12,6 +12,7 @@ import {
 } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
+import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 import { applyCampaignSummary, CAMPAIGNS, type PublicCampaignSummary } from "@/lib/campaigns";
 import { addPendingDonation, removePendingDonation } from "@/lib/pendingDonations";
 import { useAuthStore } from "@/store/authStore";
@@ -320,13 +321,14 @@ export default function DetailPage() {
         {/* LEFT */}
         <div>
           {/* Hero image */}
-          <div className={`detail-img ${activeCampaign.imageSrc ? "has-photo" : ""}`} style={{ background: activeCampaign.heroGradient }}>
-            {activeCampaign.imageSrc ? (
-              <img className="detail-img-photo" src={activeCampaign.imageSrc} alt={activeCampaign.title} />
-            ) : (
-              <Icon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />
-            )}
-          </div>
+          <SafeImageFrame
+            src={activeCampaign.imageSrc}
+            alt={activeCampaign.title}
+            className="detail-img"
+            photoClassName="detail-img-photo"
+            style={{ background: activeCampaign.heroGradient }}
+            fallback={<Icon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />}
+          />
 
           {/* Badges */}
           <div className="flex gap-8 mb-16" style={{ flexWrap: "wrap" }}>
