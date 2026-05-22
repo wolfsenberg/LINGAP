@@ -1,7 +1,7 @@
 // Discover page - production ready with SSR and revalidation
-import Link from "next/link";
 import { Hospital, Anchor, BookOpen, Handshake, MapPin, Star, Sparkles, CheckCircle2, Search, Users, Home, Cat, PawPrint } from "lucide-react";
 import { CAMPAIGNS } from "@/lib/campaigns";
+import AuthPromptLink from "@/components/auth/AuthPromptLink";
 
 // Revalidate every 5 minutes for incremental static regeneration
 export const revalidate = 300; // seconds
@@ -14,12 +14,21 @@ export default async function DiscoverPage() {
 
   // Fetch campaigns from backend API (next.js API route)
   const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const res = await fetch(`${baseUrl}/api/v1/aid-requests/near?lat=${lat}&lng=${lng}&radius_km=${radius_km}`, {
-    // Enable ISR caching
-    next: { revalidate: 300 },
-  });
-  const data = (await res.json()) as { items: any[] };
-  const liveCampaigns = data.items ?? [];
+  let liveCampaigns: any[] = [];
+
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/aid-requests/near?lat=${lat}&lng=${lng}&radius_km=${radius_km}`, {
+      // Enable ISR caching
+      next: { revalidate: 300 },
+    });
+
+    if (res.ok) {
+      const data = (await res.json()) as { items?: any[] };
+      liveCampaigns = data.items ?? [];
+    }
+  } catch {
+    liveCampaigns = [];
+  }
 
   const filters = [
     { label: "All Campaigns", Icon: null },
@@ -90,7 +99,7 @@ export default async function DiscoverPage() {
               const progressColor = c.category === "Animal Rescue" ? "prog-gold" : "prog-emerald";
               const accentHex = c.category === "Animal Rescue" ? "var(--amber)" : "var(--canopy)";
               return (
-                <Link
+                <AuthPromptLink
                   key={c.id}
                   href={`/detail/${c.slug}`}
                   className="camp-card emerald-glow featured-camp"
@@ -130,7 +139,7 @@ export default async function DiscoverPage() {
                       </span>
                     </div>
                   </div>
-                </Link>
+                </AuthPromptLink>
               );
             })}
           </div>
@@ -199,7 +208,7 @@ export default async function DiscoverPage() {
 
         <div className="campaign-grid">
           {liveCampaigns.map((c) => (
-            <Link key={c.aid_request_id} href={`/detail/${c.aid_request_id}`} className="camp-card" style={{ textDecoration: "none" }}>
+            <AuthPromptLink key={c.aid_request_id} href={`/detail/${c.aid_request_id}`} className="camp-card" style={{ textDecoration: "none" }}>
               <div className="camp-img" style={{ background: "linear-gradient(135deg,#1a3a2a,#2d5a3d)" }}>
                 <div className="camp-img-inner"><Hospital size={48} strokeWidth={1.2} /></div>
                 <div style={{ position: "absolute", top: 12, left: 12 }}>
@@ -233,7 +242,7 @@ export default async function DiscoverPage() {
                   <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 600 }}>{c.distance_km} km away</span>
                 </div>
               </div>
-            </Link>
+            </AuthPromptLink>
           ))}
         </div>
       </div>
