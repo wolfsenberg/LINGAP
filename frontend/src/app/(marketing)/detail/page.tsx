@@ -158,8 +158,12 @@ function DetailContent() {
       <div className="detail-grid">
         {/* LEFT */}
         <div>
-          <div className="detail-img" style={{ background: campaign.heroGradient }}>
-            <CampaignIcon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />
+          <div className={`detail-img ${campaign.imageSrc ? "has-photo" : ""}`} style={{ background: campaign.heroGradient }}>
+            {campaign.imageSrc ? (
+              <img className="detail-img-photo" src={campaign.imageSrc} alt={campaign.title} />
+            ) : (
+              <CampaignIcon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />
+            )}
           </div>
           <div className="flex gap-8 mb-16" style={{ flexWrap: "wrap" }}>
             {campaign.urgencyLabel && (
