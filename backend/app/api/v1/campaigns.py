@@ -72,7 +72,10 @@ async def _donation_totals(db: AsyncSession, campaign_id: str) -> tuple[float, i
             select(
                 func.coalesce(func.sum(Donation.amount), 0).label("total"),
                 func.count(distinct(Donation.donor_id)).label("donors"),
-            ).where(Donation.purpose == f"campaign:{campaign_id}")
+            ).where(
+                Donation.purpose == f"campaign:{campaign_id}",
+                Donation.blockchain_confirmed.is_(True),
+            )
         )
     ).one()
     return float(row.total or 0), int(row.donors or 0)
@@ -201,9 +204,78 @@ async def _public_campaigns(db: AsyncSession) -> list[dict]:
     return items
 
 
+async def _confirmed_campaign_donations(
+    db: AsyncSession,
+    campaign_id: str,
+    limit: int = 25,
+) -> list[dict]:
+    rows = (
+        await db.execute(
+            select(Donation, User)
+            .join(User, User.id == Donation.donor_id)
+            .where(
+                Donation.purpose == f"campaign:{campaign_id}",
+                Donation.blockchain_confirmed.is_(True),
+            )
+            .order_by(Donation.created_at.desc())
+            .limit(limit)
+        )
+    ).all()
+
+    return [
+        {
+            "id": str(donation.id),
+            "donor_id": str(donation.donor_id),
+            "donor_name": user.name,
+            "amount": float(donation.amount),
+            "asset": donation.asset,
+            "amount_php": float(donation.amount) * DEMO_XLM_TO_PHP,
+            "stellar_tx_hash": donation.stellar_tx_hash,
+            "blockchain_confirmed": donation.blockchain_confirmed,
+            "disbursed": donation.disbursed,
+            "disbursed_amount": float(donation.disbursed_amount),
+            "created_at": donation.created_at,
+        }
+        for donation, user in rows
+    ]
+
+
 @router.get("/public")
 async def public_campaigns(db: AsyncSession = Depends(get_db)):
     return {"success": True, "data": await _public_campaigns(db)}
+
+
+@router.get("/public/{campaign_id}/escrow")
+async def public_campaign_escrow(campaign_id: str, db: AsyncSession = Depends(get_db)):
+    items = await _public_campaigns(db)
+    campaign = next(
+        (item for item in items if item["id"] == campaign_id or item["slug"] == campaign_id),
+        None,
+    )
+    if not campaign:
+        return {"success": False, "message": "Campaign not found", "data": None}
+
+    donations = await _confirmed_campaign_donations(db, campaign["id"])
+    total_xlm = sum(item["amount"] for item in donations)
+    total_php = sum(item["amount_php"] for item in donations)
+    released_php = sum(item["disbursed_amount"] * DEMO_XLM_TO_PHP for item in donations if item["disbursed"])
+    locked_php = max(total_php - released_php, 0)
+
+    return {
+        "success": True,
+        "data": {
+            "campaign": campaign,
+            "summary": {
+                "total_escrowed_xlm": total_xlm,
+                "total_escrowed_php": total_php,
+                "released_php": released_php,
+                "locked_php": locked_php,
+                "pending_verification_php": locked_php,
+                "confirmed_donation_count": len(donations),
+            },
+            "transactions": donations,
+        },
+    }
 
 
 @router.get("/public/{campaign_id}")

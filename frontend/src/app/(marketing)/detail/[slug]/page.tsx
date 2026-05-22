@@ -513,7 +513,7 @@ export default function DetailPage() {
             <button className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
               <RefreshCw size={14} /> Set Monthly Donation
             </button>
-            <Link href="/escrow" className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+            <Link href={`/escrow?campaign=${activeCampaign.slug || activeCampaign.id}`} className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
               <Lock size={14} /> View Escrow Dashboard
             </Link>
 

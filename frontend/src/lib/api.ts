@@ -74,6 +74,31 @@ export type PublicCampaignApi = CampaignDriveApi & {
   organizer_name?: string | null;
 };
 
+export type CampaignEscrowApi = {
+  campaign: PublicCampaignApi;
+  summary: {
+    total_escrowed_xlm: number;
+    total_escrowed_php: number;
+    released_php: number;
+    locked_php: number;
+    pending_verification_php: number;
+    confirmed_donation_count: number;
+  };
+  transactions: Array<{
+    id: string;
+    donor_id: string;
+    donor_name: string;
+    amount: number;
+    asset: string;
+    amount_php: number;
+    stellar_tx_hash: string;
+    blockchain_confirmed: boolean;
+    disbursed: boolean;
+    disbursed_amount: number;
+    created_at: string;
+  }>;
+};
+
 export type LeaderboardDonorApi = {
   rank: number;
   user_id: string;
@@ -272,6 +297,8 @@ export const campaignsApi = {
   publicList: () => api.get<ApiResponse<PublicCampaignApi[]>>("/api/v1/campaigns/public"),
   publicOne: (campaignId: string) =>
     api.get<ApiResponse<PublicCampaignApi | null>>(`/api/v1/campaigns/public/${campaignId}`),
+  escrow: (campaignId: string) =>
+    api.get<ApiResponse<CampaignEscrowApi | null>>(`/api/v1/campaigns/public/${campaignId}/escrow`),
   mine: () => api.get<ApiResponse<CampaignDriveApi[]>>("/api/v1/campaigns/mine"),
   create: (data: {
     title: string;
