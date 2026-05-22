@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
 import { balanceApi, campaignsApi, donationsApi, type BalanceApi } from "@/lib/api";
-import { getStellarExpertTxUrl } from "@/lib/stellar";
+import { getStellarExpertContractUrl, getStellarExpertTxUrl } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
@@ -17,7 +17,8 @@ import {
 } from "lucide-react";
 
 const AMOUNTS = [100, 250, 500, 1000, 5000];
-const DEMO_XLM_TO_PHP = 10;
+const PHP_AMOUNTS = [100, 250, 500, 1000, 2500];
+const DEMO_XLM_TO_PHP = 8.93;
 const DEFAULT_BALANCE: BalanceApi = {
   xlm_balance: 0,
   php_equivalent: 0,
@@ -230,6 +231,8 @@ export default function DetailPage() {
   const rawInputAmount = useCustom ? parseFloat(customAmount) || 0 : selectedAmount;
   const effectiveAmount = amountMode === "php" ? rawInputAmount / conversionRate : rawInputAmount;
   const effectivePhp = effectiveAmount * conversionRate;
+  const donationPresets = amountMode === "php" ? PHP_AMOUNTS : AMOUNTS;
+  const stellarVaultUrl = getStellarExpertContractUrl();
   const usesXlmGoal = activeCampaign.asset === "XLM" || /XLM/i.test(activeCampaign.goalLabel || "");
   const displayRaised = activeCampaign.raised + confirmedDonationXlm * (usesXlmGoal ? 1 : DEMO_XLM_TO_PHP);
   const displayRaisedLabel = usesXlmGoal
@@ -429,18 +432,18 @@ export default function DetailPage() {
               <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)" }}>XLM / PHP Converter</div>
                 <div style={{ display: "flex", gap: 6 }}>
-                  <button type="button" onClick={() => setAmountMode("xlm")} className={`btn btn-sm ${amountMode === "xlm" ? "btn-primary" : "btn-outline"}`}>Enter amount in XLM</button>
-                  <button type="button" onClick={() => { setAmountMode("php"); setUseCustom(true); }} className={`btn btn-sm ${amountMode === "php" ? "btn-primary" : "btn-outline"}`}>Enter amount in PHP</button>
+                  <button type="button" onClick={() => { setAmountMode("xlm"); setUseCustom(false); setSelectedAmount(AMOUNTS[0]); }} className={`btn btn-sm ${amountMode === "xlm" ? "btn-primary" : "btn-outline"}`}>Enter amount in XLM</button>
+                  <button type="button" onClick={() => { setAmountMode("php"); setUseCustom(false); setSelectedAmount(PHP_AMOUNTS[2]); }} className={`btn btn-sm ${amountMode === "php" ? "btn-primary" : "btn-outline"}`}>Enter amount in PHP</button>
                 </div>
               </div>
               <div className="donation-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
-                {AMOUNTS.map((a) => (
+                {donationPresets.map((a) => (
                   <button
                     key={a}
-                    onClick={() => { setSelectedAmount(a); setUseCustom(false); setAmountMode("xlm"); }}
-                    className={`btn btn-sm ${!useCustom && amountMode === "xlm" && selectedAmount === a ? "btn-primary" : "btn-outline"}`}
+                    onClick={() => { setSelectedAmount(a); setUseCustom(false); }}
+                    className={`btn btn-sm ${!useCustom && selectedAmount === a ? "btn-primary" : "btn-outline"}`}
                   >
-                    {a} XLM
+                    {amountMode === "xlm" ? `${a} XLM` : `₱${a.toLocaleString()}`}
                   </button>
                 ))}
                 <button
@@ -490,10 +493,15 @@ export default function DetailPage() {
                   : "Connect Wallet to Donate"}
             </button>
             {lastTxHash && (
-              lastTxHash.startsWith("LINGAP-DEMO") ? (
-                <div className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
-                  <CheckCircle2 size={14} /> LINGAP reference: {lastTxHash.slice(0, 18)}...
-                </div>
+                  lastTxHash.startsWith("LINGAP-DEMO") ? (
+                    <div className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                      <CheckCircle2 size={14} /> LINGAP reference: {lastTxHash.slice(0, 18)}...
+                      {stellarVaultUrl && (
+                        <a href={stellarVaultUrl} target="_blank" rel="noreferrer" style={{ color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
+                          View vault on Stellar
+                        </a>
+                      )}
+                    </div>
               ) : (
                 <a
                   href={getStellarExpertTxUrl(lastTxHash)}

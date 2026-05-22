@@ -45,8 +45,9 @@ import { useAuthStore } from "@/store/authStore";
 import type { Donation } from "@/types";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 import TopUpModal from "@/components/balance/TopUpModal";
+import { getStellarExpertContractUrl, getStellarExpertTxUrl } from "@/lib/stellar";
 
-const XLM_TO_PHP = 10;
+const XLM_TO_PHP = 8.93;
 
 const DEFAULT_BALANCE: BalanceApi = {
   xlm_balance: 0,
@@ -92,6 +93,13 @@ function campaignNameFromPurpose(purpose?: string) {
 function transactionTitle(tx: BalanceTransactionApi) {
   if (tx.kind === "top_up") return `${tx.payment_method.toUpperCase()} top-up`;
   return `Donation to ${tx.campaign_id || "campaign"}`;
+}
+
+function stellarTransactionUrl(tx: BalanceTransactionApi) {
+  if (tx.stellar_tx_hash && !tx.stellar_tx_hash.startsWith("LINGAP-DEMO")) {
+    return getStellarExpertTxUrl(tx.stellar_tx_hash);
+  }
+  return getStellarExpertContractUrl();
 }
 
 export default function DonorPage() {
@@ -340,6 +348,11 @@ export default function DonorPage() {
                     <div className="donation-proof-row">
                       <span><Landmark size={12} /> {tx.payment_reference}</span>
                       <span><CheckCircle2 size={12} /> {tx.payment_status}</span>
+                      {stellarTransactionUrl(tx) && (
+                        <a href={stellarTransactionUrl(tx) ?? undefined} target="_blank" rel="noreferrer" style={{ color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
+                          <Network size={12} /> Stellar reference
+                        </a>
+                      )}
                     </div>
                   </div>
                   <span className={`badge ${tx.kind === "top_up" ? "badge-emerald" : "badge-gold"}`}>
