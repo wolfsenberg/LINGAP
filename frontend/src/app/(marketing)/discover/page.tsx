@@ -320,51 +320,54 @@ export default function DiscoverPage() {
           </div>
         ) : (
           <div className="campaign-grid">
-            {filteredCampaigns.map((c) => (
-              <AuthPromptLink key={c.id || c.aid_request_id} href={`/detail/${c.id || c.aid_request_id}`} className="camp-card" style={{ textDecoration: "none" }}>
-                <div className="camp-img" style={{ background: "linear-gradient(135deg,#1a3a2a,#2d5a3d)" }}>
-                  <div className="camp-img-inner"><Hospital size={48} strokeWidth={1.2} /></div>
-                  {c.location && (
-                    <div style={{ position: "absolute", top: 12, left: 12 }}>
-                      <span className="badge badge-blue" style={{ fontSize: 10 }}>{c.location}</span>
-                    </div>
-                  )}
-                  <div style={{ position: "absolute", top: 12, right: 12 }}>
-                    <span className={`badge ${c.is_verified ? "badge-emerald" : "badge-navy"}`}>
-                      {c.is_verified ? "Verified" : c.status}
-                    </span>
-                  </div>
-                  <div style={{ position: "absolute", bottom: 12, left: 12, right: 12, background: "rgba(26,58,42,.75)", borderRadius: "var(--r)", padding: "8px 12px" }}>
-                    <div style={{ fontSize: 11, color: "rgba(255,255,255,.7)" }}>Requested Amount</div>
-                    <div style={{ height: 4, background: "rgba(255,255,255,.2)", borderRadius: 2, marginTop: 4 }}>
-                      <div style={{ width: `${Math.min((c.requested_amount / (c.requested_amount + 1000)) * 100, 100)}%`, height: 4, background: "var(--canopy)", borderRadius: 2 }} />
-                    </div>
-                  </div>
-                </div>
-                <div className="camp-body">
-                  <h3 className="camp-title">{c.beneficiary_name}</h3>
-                  <p className="camp-desc">{c.purpose}</p>
-                  <div className="camp-meta">
-                    <div>
-                      <div className="camp-raised">&#8369;{c.requested_amount?.toLocaleString()}</div>
-                      <div className="camp-goal">{c.asset}</div>
-                    </div>
-                    <div className="camp-donors"><Users size={12} /> {c.donors?.toLocaleString() || 0} donors</div>
-                  </div>
-                  <div className="prog-track" style={{ height: 8 }}>
-                    <div className="prog-fill prog-emerald" style={{ width: `${c.pct || 0}%` }} />
-                  </div>
-                  <div className="camp-footer">
-                    <span className="badge badge-navy">{c.status}</span>
+            {filteredCampaigns.map((c) => {
+              const progressColor = "prog-emerald";
+              const accentHex = "var(--canopy)";
+              const pct = c.pct || 0;
+              const daysLeft = c.daysLeft || 30;
+              return (
+                <AuthPromptLink key={c.id || c.aid_request_id} href={`/detail/${c.id || c.aid_request_id}`} className="camp-card emerald-glow featured-camp" style={{ textDecoration: "none" }}>
+                  <div className="camp-img" style={{ background: "linear-gradient(135deg,#1a3a2a,#2d5a3d)" }}>
+                    <div className="camp-img-inner"><Hospital size={48} strokeWidth={1.8} /></div>
+                    {c.status && (
+                      <div style={{ position: "absolute", top: 12, left: 12 }}>
+                        <span className="badge badge-blue" style={{ textTransform: "capitalize" }}>{c.status}</span>
+                      </div>
+                    )}
+                    {c.is_verified && (
+                      <div style={{ position: "absolute", top: 12, right: 12 }}>
+                        <span className="badge badge-emerald">Verified</span>
+                      </div>
+                    )}
                     {c.location && (
-                      <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 600 }}>
-                        <MapPin size={11} style={{ display: "inline", verticalAlign: "-1px" }} /> {c.location}
-                      </span>
+                      <div style={{ position: "absolute", bottom: 12, left: 12 }}>
+                        <span className="badge badge-navy" style={{ fontSize: 10 }}>{c.location}</span>
+                      </div>
                     )}
                   </div>
-                </div>
-              </AuthPromptLink>
-            ))}
+                  <div className="camp-body">
+                    <h3 className="camp-title">{c.beneficiary_name}</h3>
+                    <p className="camp-desc">{c.purpose}</p>
+                    <div className="camp-meta">
+                      <div>
+                        <div className="camp-raised">&#8369;0</div>
+                        <div className="camp-goal">of &#8369;{c.requested_amount?.toLocaleString() || 0} goal</div>
+                      </div>
+                      <div className="camp-donors"><Users size={12} /> {c.donors?.toLocaleString() || 0} donors</div>
+                    </div>
+                    <div className="prog-track" style={{ height: 8 }}>
+                      <div className={`prog-fill ${progressColor}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="camp-footer">
+                      <span className="badge badge-navy">{c.is_verified ? "Platform Verified" : "Unverified"}</span>
+                      <span style={{ fontSize: 12, color: accentHex, fontWeight: 600 }}>
+                        {pct}% funded · {daysLeft}d left
+                      </span>
+                    </div>
+                  </div>
+                </AuthPromptLink>
+              );
+            })}
           </div>
         )}
       </div>
