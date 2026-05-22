@@ -38,6 +38,7 @@ import {
 import { getFirstName } from "@/lib/userName";
 import { useAuthStore } from "@/store/authStore";
 import type { Donation } from "@/types";
+import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 
 const XLM_TO_PHP = 10;
 
@@ -333,19 +334,20 @@ export default function DonorPage() {
                 <div className="campaign-grid">
                   {latestDrives.map((drive) => (
                     <div key={drive.id} className="camp-card" style={{ cursor: "default" }}>
-                      <div className={`camp-img ${drive.image_src ? "has-photo" : ""}`}>
-                        {drive.image_src ? (
-                          <img className="camp-img-photo" src={drive.image_src} alt={drive.title} />
-                        ) : (
-                          <div className="camp-img-inner"><Megaphone size={44} strokeWidth={1.7} /></div>
-                        )}
+                      <SafeImageFrame
+                        src={drive.image_src}
+                        alt={drive.title}
+                        className="camp-img"
+                        photoClassName="camp-img-photo"
+                        fallback={<div className="camp-img-inner"><Megaphone size={44} strokeWidth={1.7} /></div>}
+                      >
                         <div style={{ position: "absolute", top: 12, left: 12 }}>
                           <span className="badge badge-navy">{drive.category}</span>
                         </div>
                         <div style={{ position: "absolute", top: 12, right: 12 }}>
                           <span className={`badge ${drive.status === "Active" || drive.status === "Funded" ? "badge-emerald" : drive.status === "Draft" ? "badge-navy" : "badge-gold"}`}>{drive.status}</span>
                         </div>
-                      </div>
+                      </SafeImageFrame>
                       <div className="camp-body">
                         <h3 className="camp-title">{drive.title}</h3>
                       <p className="camp-desc" style={{ WebkitLineClamp: 1 }}>{drive.institution}</p>

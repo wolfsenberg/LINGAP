@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { profilesApi, type PublicProfileApi } from "@/lib/api";
 import { getStellarExpertTxUrl } from "@/lib/stellar";
+import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 
 function formatPeso(value: number) {
   return `₱${Math.round(value).toLocaleString()}`;
@@ -167,16 +168,17 @@ export default function PublicProfilePage() {
                 <div className="campaign-grid">
                   {profile.campaigns.map((campaign) => (
                     <Link key={campaign.id} href={`/detail/${campaign.slug}`} className="camp-card profile-campaign-card">
-                      <div className={`camp-img ${campaign.image_src ? "has-photo" : ""}`}>
-                        {campaign.image_src ? (
-                          <img className="camp-img-photo" src={campaign.image_src} alt={campaign.title} />
-                        ) : (
-                          <div className="camp-img-inner"><Megaphone size={44} strokeWidth={1.7} /></div>
-                        )}
+                      <SafeImageFrame
+                        src={campaign.image_src}
+                        alt={campaign.title}
+                        className="camp-img"
+                        photoClassName="camp-img-photo"
+                        fallback={<div className="camp-img-inner"><Megaphone size={44} strokeWidth={1.7} /></div>}
+                      >
                         <div style={{ position: "absolute", top: 12, right: 12 }}>
                           <span className="badge badge-emerald">{campaign.status}</span>
                         </div>
-                      </div>
+                      </SafeImageFrame>
                       <div className="camp-body">
                         <h3 className="camp-title">{campaign.title}</h3>
                         <p className="camp-desc">{campaign.description}</p>

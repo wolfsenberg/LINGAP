@@ -258,6 +258,34 @@ function getApiBaseUrl() {
   return configuredUrl || (isLocalFrontend ? "http://localhost:8000" : productionUrl);
 }
 
+function normalizeAssetUrl(url?: string | null) {
+  if (!url) return url;
+  if (url.startsWith("http") || url.startsWith("data:") || url.startsWith("blob:")) return url;
+  if (url.startsWith("/api/")) return `${getApiBaseUrl()}${url}`;
+  return url;
+}
+
+function normalizeCampaignImage<T extends { image_src?: string | null }>(campaign: T): T {
+  return {
+    ...campaign,
+    image_src: normalizeAssetUrl(campaign.image_src),
+  };
+}
+
+function normalizePublicProfile(profile: PublicProfileApi): PublicProfileApi {
+  return {
+    ...profile,
+    campaigns: profile.campaigns.map(normalizeCampaignImage),
+  };
+}
+
+function normalizeProfileSearchResult(result: PublicProfileSearchResultApi): PublicProfileSearchResultApi {
+  return {
+    ...result,
+    top_campaigns: result.top_campaigns.map(normalizeCampaignImage),
+  };
+}
+
 const api = axios.create({
   baseURL: getApiBaseUrl(),
   headers: { "Content-Type": "application/json" },
@@ -395,13 +423,52 @@ export const dashboardApi = {
 };
 
 export const campaignsApi = {
-  publicList: () => api.get<ApiResponse<PublicCampaignApi[]>>("/api/v1/campaigns/public"),
+  publicList: async () => {
+    const res = await api.get<ApiResponse<PublicCampaignApi[]>>("/api/v1/campaigns/public");
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data.map(normalizeCampaignImage),
+      },
+    };
+  },
   proofCenter: () => api.get<ApiResponse<ProofCenterApi>>("/api/v1/campaigns/proof-center"),
-  publicOne: (campaignId: string) =>
-    api.get<ApiResponse<PublicCampaignApi | null>>(`/api/v1/campaigns/public/${campaignId}`),
-  escrow: (campaignId: string) =>
-    api.get<ApiResponse<CampaignEscrowApi | null>>(`/api/v1/campaigns/public/${campaignId}/escrow`),
-  mine: () => api.get<ApiResponse<CampaignDriveApi[]>>("/api/v1/campaigns/mine"),
+  publicOne: async (campaignId: string) => {
+    const res = await api.get<ApiResponse<PublicCampaignApi | null>>(`/api/v1/campaigns/public/${campaignId}`);
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data ? normalizeCampaignImage(res.data.data) : null,
+      },
+    };
+  },
+  escrow: async (campaignId: string) => {
+    const res = await api.get<ApiResponse<CampaignEscrowApi | null>>(`/api/v1/campaigns/public/${campaignId}/escrow`);
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data
+          ? {
+              ...res.data.data,
+              campaign: normalizeCampaignImage(res.data.data.campaign),
+            }
+          : null,
+      },
+    };
+  },
+  mine: async () => {
+    const res = await api.get<ApiResponse<CampaignDriveApi[]>>("/api/v1/campaigns/mine");
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data.map(normalizeCampaignImage),
+      },
+    };
+  },
   changeLog: (limit = 25) =>
     api.get<ApiResponse<CampaignChangeLogApi[]>>("/api/v1/campaigns/admin/change-log", {
       params: { limit },
@@ -412,13 +479,13 @@ export const campaignsApi = {
     const res = await api.post<ApiResponse<{ url: string }>>("/api/v1/campaigns/uploads/cover", form, {
       headers: { "Content-Type": "multipart/form-data" },
     });
-    const url = res.data.data.url;
+    const url = normalizeAssetUrl(res.data.data.url) ?? "";
     return {
       ...res,
       data: {
         ...res.data,
         data: {
-          url: url.startsWith("http") ? url : `${getApiBaseUrl()}${url}`,
+          url,
         },
       },
     };
@@ -431,7 +498,14 @@ export const campaignsApi = {
     location: string;
     goal_amount: number;
     image_src?: string | null;
-  }) => api.post<ApiResponse<CampaignDriveApi>>("/api/v1/campaigns", data),
+  }) =>
+    api.post<ApiResponse<CampaignDriveApi>>("/api/v1/campaigns", data).then((res) => ({
+      ...res,
+      data: {
+        ...res.data,
+        data: normalizeCampaignImage(res.data.data),
+      },
+    })),
   update: (
     campaignId: string,
     data: Partial<{
@@ -443,7 +517,14 @@ export const campaignsApi = {
       goal_amount: number;
       image_src: string | null;
     }>
-  ) => api.patch<ApiResponse<CampaignDriveApi>>(`/api/v1/campaigns/${campaignId}`, data),
+  ) =>
+    api.patch<ApiResponse<CampaignDriveApi>>(`/api/v1/campaigns/${campaignId}`, data).then((res) => ({
+      ...res,
+      data: {
+        ...res.data,
+        data: normalizeCampaignImage(res.data.data),
+      },
+    })),
 };
 
 export const donorsApi = {
@@ -458,14 +539,38 @@ export const donorsApi = {
 };
 
 export const profilesApi = {
-  search: (q = "", limit = 8) =>
-    api.get<ApiResponse<PublicProfileSearchResultApi[]>>("/api/v1/profiles/search", {
+  search: async (q = "", limit = 8) => {
+    const res = await api.get<ApiResponse<PublicProfileSearchResultApi[]>>("/api/v1/profiles/search", {
       params: { q, limit },
-    }),
-  me: () =>
-    api.get<ApiResponse<PublicProfileApi>>("/api/v1/profiles/me"),
-  get: (userId: string) =>
-    api.get<ApiResponse<PublicProfileApi | null>>(`/api/v1/profiles/${userId}`),
+    });
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data.map(normalizeProfileSearchResult),
+      },
+    };
+  },
+  me: async () => {
+    const res = await api.get<ApiResponse<PublicProfileApi>>("/api/v1/profiles/me");
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: normalizePublicProfile(res.data.data),
+      },
+    };
+  },
+  get: async (userId: string) => {
+    const res = await api.get<ApiResponse<PublicProfileApi | null>>(`/api/v1/profiles/${userId}`);
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data ? normalizePublicProfile(res.data.data) : null,
+      },
+    };
+  },
 };
 
 export const stellarApi = {
