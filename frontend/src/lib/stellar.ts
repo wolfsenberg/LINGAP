@@ -52,6 +52,16 @@ export async function buildPaymentTransaction(
   return txBuilder.build();
 }
 
+export async function submitSignedTransactionXdr(signedXdr: string) {
+  const transaction = TransactionBuilder.fromXDR(signedXdr, STELLAR_CONFIG.network);
+  return horizonServer.submitTransaction(transaction);
+}
+
+export function getStellarExpertTxUrl(txHash: string) {
+  const explorerNetwork = NETWORK === "mainnet" ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`;
+}
+
 export async function getTransactionDetails(txHash: string) {
   return horizonServer.transactions().transaction(txHash).call();
 }

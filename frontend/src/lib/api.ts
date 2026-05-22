@@ -28,6 +28,14 @@ type RegisterRequest = {
   stellarPublicKey?: string;
 };
 
+type DonationCreateRequest = {
+  amount: number;
+  asset: string;
+  purpose?: string;
+  stellarTxHash?: string;
+  stellar_tx_hash?: string;
+};
+
 const normalizeUser = (user: ApiUser): User => ({
   id: user.id,
   email: user.email,
@@ -124,7 +132,13 @@ export const donationsApi = {
   list: (page = 1, size = 20) =>
     api.get<PaginatedResponse<Donation>>("/api/v1/donations", { params: { page, size } }),
   get: (id: string) => api.get<ApiResponse<Donation>>(`/api/v1/donations/${id}`),
-  create: (data: Partial<Donation>) => api.post<ApiResponse<Donation>>("/api/v1/donations", data),
+  create: (data: DonationCreateRequest) =>
+    api.post<ApiResponse<Donation>>("/api/v1/donations", {
+      amount: data.amount,
+      asset: data.asset,
+      purpose: data.purpose,
+      stellar_tx_hash: data.stellar_tx_hash ?? data.stellarTxHash,
+    }),
   getProvenance: (id: string) =>
     api.get<ApiResponse<ProvenanceRecord[]>>(`/api/v1/donations/${id}/provenance`),
 };
