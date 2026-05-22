@@ -148,7 +148,7 @@ async def _donation_totals(db: AsyncSession, campaign_id: str) -> tuple[float, i
 
 
 def _format_php(amount: float) -> str:
-    return f"₱{round(amount):,}"
+    return f"₱{amount:,.2f}"
 
 
 def _serialize_public_campaign(
@@ -168,6 +168,7 @@ def _serialize_public_campaign(
     source: str,
     organizer_id: UUID | None = None,
     organizer_name: str | None = None,
+    soroban_campaign_id: int | None = None,
 ) -> dict:
     return {
         "id": campaign_id,
@@ -187,6 +188,7 @@ def _serialize_public_campaign(
         "institution": institution,
         "location": location,
         "image_src": image_src,
+        "soroban_campaign_id": soroban_campaign_id,
         "updated_at": updated_at,
         "source": source,
     }
@@ -248,6 +250,26 @@ def _change_log_payload(change: CampaignDriveChange, campaign: CampaignDrive, ac
     }
 
 
+def _delete_request_status(change: CampaignDriveChange) -> str | None:
+    if "delete_request" not in (change.changed_fields or []):
+        return None
+    payload = (change.changes or {}).get("delete_request") or {}
+    return payload.get("status")
+
+
+async def _approved_delete_campaign_ids(db: AsyncSession) -> set[UUID]:
+    rows = (
+        await db.execute(
+            select(CampaignDriveChange)
+        )
+    ).scalars().all()
+    return {
+        change.campaign_id
+        for change in rows
+        if _delete_request_status(change) == "approved"
+    }
+
+
 async def _serialize_static_campaigns(
     db: AsyncSession,
     user: User | None = None,
@@ -288,6 +310,7 @@ async def _static_drives_for_user(db: AsyncSession, user: User) -> list[dict]:
 
 
 async def _public_campaigns(db: AsyncSession) -> list[dict]:
+    deleted_ids = await _approved_delete_campaign_ids(db)
     drives = (
         await db.execute(
             select(CampaignDrive)
@@ -298,6 +321,8 @@ async def _public_campaigns(db: AsyncSession) -> list[dict]:
 
     items = await _serialize_static_campaigns(db)
     for drive in drives:
+        if drive.id in deleted_ids:
+            continue
         items.append(await _serialize_drive(db, drive))
     items.sort(key=lambda item: item["updated_at"], reverse=True)
     return items
@@ -470,6 +495,99 @@ async def campaign_change_log(
     }
 
 
+@router.get("/admin/delete-requests")
+async def campaign_delete_requests(
+    limit: int = 25,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    rows = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .order_by(CampaignDriveChange.created_at.desc())
+        )
+    ).all()
+    rows = [row for row in rows if "delete_request" in (row[0].changed_fields or [])][: min(max(limit, 1), 100)]
+
+    return {
+        "success": True,
+        "data": [_change_log_payload(change, campaign, actor) for change, campaign, actor in rows],
+    }
+
+
+@router.post("/admin/delete-requests/{request_id}/approve")
+async def approve_campaign_delete_request(
+    request_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .where(CampaignDriveChange.id == request_id)
+        )
+    ).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Delete request not found.")
+
+    change, campaign, actor = row
+    if _delete_request_status(change) != "pending":
+        raise HTTPException(status_code=400, detail="Delete request is no longer pending.")
+
+    change.changes = {
+        **(change.changes or {}),
+        "delete_request": {
+            **((change.changes or {}).get("delete_request") or {}),
+            "status": "approved",
+            "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+    change.summary = f"Admin approved deletion request for {campaign.title}."
+    campaign.status = CampaignDriveStatus.draft
+    await db.commit()
+    await db.refresh(change)
+    return {"success": True, "message": "Delete request approved", "data": _change_log_payload(change, campaign, actor)}
+
+
+@router.post("/admin/delete-requests/{request_id}/reject")
+async def reject_campaign_delete_request(
+    request_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .where(CampaignDriveChange.id == request_id)
+        )
+    ).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Delete request not found.")
+
+    change, campaign, actor = row
+    if _delete_request_status(change) != "pending":
+        raise HTTPException(status_code=400, detail="Delete request is no longer pending.")
+
+    change.changes = {
+        **(change.changes or {}),
+        "delete_request": {
+            **((change.changes or {}).get("delete_request") or {}),
+            "status": "rejected",
+            "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+    change.summary = f"Admin rejected deletion request for {campaign.title}."
+    await db.commit()
+    await db.refresh(change)
+    return {"success": True, "message": "Delete request rejected", "data": _change_log_payload(change, campaign, actor)}
+
+
 @router.get("/proof-center")
 async def public_proof_center(db: AsyncSession = Depends(get_db)):
     campaigns = await _public_campaigns(db)
@@ -560,6 +678,7 @@ async def my_campaigns(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    deleted_ids = await _approved_delete_campaign_ids(db)
     db_drives = (
         await db.execute(
             select(CampaignDrive)
@@ -570,9 +689,63 @@ async def my_campaigns(
 
     items = await _static_drives_for_user(db, user)
     for drive in db_drives:
+        if drive.id in deleted_ids:
+            continue
         items.append(await _serialize_drive(db, drive))
     items.sort(key=lambda item: item["updated_at"], reverse=True)
     return {"success": True, "data": items}
+
+
+@router.post("/{campaign_id}/delete-request")
+async def request_campaign_deletion(
+    campaign_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    drive = (
+        await db.execute(
+            select(CampaignDrive).where(
+                CampaignDrive.id == campaign_id,
+                CampaignDrive.organizer_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not drive:
+        raise HTTPException(status_code=404, detail="Campaign not found or you do not have permission to delete it.")
+
+    existing = (
+        await db.execute(
+            select(CampaignDriveChange).where(
+                CampaignDriveChange.campaign_id == drive.id,
+                CampaignDriveChange.actor_id == user.id,
+            ).order_by(CampaignDriveChange.created_at.desc())
+        )
+    ).scalars().all()
+    existing = next((change for change in existing if "delete_request" in (change.changed_fields or [])), None)
+    if existing and _delete_request_status(existing) == "pending":
+        return {
+            "success": True,
+            "message": "Delete request already pending",
+            "data": _change_log_payload(existing, drive, user),
+        }
+
+    change = CampaignDriveChange(
+        campaign_id=drive.id,
+        actor_id=user.id,
+        changed_fields=["delete_request"],
+        changes={
+            "delete_request": {
+                "status": "pending",
+                "requested_title": drive.title,
+                "requested_at": datetime.now(timezone.utc).isoformat(),
+            }
+        },
+        summary=f"{user.name} requested deletion review for {drive.title}.",
+    )
+    db.add(change)
+    await db.commit()
+    await db.refresh(change)
+    return {"success": True, "message": "Delete request sent to admin", "data": _change_log_payload(change, drive, user)}
 
 
 @router.patch("/{campaign_id}")

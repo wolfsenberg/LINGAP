@@ -1,4 +1,5 @@
 from uuid import UUID
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -40,7 +41,7 @@ async def current_xlm_to_php_rate() -> tuple[float, str]:
                 return rate, "coingecko_live"
     except Exception:
         pass
-    return settings.XLM_TO_PHP_RATE, "demo_fallback"
+    return settings.XLM_TO_PHP_RATE, "configured_rate"
 
 
 def xlm_to_php(amount_xlm: float, rate: float) -> float:
@@ -113,7 +114,7 @@ async def get_recent_transactions(
     ).scalars().all()
 
 
-async def next_demo_reference(db: AsyncSession, method: BalancePaymentMethod) -> str:
+async def next_ledger_reference(db: AsyncSession, method: BalancePaymentMethod) -> str:
     count = (
         await db.execute(
             select(func.count()).select_from(BalanceTransaction).where(
@@ -122,7 +123,8 @@ async def next_demo_reference(db: AsyncSession, method: BalancePaymentMethod) ->
             )
         )
     ).scalar() or 0
-    return f"{method.value.upper()}-DEMO-2026-{int(count) + 1:03d}"
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    return f"{method.value.upper()}-{stamp}-{int(count) + 1:04d}"
 
 
 async def create_confirmed_top_up(
@@ -138,9 +140,9 @@ async def create_confirmed_top_up(
         amount_xlm=amount_xlm,
         amount_php=xlm_to_php(amount_xlm, rate),
         payment_method=method,
-        payment_reference=await next_demo_reference(db, method),
+        payment_reference=await next_ledger_reference(db, method),
         payment_status=BalancePaymentStatus.confirmed,
-        note="Simulated MVP payment confirmation. Mirrors to Stellar/Soroban ledger service when contract support is ready.",
+        note="Payment confirmation credited to the LINGAP balance ledger.",
     )
     db.add(tx)
     await db.commit()
@@ -203,7 +205,7 @@ async def simulate_top_up(
     if method not in SIMULATED_TOPUP_METHODS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Only PDAX, GCash, and Maya use simulated MVP confirmations. Use Stellar Wallet from the wallet flow.",
+            detail="PDAX, GCash, and Maya are handled through the top-up confirmation flow. Use Stellar Wallet from the wallet flow.",
         )
 
     if body.amount_xlm is None and body.amount_php is None:

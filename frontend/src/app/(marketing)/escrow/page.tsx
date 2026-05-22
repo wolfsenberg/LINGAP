@@ -17,14 +17,14 @@ import {
 } from "lucide-react";
 import { campaignsApi, type CampaignEscrowApi } from "@/lib/api";
 import { CAMPAIGNS } from "@/lib/campaigns";
-import { getStellarExpertTxUrl } from "@/lib/stellar";
+import { formatLedgerReference, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
 
 function formatPeso(amount: number) {
   return `₱${Math.round(amount).toLocaleString()}`;
 }
 
 function formatXlm(amount: number) {
-  return `${amount.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM`;
+  return `${amount.toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`;
 }
 
 function shortHash(hash: string) {
@@ -78,7 +78,9 @@ export default function EscrowPage() {
   const summary = escrow?.summary;
   const transactions = escrow?.transactions ?? [];
   const activeContractUrl = transactions[0]
-    ? getStellarExpertTxUrl(transactions[0].stellar_tx_hash)
+    ? isStellarTxHash(transactions[0].stellar_tx_hash)
+      ? getStellarExpertTxUrl(transactions[0].stellar_tx_hash)
+      : contractExplorerUrl
     : contractExplorerUrl;
 
   const chainSteps = useMemo(
@@ -138,7 +140,7 @@ export default function EscrowPage() {
             </div>
           </div>
           <p style={{ color: "rgba(255,255,255,.65)", fontSize: 16, marginBottom: 24 }}>
-            Campaign-specific escrow records. Totals below come from confirmed Stellar transaction hashes recorded by LINGAP.
+            Campaign-specific escrow records. Totals below come from confirmed LINGAP ledger entries and Stellar-linked references.
           </p>
           <div className="flex gap-12 esc-hero-badges" style={{ flexWrap: "wrap" }}>
             <span className="badge badge-emerald"><Star size={11} /> Stellar {network === "public" ? "Mainnet" : "Testnet"}</span>
@@ -220,13 +222,13 @@ export default function EscrowPage() {
 
           {transactions.length === 0 ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text3)", border: "1px dashed var(--border2)", borderRadius: 12 }}>
-              No confirmed Stellar donations for this campaign yet. Once a donor completes a Freighter transaction and the backend verifies the tx hash, it will appear here.
+              No confirmed donations for this campaign yet. Once a donor completes a LINGAP balance or wallet transaction, it will appear here.
             </div>
           ) : (
             transactions.map((tx) => (
               <a
                 key={tx.stellar_tx_hash}
-                href={getStellarExpertTxUrl(tx.stellar_tx_hash)}
+                href={isStellarTxHash(tx.stellar_tx_hash) ? getStellarExpertTxUrl(tx.stellar_tx_hash) : contractExplorerUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="tx-card"
@@ -240,10 +242,10 @@ export default function EscrowPage() {
                     Donation Received - Escrow Tracked
                   </div>
                   <div className="tx-hash">
-                    STELLAR:{shortHash(tx.stellar_tx_hash)} - {new Date(tx.created_at).toLocaleString()}
+                    REF:{shortHash(formatLedgerReference(tx.stellar_tx_hash))} - {new Date(tx.created_at).toLocaleString()}
                   </div>
                   <div style={{ marginTop: 6 }}>
-                    <span className="badge badge-emerald" style={{ fontSize: 11 }}>Confirmed on Stellar</span>
+                    <span className="badge badge-emerald" style={{ fontSize: 11 }}>{isStellarTxHash(tx.stellar_tx_hash) ? "Confirmed on Stellar" : "Ledger Confirmed"}</span>
                   </div>
                 </div>
                 <div className="text-right">
@@ -257,7 +259,7 @@ export default function EscrowPage() {
           <div style={{ marginTop: 20, padding: 16, background: "var(--bg)", borderRadius: 10, border: "1px dashed var(--border2)", display: "flex", gap: 10, alignItems: "flex-start" }}>
             <ShieldCheck size={20} color="var(--canopy)" strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6 }}>
-              <strong style={{ color: "var(--forest)" }}>This view is campaign-specific and centralized.</strong> It only displays donations recorded in the backend with confirmed Stellar transaction hashes, so every visible entry can be checked on Stellar Explorer.
+              <strong style={{ color: "var(--forest)" }}>This view is campaign-specific and centralized.</strong> It displays confirmed LINGAP ledger entries and links on-chain references to Stellar Explorer when available.
             </div>
           </div>
         </div>

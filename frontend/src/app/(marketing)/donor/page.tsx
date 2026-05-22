@@ -45,7 +45,7 @@ import { useAuthStore } from "@/store/authStore";
 import type { Donation } from "@/types";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 import TopUpModal from "@/components/balance/TopUpModal";
-import { getStellarExpertContractUrl, getStellarExpertTxUrl } from "@/lib/stellar";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
 
 const XLM_TO_PHP = 8.93;
 
@@ -61,7 +61,7 @@ function formatPeso(value: number) {
 }
 
 function formatXlm(value: number) {
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM`;
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`;
 }
 
 function formatPhp(value: number) {
@@ -96,8 +96,8 @@ function transactionTitle(tx: BalanceTransactionApi) {
 }
 
 function stellarTransactionUrl(tx: BalanceTransactionApi) {
-  if (tx.stellar_tx_hash && !tx.stellar_tx_hash.startsWith("LINGAP-DEMO")) {
-    return getStellarExpertTxUrl(tx.stellar_tx_hash);
+  if (isStellarTxHash(tx.stellar_tx_hash)) {
+    return getStellarExpertTxUrl(tx.stellar_tx_hash || "");
   }
   return getStellarExpertContractUrl();
 }
@@ -250,8 +250,8 @@ export default function DonorPage() {
         badge: donation.blockchainConfirmed ? "badge-emerald" : "badge-gold",
         badgeText: donation.blockchainConfirmed ? "Verified" : "Pending",
         escrow: donation.disbursed ? "Released from escrow" : "Tracked in donation vault",
-        stellar: donation.stellarTxHash
-          ? `${donation.stellarTxHash.slice(0, 10)}...${donation.stellarTxHash.slice(-6)}`
+          stellar: donation.stellarTxHash
+          ? `${formatLedgerReference(donation.stellarTxHash).slice(0, 10)}...${formatLedgerReference(donation.stellarTxHash).slice(-6)}`
           : "No tx hash",
         done: donation.blockchainConfirmed,
       })),
@@ -331,7 +331,7 @@ export default function DonorPage() {
               <div className="transparency-icon"><Network size={17} strokeWidth={1.8} /></div>
               <div className="transparency-label">XLM / PHP Converter</div>
               <div className="transparency-value">1 XLM = {formatPhp(conversionRate)}</div>
-              <div className="transparency-sub">Demo rate configured by backend</div>
+              <div className="transparency-sub">Rate synced by backend</div>
             </div>
           </div>
 
@@ -346,11 +346,11 @@ export default function DonorPage() {
                       {formatDate(tx.created_at)} · {formatXlm(tx.amount_xlm)} ≈ {formatPhp(tx.amount_php)}
                     </div>
                     <div className="donation-proof-row">
-                      <span><Landmark size={12} /> {tx.payment_reference}</span>
+                      <span><Landmark size={12} /> {formatLedgerReference(tx.payment_reference)}</span>
                       <span><CheckCircle2 size={12} /> {tx.payment_status}</span>
                       {stellarTransactionUrl(tx) && (
                         <a href={stellarTransactionUrl(tx) ?? undefined} target="_blank" rel="noreferrer" style={{ color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
-                          <Network size={12} /> Stellar reference
+                          <Network size={12} /> {isStellarTxHash(tx.stellar_tx_hash) ? "Stellar transaction" : "Vault reference"}
                         </a>
                       )}
                     </div>

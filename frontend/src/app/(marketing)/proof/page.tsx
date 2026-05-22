@@ -14,7 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { campaignsApi, type ProofCenterApi } from "@/lib/api";
-import { getStellarExpertTxUrl } from "@/lib/stellar";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
 
 type Filter = "All" | "Transactions" | "Receipts" | "Photos" | "Documents";
 
@@ -27,8 +27,9 @@ function formatDate(value: string) {
 }
 
 function shortHash(hash?: string | null) {
-  if (!hash) return "No Stellar anchor";
-  return `${hash.slice(0, 10)}...${hash.slice(-8)}`;
+  if (!hash) return "No ledger anchor";
+  const value = formatLedgerReference(hash);
+  return `${value.slice(0, 10)}...${value.slice(-8)}`;
 }
 
 function iconForKind(kind: string) {
@@ -208,7 +209,11 @@ export default function ProofPage() {
             {filteredDocuments.map((proof) => {
               const Icon = iconForKind(proof.kind);
               const isTx = proof.source === "confirmed_donation";
-              const txHref = proof.stellar_tx_hash ? getStellarExpertTxUrl(proof.stellar_tx_hash) : undefined;
+              const txHref = isStellarTxHash(proof.stellar_tx_hash)
+                ? getStellarExpertTxUrl(proof.stellar_tx_hash || "")
+                : proof.stellar_tx_hash
+                  ? getStellarExpertContractUrl()
+                  : undefined;
               return (
                 <div key={proof.id} className="proof-card">
                   <div className="proof-thumb" style={{ background: isTx ? "linear-gradient(135deg,rgba(74,155,106,.1),rgba(61,122,82,.1))" : "linear-gradient(135deg,rgba(200,134,10,.1),rgba(160,113,74,.1))" }}>

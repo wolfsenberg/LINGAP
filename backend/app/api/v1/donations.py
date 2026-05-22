@@ -19,6 +19,7 @@ from app.stellar.ledger_service import record_donation
 from app.certificates.service import create_certificate_for_donation
 import uuid
 import logging
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +30,9 @@ def _php(amount_xlm: float) -> float:
     return round(amount_xlm * settings.XLM_TO_PHP_RATE, 2)
 
 
-def _demo_donation_hash() -> str:
-    return f"LINGAP-DEMO-DON-{uuid.uuid4().hex[:28]}"
+def _ledger_donation_reference() -> str:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+    return f"LNGP-DON-{stamp}-{uuid.uuid4().hex[:12].upper()}"
 
 
 def _read(d: Donation, donor_name: str, balance_tx: BalanceTransaction | None = None) -> dict:
@@ -155,7 +157,7 @@ async def create_donation(
         }
 
     balance_tx: BalanceTransaction | None = None
-    tx_hash = body.stellar_tx_hash or _demo_donation_hash()
+    tx_hash = body.stellar_tx_hash or _ledger_donation_reference()
     blockchain_confirmed = False
 
     if body.spend_balance:

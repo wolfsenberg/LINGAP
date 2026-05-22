@@ -34,7 +34,7 @@ const methods: Array<{
 ];
 
 function formatXlm(value: number) {
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM`;
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`;
 }
 
 function formatPhp(value: number) {
@@ -76,7 +76,7 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
     }
 
     if (method === "stellar_wallet") {
-      toast("Direct Stellar Wallet top-up placeholder is ready for the on-chain flow.");
+      toast("Connect Stellar Wallet to continue with a direct on-chain top-up.");
       return;
     }
 
@@ -85,8 +85,8 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
     try {
       const res = await balanceApi.simulateTopUp({
         paymentMethod: method,
-        amountXlm: mode === "xlm" ? amountXlm : undefined,
-        amountPhp: mode === "php" ? amountPhp : undefined,
+        amountXlm: mode === "xlm" ? Number(amountXlm.toFixed(2)) : undefined,
+        amountPhp: mode === "php" ? Number(amountPhp.toFixed(2)) : undefined,
       });
       const tx = res.data.data.top_up;
       setConfirmedRef(tx.payment_reference);
@@ -115,7 +115,7 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
         <div className="section-label">LINGAP WALLET</div>
         <h2 style={{ textAlign: "left" }}>Top Up Your LINGAP Balance</h2>
         <p style={{ marginLeft: 0, maxWidth: 540 }}>
-          Choose a payment channel to add XLM to your LINGAP balance. For this MVP, PDAX, GCash, and Maya use simulated confirmations, while Stellar Wallet represents a direct on-chain flow.
+          Choose a payment channel to add XLM to your LINGAP balance. PDAX, GCash, and Maya create payment confirmations, while Stellar Wallet represents a direct on-chain flow.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 10, marginBottom: 16 }}>
@@ -179,7 +179,7 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
           {connected && publicKey ? `Connected wallet: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}` : "Connect Stellar Wallet to continue before any top-up is confirmed."}
           {stellarVaultUrl && (
             <a href={stellarVaultUrl} target="_blank" rel="noreferrer" style={{ display: "block", color: "var(--canopy)", fontWeight: 800, marginTop: 6, textDecoration: "none" }}>
-              View LINGAP vault reference on Stellar
+              View LINGAP vault on Stellar
             </a>
           )}
         </div>
@@ -191,7 +191,7 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
         )}
 
         <button type="button" onClick={handleConfirm} disabled={submitting} className="btn btn-emerald btn-lg" style={{ width: "100%", justifyContent: "center" }}>
-          {submitting ? "Confirming..." : !connected ? "Connect Wallet to Continue" : method === "stellar_wallet" ? "Continue with Stellar Wallet" : "Confirm Simulated Top-up"}
+          {submitting ? "Confirming..." : !connected ? "Connect Wallet to Continue" : method === "stellar_wallet" ? "Continue with Stellar Wallet" : "Confirm Top-up"}
         </button>
       </div>
     </div>

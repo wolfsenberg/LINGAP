@@ -16,6 +16,7 @@ export type Milestone = {
 export type Campaign = {
   id: number;
   slug: string;
+  sorobanCampaignId?: number | null;
   category: "Community" | "Animal Rescue" | "Disaster Relief" | "Medical" | "Education";
   urgencyLabel: string | null;
   urgencyClass: string | null;
@@ -49,6 +50,7 @@ export type Campaign = {
 export type PublicCampaignSummary = {
   id: string;
   slug: string;
+  soroban_campaign_id?: number | null;
   title: string;
   description: string;
   category: string;
@@ -82,6 +84,7 @@ export function applyCampaignSummary(campaign: Campaign, summary?: PublicCampaig
     goalLabel: summary.goal_label ?? pesoLabel(summary.goal_amount),
     donors: summary.donors,
     pct: summary.progress,
+    sorobanCampaignId: summary.soroban_campaign_id ?? campaign.sorobanCampaignId ?? null,
   };
 }
 

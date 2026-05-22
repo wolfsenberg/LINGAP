@@ -18,7 +18,7 @@ import {
   Users,
 } from "lucide-react";
 import { profilesApi, type PublicProfileApi } from "@/lib/api";
-import { getStellarExpertTxUrl } from "@/lib/stellar";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 
 function formatPeso(value: number) {
@@ -26,7 +26,7 @@ function formatPeso(value: number) {
 }
 
 function formatXlm(value: number) {
-  return `${value.toLocaleString(undefined, { maximumFractionDigits: 7 })} XLM`;
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`;
 }
 
 function formatDate(value?: string | null) {
@@ -39,7 +39,8 @@ function formatDate(value?: string | null) {
 }
 
 function shortHash(hash: string) {
-  return `${hash.slice(0, 10)}...${hash.slice(-6)}`;
+  const value = formatLedgerReference(hash);
+  return `${value.slice(0, 10)}...${value.slice(-6)}`;
 }
 
 export default function PublicProfilePage() {
@@ -213,7 +214,7 @@ export default function PublicProfilePage() {
                   profile.activity.map((item) => (
                     <a
                       key={item.id}
-                      href={getStellarExpertTxUrl(item.stellar_tx_hash)}
+                      href={isStellarTxHash(item.stellar_tx_hash) ? getStellarExpertTxUrl(item.stellar_tx_hash) : getStellarExpertContractUrl() || "#"}
                       target="_blank"
                       rel="noreferrer"
                       className="donation-row profile-activity-row"
@@ -227,7 +228,7 @@ export default function PublicProfilePage() {
                         </div>
                       </div>
                       <span className="badge badge-emerald">
-                        Stellar <ExternalLink size={10} />
+                        {isStellarTxHash(item.stellar_tx_hash) ? "Stellar" : "Ledger"} <ExternalLink size={10} />
                       </span>
                     </a>
                   ))

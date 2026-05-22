@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowLeft, Building2, FileText, ImagePlus, Landmark, MapPin, Save, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Building2, FileText, ImagePlus, Landmark, MapPin, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { campaignsApi, type CampaignDriveApi } from "@/lib/api";
 
 const categories = ["Medical", "Relief", "Education", "Community", "Animal Rescue", "Disaster Relief"];
@@ -15,6 +15,7 @@ export default function EditCampaignPage() {
   const [campaign, setCampaign] = useState<CampaignDriveApi | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [requestingDelete, setRequestingDelete] = useState(false);
   const [category, setCategory] = useState("Medical");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -96,6 +97,22 @@ export default function EditCampaignPage() {
       toast.error(error instanceof Error ? error.message : "Campaign update failed.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteRequest() {
+    if (!campaign) return;
+    const confirmed = window.confirm("Send this campaign to admin for deletion review?");
+    if (!confirmed) return;
+    setRequestingDelete(true);
+    try {
+      await campaignsApi.requestDelete(campaign.id);
+      toast.success("Delete request sent to admin.");
+      router.push("/donor#organized-drives");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to request campaign deletion.");
+    } finally {
+      setRequestingDelete(false);
     }
   }
 
@@ -216,6 +233,18 @@ export default function EditCampaignPage() {
                 <span className="badge badge-navy">{campaign.category}</span>
                 <span className="badge badge-emerald">{campaign.status}</span>
               </div>
+            </section>
+
+            <section className="card" style={{ borderColor: "rgba(220,38,38,.18)", background: "rgba(220,38,38,.025)" }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--forest)", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                <Trash2 size={18} color="#DC2626" /> Delete request
+              </h2>
+              <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6, marginBottom: 12 }}>
+                Deletion needs admin approval so campaign history and donor records remain auditable.
+              </p>
+              <button type="button" onClick={handleDeleteRequest} disabled={requestingDelete} className="btn btn-outline" style={{ width: "100%", justifyContent: "center", color: "#991B1B", borderColor: "rgba(220,38,38,.24)" }}>
+                <Trash2 size={14} /> {requestingDelete ? "Sending..." : "Request Deletion"}
+              </button>
             </section>
 
             <div className="flex" style={{ flexDirection: "column", gap: 8 }}>
