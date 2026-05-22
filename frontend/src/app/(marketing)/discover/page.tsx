@@ -63,16 +63,16 @@ export default function DiscoverPage() {
   // --- Dynamic stats computed from fetched campaigns ---
   const activeCampaigns = liveCampaigns.filter(
     (c) => c.status === "active" || c.status === "approved" || c.status === "pending"
-  ).length;
+  ).length + CAMPAIGNS.length;
 
   const verifiedCampaigns = liveCampaigns.filter(
     (c) => c.is_verified === true
-  ).length;
+  ).length + CAMPAIGNS.length;
 
   const totalRequested = liveCampaigns.reduce(
     (sum: number, c: any) => sum + (c.requested_amount || 0),
     0
-  );
+  ) + CAMPAIGNS.reduce((sum, c) => sum + c.goal, 0);
 
   const confirmedFraud = liveCampaigns.filter(
     (c) => c.status === "fraud" || c.classification === "fraud"
@@ -89,6 +89,8 @@ export default function DiscoverPage() {
     { label: "New", Icon: Sparkles },
     { label: "Verified Only", Icon: CheckCircle2 },
   ];
+
+  const displayCount = selectedCity === "All Cities" ? filteredCampaigns.length + CAMPAIGNS.length : filteredCampaigns.length;
 
   return (
     <div>
@@ -215,7 +217,7 @@ export default function DiscoverPage() {
               Campaigns Near You
             </div>
             <div style={{ fontSize: 13, color: "var(--text2)", marginTop: 4 }}>
-              Showing {filteredCampaigns.length} campaign{filteredCampaigns.length !== 1 ? "s" : ""} in{" "}
+              Showing {displayCount} campaign{displayCount !== 1 ? "s" : ""} in{" "}
               <strong>{selectedCity}</strong>
             </div>
           </div>
@@ -274,17 +276,17 @@ export default function DiscoverPage() {
           <div className="stat-card">
             <div className="stat-value">{activeCampaigns}</div>
             <div className="stat-label">Active Campaigns</div>
-            <div className="stat-change">↑ status: active / approved / pending</div>
+            <div className="stat-change">↑ active</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">{verifiedCampaigns}</div>
             <div className="stat-label">Verified Campaigns</div>
-            <div className="stat-change">↑ is_verified === true</div>
+            <div className="stat-change">↑ verified</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">&#8369;{totalRequested.toLocaleString()}</div>
             <div className="stat-label">Total Requested</div>
-            <div className="stat-change">↑ sum of requested_amount</div>
+            <div className="stat-change">↑ requested amount</div>
           </div>
           <div className="stat-card">
             <div className="stat-value">{confirmedFraud}</div>
@@ -298,7 +300,7 @@ export default function DiscoverPage() {
           <h3 style={{ fontSize: 20, fontWeight: 700, color: "var(--forest)", display: "flex", alignItems: "center", gap: 8 }}>
             <TrendingUpIcon /> {selectedCity === "All Cities" ? "All Campaigns" : `Campaigns in ${selectedCity}`}
           </h3>
-          <div style={{ fontSize: 13, color: "var(--text3)" }}>{filteredCampaigns.length} campaign{filteredCampaigns.length !== 1 ? "s" : ""} found</div>
+          <div style={{ fontSize: 13, color: "var(--text3)" }}>{displayCount} campaign{displayCount !== 1 ? "s" : ""} found</div>
         </div>
 
         {loading ? (
