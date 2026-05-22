@@ -6,6 +6,7 @@ import {
   Keypair,
   Horizon,
   BASE_FEE,
+  Memo,
 } from "@stellar/stellar-sdk";
 
 const NETWORK = process.env.NEXT_PUBLIC_STELLAR_NETWORK as "testnet" | "mainnet";
@@ -46,7 +47,7 @@ export async function buildPaymentTransaction(
     Operation.payment({ destination: destinationPublicKey, asset, amount })
   );
 
-  if (memo) txBuilder.addMemo({ type: "text", value: memo } as never);
+  if (memo) txBuilder.addMemo(Memo.text(memo));
 
   txBuilder.setTimeout(180);
   return txBuilder.build();
