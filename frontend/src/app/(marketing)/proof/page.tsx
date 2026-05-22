@@ -174,6 +174,25 @@ export default function ProofPage() {
           </div>
         </div>
 
+        <div className="proof-legend">
+          <div className="proof-legend-title">Badge Verification System</div>
+          <div className="proof-legend-grid">
+            {[
+              { Icon: CheckCircle2, text: "VERIFIED", bg: "rgba(74,155,106,.06)", border: "rgba(74,155,106,.2)", color: "var(--forest-light)" },
+              { Icon: Clock, text: "AWAITING PROOF", bg: "rgba(200,134,10,.06)", border: "rgba(200,134,10,.2)", color: "var(--amber)" },
+              { Icon: AlertTriangle, text: "FLAGGED", bg: "rgba(220,38,38,.06)", border: "rgba(220,38,38,.2)", color: "#991B1B" },
+              { Icon: ShieldCheck, text: "STELLAR CONFIRMED", bg: "rgba(74,155,106,.06)", border: "rgba(74,155,106,.2)", color: "var(--forest-light)" },
+              { Icon: FileText, text: "DOC ANCHORED", bg: "rgba(200,134,10,.06)", border: "rgba(200,134,10,.2)", color: "var(--amber)" },
+              { Icon: XCircle, text: "NOT SHOWN IF FAKE", bg: "rgba(220,38,38,.06)", border: "rgba(220,38,38,.2)", color: "#991B1B" },
+            ].map((badge) => (
+              <div key={badge.text} className="proof-legend-item" style={{ background: badge.bg, borderColor: badge.border, color: badge.color }}>
+                <badge.Icon size={16} strokeWidth={1.8} />
+                <span>{badge.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {loading ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text3)" }}>Loading proof records...</div>
         ) : filteredDocuments.length === 0 ? (
@@ -219,27 +238,6 @@ export default function ProofPage() {
             })}
           </div>
         )}
-
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28, marginTop: 28 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: "var(--forest)", marginBottom: 20 }}>Badge Verification System</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(140px,1fr))", gap: 12 }}>
-            {[
-              { Icon: CheckCircle2, text: "VERIFIED", bg: "rgba(74,155,106,.06)", border: "rgba(74,155,106,.2)", color: "var(--forest-light)" },
-              { Icon: Clock, text: "AWAITING PROOF", bg: "rgba(200,134,10,.06)", border: "rgba(200,134,10,.2)", color: "var(--amber)" },
-              { Icon: AlertTriangle, text: "FLAGGED", bg: "rgba(220,38,38,.06)", border: "rgba(220,38,38,.2)", color: "#991B1B" },
-              { Icon: ShieldCheck, text: "STELLAR CONFIRMED", bg: "rgba(74,155,106,.06)", border: "rgba(74,155,106,.2)", color: "var(--forest-light)" },
-              { Icon: FileText, text: "DOC ANCHORED", bg: "rgba(200,134,10,.06)", border: "rgba(200,134,10,.2)", color: "var(--amber)" },
-              { Icon: XCircle, text: "NOT SHOWN IF FAKE", bg: "rgba(220,38,38,.06)", border: "rgba(220,38,38,.2)", color: "#991B1B" },
-            ].map((badge) => (
-              <div key={badge.text} style={{ textAlign: "center", padding: 16, background: badge.bg, border: `1px solid ${badge.border}`, borderRadius: 12 }}>
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
-                  <badge.Icon size={28} color={badge.color} strokeWidth={1.5} />
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: badge.color }}>{badge.text}</div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
