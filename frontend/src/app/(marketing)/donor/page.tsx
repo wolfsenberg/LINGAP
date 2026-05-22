@@ -21,11 +21,11 @@ import {
   Users,
 } from "lucide-react";
 import {
-  campaignsApi,
   donationsApi,
   donorsApi,
-  type CampaignDriveApi,
   type LeaderboardDonorApi,
+  profilesApi,
+  type PublicProfileCampaignApi,
 } from "@/lib/api";
 import { CAMPAIGNS } from "@/lib/campaigns";
 import {
@@ -72,7 +72,7 @@ function campaignNameFromPurpose(purpose?: string) {
 export default function DonorPage() {
   const user = useAuthStore((state) => state.user);
   const firstName = getFirstName(user?.name);
-  const [drives, setDrives] = useState<CampaignDriveApi[]>([]);
+  const [drives, setDrives] = useState<PublicProfileCampaignApi[]>([]);
   const [donations, setDonations] = useState<Donation[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardDonorApi[]>([]);
   const [impact, setImpact] = useState({
@@ -97,8 +97,9 @@ export default function DonorPage() {
       }
 
       try {
-        const [campaignRes, donationRes, leaderboardRes, impactRes] = await Promise.all([
-          campaignsApi.mine(),
+        if (!user?.id) return;
+        const [profileRes, donationRes, leaderboardRes, impactRes] = await Promise.all([
+          profilesApi.get(user.id),
           donationsApi.mine(1, 10),
           donorsApi.leaderboard(10),
           donorsApi.myImpact(),
@@ -117,22 +118,45 @@ export default function DonorPage() {
             // Keep it locally and retry on the next dashboard visit.
           }
         }
-        const [freshDonationRes, freshLeaderboardRes, freshImpactRes] = pending.length > 0
+        const [freshProfileRes, freshDonationRes, freshLeaderboardRes, freshImpactRes] = pending.length > 0
           ? await Promise.all([
+              profilesApi.get(user.id),
               donationsApi.mine(1, 10),
               donorsApi.leaderboard(10),
               donorsApi.myImpact(),
             ])
-          : [donationRes, leaderboardRes, impactRes];
-        setDrives(campaignRes.data.data);
+          : [profileRes, donationRes, leaderboardRes, impactRes];
+        const publicProfile = freshProfileRes.data.data;
+        const profileActivityFallback: Donation[] = (publicProfile?.activity ?? []).map((activity) => ({
+          id: activity.id,
+          donorId: user.id,
+          donorName: user.name,
+          amount: activity.amount,
+          asset: activity.asset,
+          purpose: `campaign:${activity.campaign_id}`,
+          stellarTxHash: activity.stellar_tx_hash,
+          blockchainConfirmed: true,
+          disbursed: false,
+          disbursedAmount: 0,
+          createdAt: activity.created_at,
+        }));
+        setDrives(publicProfile?.campaigns ?? []);
         const remainingPending = getPendingDonations(user?.id).map(toDonation);
         const backendHashes = new Set(freshDonationRes.data.items.map((donation) => donation.stellarTxHash));
-        setDonations([
+        const syncedDonations = [
           ...remainingPending.filter((donation) => !backendHashes.has(donation.stellarTxHash)),
           ...freshDonationRes.data.items,
-        ]);
+        ];
+        setDonations(syncedDonations.length > 0 ? syncedDonations : profileActivityFallback);
         setLeaderboard(freshLeaderboardRes.data.data);
-        setImpact(freshImpactRes.data.data);
+        setImpact(publicProfile ? {
+          name: publicProfile.user.display_name,
+          total_donated: publicProfile.impact.total_donated_xlm,
+          campaigns_helped: publicProfile.impact.donation_count,
+          lives_impacted: publicProfile.impact.total_donated_xlm > 0
+            ? Math.max(1, Math.floor(publicProfile.impact.total_donated_php / 2000))
+            : 0,
+        } : freshImpactRes.data.data);
       } catch {
         if (!active) return;
         setDrives([]);

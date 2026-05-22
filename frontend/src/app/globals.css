@@ -394,6 +394,11 @@ select.form-input{appearance:none;background-image:linear-gradient(45deg,transpa
 .profile-card-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid rgba(222,216,202,.82);padding-top:12px}
 .community-note{display:flex;gap:10px;align-items:flex-start;margin-top:24px;background:rgba(200,134,10,.07);border:1px solid rgba(200,134,10,.18);border-radius:var(--r-sm);padding:14px;color:var(--text2);font-size:13px;line-height:1.55}
 .community-note strong{color:var(--forest)}
+.community-leaderboard-panel{margin-bottom:28px}
+.community-leaderboard-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.community-leaderboard-item{display:grid;grid-template-columns:36px 40px minmax(0,1fr) auto;align-items:center;gap:12px;background:#fffdf8;border:1px solid rgba(222,216,202,.82);border-radius:10px;padding:12px;text-decoration:none;color:inherit;transition:transform .18s,border-color .18s,background .18s}
+.community-leaderboard-item:hover{transform:translateY(-1px);border-color:rgba(74,155,106,.3);background:#fff}
+.community-leaderboard-item .lb-rank{width:auto}
 .profile-hero-grid{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:28px;align-items:end}
 .profile-back{color:#fff;border-color:rgba(255,255,255,.26);background:rgba(255,255,255,.08);margin-bottom:26px}
 .profile-hero-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -612,6 +617,7 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-v
   .proof-legend-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .community-hero,.profile-hero{padding:42px 28px}
   .community-stats,.profile-impact-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .community-leaderboard-grid{grid-template-columns:1fr}
   .profile-hero-grid,.profile-layout{grid-template-columns:1fr}
   .profile-hero-card{max-width:520px}
   .impact-dashboard-grid{grid-template-columns:1fr}
@@ -699,6 +705,8 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-v
   .community-search{padding:11px 13px}
   .community-stats,.profile-impact-grid{grid-template-columns:1fr}
   .profile-grid{grid-template-columns:1fr}
+  .community-leaderboard-item{grid-template-columns:30px 36px minmax(0,1fr);align-items:start}
+  .community-leaderboard-item .lb-amount{grid-column:3;margin-left:0}
   .profile-card{padding:16px}
   .profile-card-foot{align-items:flex-start;flex-direction:column}
   .profile-mini-stats{grid-template-columns:1fr}
