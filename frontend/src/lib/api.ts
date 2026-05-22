@@ -192,6 +192,7 @@ export type PublicProfileApi = {
     amount: number;
     asset: string;
     stellar_tx_hash: string;
+    blockchain_confirmed?: boolean;
     created_at: string;
   }>;
   badges: Array<{
