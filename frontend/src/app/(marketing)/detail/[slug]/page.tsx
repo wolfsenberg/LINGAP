@@ -218,8 +218,12 @@ export default function DetailPage() {
         {/* LEFT */}
         <div>
           {/* Hero image */}
-          <div className="detail-img" style={{ background: activeCampaign.heroGradient }}>
-            <Icon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />
+          <div className={`detail-img ${activeCampaign.imageSrc ? "has-photo" : ""}`} style={{ background: activeCampaign.heroGradient }}>
+            {activeCampaign.imageSrc ? (
+              <img className="detail-img-photo" src={activeCampaign.imageSrc} alt={activeCampaign.title} />
+            ) : (
+              <Icon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />
+            )}
           </div>
 
           {/* Badges */}

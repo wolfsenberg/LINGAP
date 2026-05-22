@@ -105,8 +105,12 @@ export default async function DiscoverPage() {
                   className="camp-card emerald-glow featured-camp"
                   style={{ textDecoration: "none" }}
                 >
-                  <div className="camp-img" style={{ background: c.heroGradient }}>
-                    <div className="camp-img-inner"><Icon size={48} strokeWidth={1.8} /></div>
+                  <div className={`camp-img ${c.imageSrc ? "has-photo" : ""}`} style={{ background: c.heroGradient }}>
+                    {c.imageSrc ? (
+                      <img className="camp-img-photo" src={c.imageSrc} alt={c.title} />
+                    ) : (
+                      <div className="camp-img-inner"><Icon size={48} strokeWidth={1.8} /></div>
+                    )}
                     {c.urgencyLabel && (
                       <div style={{ position: "absolute", top: 12, left: 12 }}>
                         <span className={`badge ${c.urgencyClass}`}>{c.urgencyLabel}</span>

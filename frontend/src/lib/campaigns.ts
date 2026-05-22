@@ -40,6 +40,7 @@ export type Campaign = {
   transparencyScore: number;
   heroGradient: string;
   heroIcon: string;
+  imageSrc: string;
   accentColor: string;
   spending: SpendItem[];
   milestones: Milestone[];
@@ -78,6 +79,7 @@ export const CAMPAIGNS: Campaign[] = [
     transparencyScore: 92,
     heroGradient: "linear-gradient(135deg,#1a2a3a,#2d4a6a)",
     heroIcon: "🏠",
+    imageSrc: "/images/help_kuya_gino.png",
     accentColor: "var(--canopy)",
     spending: [
       { label: "🚪 Doors & Window Frames", pct: 55, amount: "₱8,250", bg: "linear-gradient(90deg,var(--forest),var(--forest-light))" },
@@ -124,6 +126,7 @@ export const CAMPAIGNS: Campaign[] = [
     transparencyScore: 90,
     heroGradient: "linear-gradient(135deg,#1a2a1a,#2d5a2d)",
     heroIcon: "🐱",
+    imageSrc: "/images/help_build_a_safe_shelter.png",
     accentColor: "var(--forest)",
     spending: [
       { label: "🏗️ Shelter Construction", pct: 50, amount: "₱450,000", bg: "linear-gradient(90deg,var(--forest),var(--forest-light))" },
@@ -171,6 +174,7 @@ export const CAMPAIGNS: Campaign[] = [
     transparencyScore: 87,
     heroGradient: "linear-gradient(135deg,#2a1a1a,#5a2d2d)",
     heroIcon: "🐾",
+    imageSrc: "/images/rescue_and_care.png",
     accentColor: "var(--amber)",
     spending: [
       { label: "🩺 Veterinary Care & Meds", pct: 45, amount: "₱23,085", bg: "linear-gradient(90deg,var(--amber),var(--amber-light))" },
