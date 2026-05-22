@@ -17,6 +17,7 @@ from app.models.balance_transaction import (
 )
 from app.models.user import User
 from app.schemas.balance import BalanceRead, BalanceTransactionRead, TopUpSimulateCreate
+from app.stellar.client import verify_native_payment
 from app.stellar.ledger_service import record_top_up
 
 router = APIRouter(tags=["balance"])
@@ -25,6 +26,13 @@ SIMULATED_TOPUP_METHODS = {
     BalancePaymentMethod.pdax,
     BalancePaymentMethod.gcash,
     BalancePaymentMethod.maya,
+}
+
+METHOD_LABELS = {
+    BalancePaymentMethod.pdax: "PDAX",
+    BalancePaymentMethod.gcash: "GCash",
+    BalancePaymentMethod.maya: "Maya",
+    BalancePaymentMethod.stellar_wallet: "Stellar Wallet",
 }
 
 
@@ -142,7 +150,7 @@ async def create_confirmed_top_up(
         payment_method=method,
         payment_reference=await next_ledger_reference(db, method),
         payment_status=BalancePaymentStatus.confirmed,
-        note="Payment confirmation credited to the LINGAP balance ledger.",
+        note=f"{METHOD_LABELS.get(method, method.value)} payment confirmation credited to the LINGAP balance ledger.",
     )
     db.add(tx)
     await db.commit()
@@ -202,12 +210,6 @@ async def simulate_top_up(
     user: User = Depends(get_current_user),
 ):
     method = _method_from_string(body.payment_method)
-    if method not in SIMULATED_TOPUP_METHODS:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="PDAX, GCash, and Maya are handled through the top-up confirmation flow. Use Stellar Wallet from the wallet flow.",
-        )
-
     if body.amount_xlm is None and body.amount_php is None:
         raise HTTPException(status_code=422, detail="Enter an amount in XLM or PHP.")
 
@@ -216,7 +218,55 @@ async def simulate_top_up(
     if amount_xlm <= 0:
         raise HTTPException(status_code=422, detail="Amount must be greater than 0.")
 
-    tx = await create_confirmed_top_up(db, user, method, round(float(amount_xlm), 7), rate)
+    amount_xlm = round(float(amount_xlm), 7)
+
+    if method == BalancePaymentMethod.stellar_wallet:
+        if not settings.LINGAP_RECEIVER_PUBLIC_KEY:
+            raise HTTPException(status_code=400, detail="LINGAP receiving wallet is not configured.")
+        if not body.sender_wallet or not body.stellar_tx_hash:
+            raise HTTPException(status_code=422, detail="Stellar Wallet top-up requires sender wallet and transaction hash.")
+        verification = await verify_native_payment(
+            body.stellar_tx_hash,
+            source_public_key=body.sender_wallet,
+            destination_public_key=settings.LINGAP_RECEIVER_PUBLIC_KEY,
+            expected_amount=amount_xlm,
+        )
+        if not verification.get("confirmed"):
+            raise HTTPException(status_code=400, detail=verification.get("reason") or "Stellar payment could not be verified.")
+        tx = BalanceTransaction(
+            user_id=user.id,
+            kind=BalanceTransactionKind.top_up,
+            amount_xlm=amount_xlm,
+            amount_php=xlm_to_php(amount_xlm, rate),
+            payment_method=method,
+            payment_reference=body.stellar_tx_hash,
+            payment_status=BalancePaymentStatus.confirmed,
+            stellar_tx_hash=body.stellar_tx_hash,
+            note=f"Direct Stellar Wallet top-up from {body.sender_wallet}.",
+        )
+        db.add(tx)
+        await db.commit()
+        await db.refresh(tx)
+        await record_top_up(tx)
+    else:
+        if method not in SIMULATED_TOPUP_METHODS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Payment method is not available for this top-up flow.",
+            )
+        if method in {BalancePaymentMethod.gcash, BalancePaymentMethod.maya} and not body.sender_reference:
+            raise HTTPException(status_code=422, detail=f"{METHOD_LABELS[method]} number is required.")
+        if method == BalancePaymentMethod.pdax and not (body.sender_reference or body.sender_name):
+            raise HTTPException(status_code=422, detail="PDAX account email or account name is required.")
+        tx = await create_confirmed_top_up(db, user, method, amount_xlm, rate)
+        if body.sender_reference or body.sender_name:
+            tx.note = (
+                f"{METHOD_LABELS[method]} confirmation credited to LINGAP balance ledger. "
+                f"Sender: {body.sender_reference or body.sender_name}."
+            )
+            await db.commit()
+            await db.refresh(tx)
+
     balance = await get_user_xlm_balance(db, user.id)
     return {
         "success": True,

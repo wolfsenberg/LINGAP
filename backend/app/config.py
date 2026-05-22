@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     STELLAR_NETWORK: str = "testnet"
     STELLAR_HORIZON_URL: str = "https://horizon-testnet.stellar.org"
     STELLAR_SOURCE_SECRET_KEY: str = ""
+    LINGAP_RECEIVER_PUBLIC_KEY: str = ""
     XLM_TO_PHP_RATE: float = 8.93
 
     CONTRACT_AID_PROVENANCE: str = "CC5EBH4P72CSGGSDM22UJSBHPV7G5BFFSQCDPAOGACQNG6KJWVZ5GDSC"
