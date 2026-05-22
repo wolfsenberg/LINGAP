@@ -28,6 +28,11 @@ import {
   type LeaderboardDonorApi,
 } from "@/lib/api";
 import { CAMPAIGNS } from "@/lib/campaigns";
+import {
+  getPendingDonations,
+  removePendingDonation,
+  toDonation,
+} from "@/lib/pendingDonations";
 import { getFirstName } from "@/lib/userName";
 import { useAuthStore } from "@/store/authStore";
 import type { Donation } from "@/types";
@@ -80,6 +85,17 @@ export default function DonorPage() {
     let active = true;
 
     async function loadImpactData() {
+      const pending = getPendingDonations(user?.id);
+      if (active && pending.length > 0) {
+        setDonations((current) => {
+          const existingHashes = new Set(current.map((donation) => donation.stellarTxHash));
+          return [
+            ...pending.filter((item) => !existingHashes.has(item.stellarTxHash)).map(toDonation),
+            ...current,
+          ];
+        });
+      }
+
       try {
         const [campaignRes, donationRes, leaderboardRes, impactRes] = await Promise.all([
           campaignsApi.mine(),
@@ -88,10 +104,35 @@ export default function DonorPage() {
           donorsApi.myImpact(),
         ]);
         if (!active) return;
+        for (const item of pending) {
+          try {
+            await donationsApi.create({
+              amount: item.amount,
+              asset: item.asset,
+              purpose: item.purpose,
+              stellarTxHash: item.stellarTxHash,
+            });
+            removePendingDonation(item.stellarTxHash);
+          } catch {
+            // Keep it locally and retry on the next dashboard visit.
+          }
+        }
+        const [freshDonationRes, freshLeaderboardRes, freshImpactRes] = pending.length > 0
+          ? await Promise.all([
+              donationsApi.mine(1, 10),
+              donorsApi.leaderboard(10),
+              donorsApi.myImpact(),
+            ])
+          : [donationRes, leaderboardRes, impactRes];
         setDrives(campaignRes.data.data);
-        setDonations(donationRes.data.items);
-        setLeaderboard(leaderboardRes.data.data);
-        setImpact(impactRes.data.data);
+        const remainingPending = getPendingDonations(user?.id).map(toDonation);
+        const backendHashes = new Set(freshDonationRes.data.items.map((donation) => donation.stellarTxHash));
+        setDonations([
+          ...remainingPending.filter((donation) => !backendHashes.has(donation.stellarTxHash)),
+          ...freshDonationRes.data.items,
+        ]);
+        setLeaderboard(freshLeaderboardRes.data.data);
+        setImpact(freshImpactRes.data.data);
       } catch {
         if (!active) return;
         setDrives([]);
@@ -104,7 +145,7 @@ export default function DonorPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [user?.id]);
 
   const latestDrives = drives.slice(0, 3);
   const hasMoreDrives = drives.length > latestDrives.length;

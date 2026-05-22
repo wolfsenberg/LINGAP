@@ -76,6 +76,21 @@ async def create_donation(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
+    existing = (
+        await db.execute(
+            select(Donation).where(
+                Donation.donor_id == user.id,
+                Donation.stellar_tx_hash == body.stellar_tx_hash,
+            )
+        )
+    ).scalar_one_or_none()
+    if existing:
+        return {
+            "success": True,
+            "message": "Donation already recorded",
+            "data": _read(existing, user.name),
+        }
+
     donation = Donation(
         donor_id=user.id,
         amount=body.amount,

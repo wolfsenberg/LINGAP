@@ -105,8 +105,28 @@ const normalizePaginatedDonations = (res: PaginatedResponse<ApiDonation>): Pagin
   items: res.items.map(normalizeDonation),
 });
 
+function getApiBaseUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
+  const productionUrl = "https://lingap.onrender.com";
+
+  if (typeof window === "undefined") {
+    return configuredUrl || productionUrl;
+  }
+
+  const isLocalFrontend =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1";
+  const isLocalApi =
+    !configuredUrl ||
+    configuredUrl.includes("localhost") ||
+    configuredUrl.includes("127.0.0.1");
+
+  if (!isLocalFrontend && isLocalApi) return productionUrl;
+  return configuredUrl || (isLocalFrontend ? "http://localhost:8000" : productionUrl);
+}
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: getApiBaseUrl(),
   headers: { "Content-Type": "application/json" },
 });
 

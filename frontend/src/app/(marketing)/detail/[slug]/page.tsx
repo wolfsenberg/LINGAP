@@ -13,6 +13,8 @@ import {
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import { CAMPAIGNS } from "@/lib/campaigns";
+import { addPendingDonation, removePendingDonation } from "@/lib/pendingDonations";
+import { useAuthStore } from "@/store/authStore";
 import {
   AlertCircle, CheckCircle2, Lock, Star, Handshake, MapPin, Calendar,
   Home, Cat, PawPrint, ShieldCheck, Clock, Users,
@@ -70,6 +72,7 @@ export default function DetailPage() {
   const slug = params?.slug as string;
 
   const campaign = CAMPAIGNS.find((c) => c.slug === slug);
+  const user = useAuthStore((state) => state.user);
   const { connected, publicKey, connect } = useFreighter();
   const [selectedAmount, setSelectedAmount] = useState(500);
   const [customAmount, setCustomAmount] = useState("");
@@ -191,6 +194,15 @@ export default function DetailPage() {
       if (!signedXdr) throw new Error("Freighter did not return a signed transaction.");
       const submitRes = await submitSignedTransactionXdr(signedXdr);
       const txHash = submitRes.hash;
+      const donationPurpose = `campaign:${activeCampaign.slug || activeCampaign.id}`;
+      addPendingDonation({
+        userId: user?.id,
+        amount: effectiveAmount,
+        asset: "XLM",
+        purpose: donationPurpose,
+        stellarTxHash: txHash,
+        createdAt: new Date().toISOString(),
+      });
       setConfirmedDonationXlm((current) => current + effectiveAmount);
       setLastTxHash(txHash);
       toast.success(`Donation confirmed! Tx: ${txHash.slice(0, 8)}…`);
@@ -198,9 +210,10 @@ export default function DetailPage() {
         await donationsApi.create({
           amount: effectiveAmount,
           asset: "XLM",
-          purpose: `campaign:${activeCampaign.slug || activeCampaign.id}`,
+          purpose: donationPurpose,
           stellarTxHash: txHash,
         });
+        removePendingDonation(txHash);
         toast.success("Donation synced to LINGAP dashboard.");
       } catch {
         toast.error("Donation sent, but dashboard sync failed. Check API/CORS settings.");

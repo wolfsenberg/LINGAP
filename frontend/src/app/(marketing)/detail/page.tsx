@@ -11,6 +11,8 @@ import {
   submitSignedTransactionXdr,
 } from "@/lib/stellar";
 import { CAMPAIGNS, getCampaign } from "@/lib/campaigns";
+import { addPendingDonation, removePendingDonation } from "@/lib/pendingDonations";
+import { useAuthStore } from "@/store/authStore";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import {
@@ -77,6 +79,7 @@ function DetailContent() {
   const campaignId = parseInt(params.get("id") ?? "0", 10);
   const campaign = getCampaign(campaignId) ?? CAMPAIGNS[0];
   const CampaignIcon = CATEGORY_ICON[campaign.category] ?? Hospital;
+  const user = useAuthStore((state) => state.user);
 
   const { connected, publicKey, connect } = useFreighter();
   const [tab, setTab] = useState<"stellar" | "php">("stellar");
@@ -120,6 +123,15 @@ function DetailContent() {
       if (!signedXdr) throw new Error("Freighter did not return a signed transaction.");
       const submitRes = await submitSignedTransactionXdr(signedXdr);
       const txHash = submitRes.hash;
+      const donationPurpose = `campaign:${campaign.slug}`;
+      addPendingDonation({
+        userId: user?.id,
+        amount: effectiveAmount,
+        asset: "XLM",
+        purpose: donationPurpose,
+        stellarTxHash: txHash,
+        createdAt: new Date().toISOString(),
+      });
       setConfirmedDonationXlm((current) => current + effectiveAmount);
       setLastTxHash(txHash);
       toast.success(`Donation confirmed! Tx: ${txHash.slice(0, 8)}…`);
@@ -127,9 +139,10 @@ function DetailContent() {
         await donationsApi.create({
           amount: effectiveAmount,
           asset: "XLM",
-          purpose: `campaign:${campaign.slug}`,
+          purpose: donationPurpose,
           stellarTxHash: txHash,
         });
+        removePendingDonation(txHash);
         toast.success("Donation synced to LINGAP dashboard.");
       } catch {
         toast.error("Donation sent, but dashboard sync failed. Check API/CORS settings.");
