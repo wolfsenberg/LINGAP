@@ -1,23 +1,37 @@
+import hashlib
+import os
+import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+import aiofiles
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_admin
 from app.models.aid_request import AidRequest
 from app.models.campaign_drive import CampaignDrive, CampaignDriveStatus
+from app.models.campaign_drive_change import CampaignDriveChange
 from app.models.donation import Donation
 from app.models.proof_artifact import ProofArtifact
 from app.models.user import User
-from app.schemas.campaign_drive import CampaignDriveCreate
+from app.schemas.campaign_drive import CampaignDriveCreate, CampaignDriveUpdate
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 STATIC_ORGANIZER_EMAIL = "geineldungao012@gmail.com"
 DEMO_XLM_TO_PHP = 10
+CAMPAIGN_UPLOAD_DIR = os.path.join(os.path.dirname(settings.UPLOAD_DIR), "campaigns")
+CAMPAIGN_IMAGE_MIME = {"image/png", "image/jpeg", "image/webp"}
+CAMPAIGN_IMAGE_EXT = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+}
 
 STATIC_CAMPAIGNS = [
     {
@@ -66,6 +80,57 @@ def _progress(raised: float, goal: float) -> int:
     if goal <= 0:
         return 0
     return min(100, round((raised / goal) * 100))
+
+
+async def _save_campaign_cover(upload: UploadFile, user: User) -> str:
+    mime = (upload.content_type or "").lower()
+    if mime not in CAMPAIGN_IMAGE_MIME:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Campaign cover must be a PNG, JPG, or WebP image.",
+        )
+
+    max_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
+    os.makedirs(CAMPAIGN_UPLOAD_DIR, exist_ok=True)
+
+    hasher = hashlib.sha256()
+    total = 0
+    temp_name = f".tmp-{uuid.uuid4().hex}"
+    temp_path = os.path.join(CAMPAIGN_UPLOAD_DIR, temp_name)
+
+    try:
+        async with aiofiles.open(temp_path, "wb") as out:
+            while True:
+                chunk = await upload.read(1024 * 64)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > max_bytes:
+                    raise HTTPException(
+                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                        detail=f"Campaign cover exceeds {settings.MAX_UPLOAD_MB} MB.",
+                    )
+                hasher.update(chunk)
+                await out.write(chunk)
+    except Exception:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+        raise
+
+    digest = hasher.hexdigest()
+    ext = CAMPAIGN_IMAGE_EXT[mime]
+    final_name = f"{user.id}-{digest[:16]}{ext}"
+    final_path = os.path.join(CAMPAIGN_UPLOAD_DIR, final_name)
+
+    if os.path.exists(final_path):
+        os.remove(temp_path)
+    else:
+        os.replace(temp_path, final_path)
+
+    return f"/api/v1/campaigns/uploads/{final_name}"
 
 
 async def _donation_totals(db: AsyncSession, campaign_id: str) -> tuple[float, int]:
@@ -149,6 +214,39 @@ async def _serialize_drive(db: AsyncSession, drive: CampaignDrive) -> dict:
         updated_at=drive.updated_at,
         source="database",
     )
+
+
+def _summarize_changes(changed_fields: list[str]) -> str:
+    labels = {
+        "title": "title",
+        "description": "story",
+        "category": "category",
+        "institution": "institution",
+        "location": "location",
+        "goal_amount": "target amount",
+        "image_src": "cover image",
+    }
+    readable = [labels.get(field, field) for field in changed_fields]
+    if not readable:
+        return "No visible campaign details changed."
+    if len(readable) == 1:
+        return f"Updated campaign {readable[0]}."
+    return f"Updated campaign {', '.join(readable[:-1])}, and {readable[-1]}."
+
+
+def _change_log_payload(change: CampaignDriveChange, campaign: CampaignDrive, actor: User) -> dict:
+    return {
+        "id": str(change.id),
+        "campaign_id": str(change.campaign_id),
+        "campaign_title": campaign.title,
+        "actor_id": str(change.actor_id),
+        "actor_name": actor.name,
+        "actor_email": actor.email,
+        "changed_fields": change.changed_fields,
+        "changes": change.changes,
+        "summary": change.summary,
+        "created_at": change.created_at,
+    }
 
 
 async def _serialize_static_campaigns(
@@ -324,6 +422,55 @@ async def public_campaigns(db: AsyncSession = Depends(get_db)):
     return {"success": True, "data": await _public_campaigns(db)}
 
 
+@router.post("/uploads/cover", status_code=201)
+async def upload_campaign_cover(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    url = await _save_campaign_cover(file, user)
+    return {"success": True, "data": {"url": url}}
+
+
+@router.get("/uploads/{filename}")
+async def get_campaign_upload(filename: str):
+    if "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    path = os.path.join(CAMPAIGN_UPLOAD_DIR, filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    media_type = "image/webp"
+    if filename.lower().endswith(".png"):
+        media_type = "image/png"
+    elif filename.lower().endswith((".jpg", ".jpeg")):
+        media_type = "image/jpeg"
+
+    return FileResponse(path, media_type=media_type)
+
+
+@router.get("/admin/change-log")
+async def campaign_change_log(
+    limit: int = 25,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    rows = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .order_by(CampaignDriveChange.created_at.desc())
+            .limit(min(max(limit, 1), 100))
+        )
+    ).all()
+
+    return {
+        "success": True,
+        "data": [_change_log_payload(change, campaign, actor) for change, campaign, actor in rows],
+    }
+
+
 @router.get("/proof-center")
 async def public_proof_center(db: AsyncSession = Depends(get_db)):
     campaigns = await _public_campaigns(db)
@@ -427,6 +574,65 @@ async def my_campaigns(
         items.append(await _serialize_drive(db, drive))
     items.sort(key=lambda item: item["updated_at"], reverse=True)
     return {"success": True, "data": items}
+
+
+@router.patch("/{campaign_id}")
+async def update_campaign(
+    campaign_id: UUID,
+    body: CampaignDriveUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    drive = (
+        await db.execute(
+            select(CampaignDrive).where(
+                CampaignDrive.id == campaign_id,
+                CampaignDrive.organizer_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not drive:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found or you do not have permission to edit it.",
+        )
+
+    incoming = body.model_dump(exclude_unset=True)
+    allowed_fields = ["title", "description", "category", "institution", "location", "goal_amount", "image_src"]
+    changes: dict[str, dict] = {}
+
+    for field in allowed_fields:
+        if field not in incoming:
+            continue
+        new_value = incoming[field]
+        if new_value is None and field != "image_src":
+            continue
+        old_value = getattr(drive, field)
+        comparable_old = float(old_value) if field == "goal_amount" and old_value is not None else old_value
+        comparable_new = float(new_value) if field == "goal_amount" and new_value is not None else new_value
+        if comparable_old == comparable_new:
+            continue
+        changes[field] = {"before": comparable_old, "after": comparable_new}
+        setattr(drive, field, new_value)
+
+    if changes:
+        changed_fields = list(changes.keys())
+        change = CampaignDriveChange(
+            campaign_id=drive.id,
+            actor_id=user.id,
+            changed_fields=changed_fields,
+            changes=changes,
+            summary=_summarize_changes(changed_fields),
+        )
+        db.add(change)
+
+    await db.commit()
+    await db.refresh(drive)
+    return {
+        "success": True,
+        "message": "Campaign updated",
+        "data": await _serialize_drive(db, drive),
+    }
 
 
 @router.post("", status_code=201)

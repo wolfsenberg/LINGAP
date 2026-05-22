@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ArrowLeft,
@@ -23,13 +23,49 @@ const categories = ["Medical", "Relief", "Education", "Community"];
 export default function StartCampaignPage() {
   const [category, setCategory] = useState("Medical");
   const [saving, setSaving] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreview(null);
+      return;
+    }
+
+    const preview = URL.createObjectURL(coverFile);
+    setCoverPreview(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [coverFile]);
+
+  function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      setCoverFile(null);
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a PNG, JPG, or WebP image.");
+      event.target.value = "";
+      setCoverFile(null);
+      return;
+    }
+
+    setCoverFile(file);
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setSaving(true);
     try {
+      let imageSrc: string | null = null;
+      if (coverFile) {
+        const upload = await campaignsApi.uploadCover(coverFile);
+        imageSrc = upload.data.data.url;
+      }
+
       await campaignsApi.create({
         title: String(form.get("title") || ""),
         description: String(form.get("description") || ""),
@@ -37,6 +73,7 @@ export default function StartCampaignPage() {
         institution: String(form.get("institution") || ""),
         location: String(form.get("location") || ""),
         goal_amount: Number(form.get("goal_amount") || 0),
+        image_src: imageSrc,
       });
       toast.success("Campaign draft saved for verification.");
       router.push("/donor#organized-drives");
@@ -78,11 +115,20 @@ export default function StartCampaignPage() {
                 </label>
                 <div style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Campaign Photos</span>
-                  <div style={{padding:20,border:'1px dashed var(--border)',borderRadius:'var(--r-sm)',background:'rgba(255,255,255,.5)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',position:'relative',transition:'all .2s'}} className="hover-border-canopy">
-                    <input type="file" multiple accept="image/png, image/jpeg" style={{opacity:0,position:'absolute',top:0,left:0,width:'100%',height:'100%',cursor:'pointer'}} />
-                    <Upload size={22} color="var(--canopy)" strokeWidth={1.8}/>
-                    <div style={{fontSize:13,fontWeight:700,color:'var(--forest)',marginTop:8}}>Add cover & gallery photos</div>
-                    <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>Show donors who they are helping (PNG/JPG, max 4 photos)</div>
+                  <div style={{padding:coverPreview ? 0 : 20,border:'1px dashed var(--border)',borderRadius:'var(--r-sm)',background:'rgba(255,255,255,.5)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',position:'relative',transition:'all .2s',minHeight:180,overflow:'hidden'}} className="hover-border-canopy">
+                    <input type="file" name="cover" accept="image/png, image/jpeg, image/webp" onChange={handleCoverChange} style={{opacity:0,position:'absolute',top:0,left:0,width:'100%',height:'100%',cursor:'pointer',zIndex:2}} />
+                    {coverPreview ? (
+                      <>
+                        <img src={coverPreview} alt="Campaign cover preview" style={{width:'100%',height:220,objectFit:'cover',display:'block'}} />
+                        <div style={{position:'absolute',left:14,bottom:14,zIndex:3,padding:'8px 12px',borderRadius:999,background:'rgba(255,253,248,.92)',fontSize:12,fontWeight:800,color:'var(--forest)',boxShadow:'0 10px 24px rgba(0,0,0,.12)'}}>Cover selected - click to change</div>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={22} color="var(--canopy)" strokeWidth={1.8}/>
+                        <div style={{fontSize:13,fontWeight:700,color:'var(--forest)',marginTop:8}}>Add campaign cover photo</div>
+                        <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>Show donors who they are helping (PNG/JPG/WebP)</div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className="form-two-col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
@@ -182,7 +228,7 @@ export default function StartCampaignPage() {
               ))}
             </section>
 
-            <div className="flex gap-10" style={{flexDirection:'column'}}>
+            <div className="flex" style={{flexDirection:'column',gap:8}}>
               <button type="submit" disabled={saving} className="btn btn-emerald btn-lg" style={{justifyContent:'center', opacity: saving ? .72 : 1}}><Save size={16}/> {saving ? "Saving..." : "Save for Verification"}</button>
               <Link href="/donor#organized-drives" className="btn btn-outline" style={{justifyContent:'center'}}>Cancel</Link>
             </div>

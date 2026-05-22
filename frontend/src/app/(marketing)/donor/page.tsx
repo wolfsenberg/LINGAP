@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Award,
   CheckCircle2,
+  Edit3,
   Flame,
   Handshake,
   Heart,
@@ -317,28 +318,40 @@ export default function DonorPage() {
                 </div>
               </div>
 
-              <div className="campaign-grid">
-                {latestDrives.map((drive) => (
-                  <div key={drive.id} className="camp-card" style={{ cursor: "default" }}>
-                    <div className="camp-body">
-                      <div className="flex flex-center flex-between mb-12">
-                        <span className="badge badge-navy">{drive.category}</span>
-                        <span className={`badge ${drive.status === "Active" || drive.status === "Funded" ? "badge-emerald" : drive.status === "Draft" ? "badge-navy" : "badge-gold"}`}>{drive.status}</span>
+                <div className="campaign-grid">
+                  {latestDrives.map((drive) => (
+                    <div key={drive.id} className="camp-card" style={{ cursor: "default" }}>
+                      <div className={`camp-img ${drive.image_src ? "has-photo" : ""}`}>
+                        {drive.image_src ? (
+                          <img className="camp-img-photo" src={drive.image_src} alt={drive.title} />
+                        ) : (
+                          <div className="camp-img-inner"><Megaphone size={44} strokeWidth={1.7} /></div>
+                        )}
+                        <div style={{ position: "absolute", top: 12, left: 12 }}>
+                          <span className="badge badge-navy">{drive.category}</span>
+                        </div>
+                        <div style={{ position: "absolute", top: 12, right: 12 }}>
+                          <span className={`badge ${drive.status === "Active" || drive.status === "Funded" ? "badge-emerald" : drive.status === "Draft" ? "badge-navy" : "badge-gold"}`}>{drive.status}</span>
+                        </div>
                       </div>
-                      <h3 className="camp-title">{drive.title}</h3>
+                      <div className="camp-body">
+                        <h3 className="camp-title">{drive.title}</h3>
                       <p className="camp-desc" style={{ WebkitLineClamp: 1 }}>{drive.institution}</p>
                       <div className="camp-meta">
                         <div><div className="camp-raised">{formatPeso(drive.raised_amount)}</div><div className="camp-goal">of {formatPeso(drive.goal_amount)} goal</div></div>
                         <div className="camp-donors"><Users size={12} /> {drive.donors.toLocaleString()} donors</div>
                       </div>
                       <div className="prog-track" style={{ height: 8 }}><div className="prog-fill prog-emerald" style={{ width: `${drive.progress}%` }} /></div>
-                      <div className="camp-footer">
-                        <span style={{ fontSize: 12, color: "var(--text3)" }}>{formatRelativeDate(drive.updated_at)}</span>
-                        <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 700 }}>{drive.progress}%</span>
+                        <div className="camp-footer">
+                          <span style={{ fontSize: 12, color: "var(--text3)" }}>{formatRelativeDate(drive.updated_at)}</span>
+                          <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 700 }}>{drive.progress}%</span>
+                        </div>
+                        <Link href={`/campaigns/${drive.id}/edit`} className="btn btn-outline btn-sm mt-16" style={{ width: "100%", justifyContent: "center" }}>
+                          <Edit3 size={14} /> Edit Campaign
+                        </Link>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
 
               {latestDrives.length === 0 && (

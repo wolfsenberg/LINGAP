@@ -16,6 +16,16 @@ class CampaignDriveCreate(BaseModel):
     image_src: str | None = None
 
 
+class CampaignDriveUpdate(BaseModel):
+    title: str | None = None
+    description: str | None = None
+    category: str | None = None
+    institution: str | None = None
+    location: str | None = None
+    goal_amount: float | None = None
+    image_src: str | None = None
+
+
 class CampaignDriveRead(BaseModel):
     id: str
     organizer_id: UUID | None = None

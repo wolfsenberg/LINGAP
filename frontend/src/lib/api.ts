@@ -75,6 +75,19 @@ export type PublicCampaignApi = CampaignDriveApi & {
   organizer_name?: string | null;
 };
 
+export type CampaignChangeLogApi = {
+  id: string;
+  campaign_id: string;
+  campaign_title: string;
+  actor_id: string;
+  actor_name: string;
+  actor_email: string;
+  changed_fields: string[];
+  changes: Record<string, { before: unknown; after: unknown }>;
+  summary: string;
+  created_at: string;
+};
+
 export type CampaignEscrowApi = {
   campaign: PublicCampaignApi;
   summary: {
@@ -388,6 +401,27 @@ export const campaignsApi = {
   escrow: (campaignId: string) =>
     api.get<ApiResponse<CampaignEscrowApi | null>>(`/api/v1/campaigns/public/${campaignId}/escrow`),
   mine: () => api.get<ApiResponse<CampaignDriveApi[]>>("/api/v1/campaigns/mine"),
+  changeLog: (limit = 25) =>
+    api.get<ApiResponse<CampaignChangeLogApi[]>>("/api/v1/campaigns/admin/change-log", {
+      params: { limit },
+    }),
+  uploadCover: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await api.post<ApiResponse<{ url: string }>>("/api/v1/campaigns/uploads/cover", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const url = res.data.data.url;
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: {
+          url: url.startsWith("http") ? url : `${getApiBaseUrl()}${url}`,
+        },
+      },
+    };
+  },
   create: (data: {
     title: string;
     description: string;
@@ -397,6 +431,18 @@ export const campaignsApi = {
     goal_amount: number;
     image_src?: string | null;
   }) => api.post<ApiResponse<CampaignDriveApi>>("/api/v1/campaigns", data),
+  update: (
+    campaignId: string,
+    data: Partial<{
+      title: string;
+      description: string;
+      category: string;
+      institution: string;
+      location: string;
+      goal_amount: number;
+      image_src: string | null;
+    }>
+  ) => api.patch<ApiResponse<CampaignDriveApi>>(`/api/v1/campaigns/${campaignId}`, data),
 };
 
 export const donorsApi = {
