@@ -67,6 +67,13 @@ export type CampaignDriveApi = {
   source: string;
 };
 
+export type PublicCampaignApi = CampaignDriveApi & {
+  slug: string;
+  raised_label?: string;
+  goal_label?: string;
+  organizer_name?: string | null;
+};
+
 export type LeaderboardDonorApi = {
   rank: number;
   user_id: string;
@@ -262,6 +269,9 @@ export const dashboardApi = {
 };
 
 export const campaignsApi = {
+  publicList: () => api.get<ApiResponse<PublicCampaignApi[]>>("/api/v1/campaigns/public"),
+  publicOne: (campaignId: string) =>
+    api.get<ApiResponse<PublicCampaignApi | null>>(`/api/v1/campaigns/public/${campaignId}`),
   mine: () => api.get<ApiResponse<CampaignDriveApi[]>>("/api/v1/campaigns/mine"),
   create: (data: {
     title: string;

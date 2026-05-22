@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import TopNav from "@/components/layout/TopNav";
 import MobileNav from "@/components/layout/MobileNav";
 import Link from "next/link";
@@ -6,9 +9,32 @@ import {
   ShieldCheck, FileCheck, Shield, Bot, Award, MapPin, Users, TrendingUp,
   Facebook, MessageCircle, Music2, Twitter, Home, Cat, PawPrint
 } from "lucide-react";
-import { CAMPAIGNS } from "@/lib/campaigns";
+import { CAMPAIGNS, mergeCampaignSummaries } from "@/lib/campaigns";
+import { campaignsApi } from "@/lib/api";
 
 export default function HomePage() {
+  const [campaigns, setCampaigns] = useState(CAMPAIGNS);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCampaigns() {
+      try {
+        const res = await campaignsApi.publicList();
+        if (mounted) setCampaigns(mergeCampaignSummaries(res.data.data));
+      } catch {
+        if (mounted) setCampaigns(CAMPAIGNS);
+      }
+    }
+
+    loadCampaigns();
+    const timer = window.setInterval(loadCampaigns, 10000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
   return (
     <>
       <TopNav />
@@ -180,7 +206,7 @@ export default function HomePage() {
             <Link href="/discover" className="btn btn-outline">See All Campaigns →</Link>
           </div>
           <div className="campaign-grid">
-            {CAMPAIGNS.map((c) => {
+            {campaigns.map((c) => {
               const Icon = c.heroIcon === "🏠" ? Home : c.heroIcon === "🐱" ? Cat : PawPrint;
               const progressColor = c.category === "Animal Rescue" ? "prog-gold" : "prog-emerald";
               const accentHex = c.category === "Animal Rescue" ? "var(--amber)" : "var(--canopy)";

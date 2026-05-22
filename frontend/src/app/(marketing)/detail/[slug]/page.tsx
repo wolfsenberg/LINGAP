@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
-import { donationsApi } from "@/lib/api";
+import { campaignsApi, donationsApi } from "@/lib/api";
 import {
   STELLAR_CONFIG,
   buildPaymentTransaction,
@@ -12,7 +12,7 @@ import {
 } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
-import { CAMPAIGNS } from "@/lib/campaigns";
+import { applyCampaignSummary, CAMPAIGNS, type PublicCampaignSummary } from "@/lib/campaigns";
 import { addPendingDonation, removePendingDonation } from "@/lib/pendingDonations";
 import { useAuthStore } from "@/store/authStore";
 import {
@@ -67,6 +67,59 @@ function getDonationMemo(campaignTitle: string, amount: number) {
   return truncateMemo(`${formatXlmAmount(amount)}XLM ${safeTitle}`);
 }
 
+function publicSummaryToDetailCampaign(summary: PublicCampaignSummary) {
+  const raisedLabel = summary.raised_label ?? `₱${Math.round(summary.raised_amount).toLocaleString()}`;
+  const goalLabel = summary.goal_label ?? `₱${Math.round(summary.goal_amount).toLocaleString()}`;
+
+  return {
+    id: summary.id,
+    slug: summary.slug,
+    category: summary.category,
+    urgencyLabel: summary.status,
+    urgencyClass: "badge-blue",
+    title: summary.title,
+    shortTitle: summary.title,
+    description: summary.description,
+    story: [summary.description],
+    organizer: summary.organizer_name || "LINGAP verified organizer",
+    location: summary.location,
+    startDate: new Date(summary.updated_at).toLocaleDateString(),
+    institution: summary.institution,
+    institutionBadge: "Verified LINGAP Campaign",
+    institutionDesc: "Platform Verified",
+    raisedLabel,
+    raised: summary.raised_amount,
+    goal: summary.goal_amount,
+    goalLabel,
+    donors: summary.donors,
+    daysLeft: 30,
+    pct: summary.progress,
+    credibility: 8.8,
+    transparencyScore: 88,
+    heroGradient: "linear-gradient(135deg,#1a3a2a,#2d5a3d)",
+    heroIcon: "🏠",
+    imageSrc: summary.image_src || "",
+    accentColor: "var(--canopy)",
+    spending: [
+      {
+        label: "Campaign funding",
+        pct: 100,
+        amount: goalLabel,
+        bg: "linear-gradient(90deg,var(--forest),var(--forest-light))",
+      },
+    ],
+    milestones: [
+      {
+        dot: "ml-dot-active",
+        title: `Status: ${summary.status}`,
+        sub: "Live campaign totals are synced through LINGAP records.",
+        badge: "badge-blue",
+        badgeText: summary.status,
+      },
+    ],
+  };
+}
+
 export default function DetailPage() {
   const params = useParams();
   const slug = params?.slug as string;
@@ -82,12 +135,13 @@ export default function DetailPage() {
   const [lastTxHash, setLastTxHash] = useState("");
 
   const [dbCampaign, setDbCampaign] = useState<any>(null);
+  const [liveSummary, setLiveSummary] = useState<PublicCampaignSummary | null>(null);
   const [loading, setLoading] = useState(!campaign && !!slug);
   const [error, setError] = useState(false);
 
 
   useEffect(() => {
-    if (!campaign && slug) {
+    if (false && !campaign && slug) {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       fetch(`${baseUrl}/api/v1/aid-requests/${slug}`)
         .then((res) => {
@@ -140,7 +194,39 @@ export default function DetailPage() {
     }
   }, [campaign, slug]);
 
-  const activeCampaign: any = campaign || dbCampaign;
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCampaign() {
+      if (!slug) return;
+      try {
+        const res = await campaignsApi.publicOne(slug);
+        const summary = res.data.data;
+        if (!mounted) return;
+        if (!summary) {
+          if (!campaign) setError(true);
+          return;
+        }
+        setLiveSummary(summary);
+        if (!campaign) setDbCampaign(publicSummaryToDetailCampaign(summary));
+        setError(false);
+      } catch {
+        if (mounted && !campaign) setError(true);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    setLoading(!campaign && !!slug);
+    loadCampaign();
+    const timer = window.setInterval(loadCampaign, 10000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [campaign, slug]);
+
+  const activeCampaign: any = campaign ? applyCampaignSummary(campaign, liveSummary ?? undefined) : dbCampaign;
 
   if (loading) return <div style={{ padding: 100, textAlign: "center", color: "var(--forest)", fontWeight: 600 }}>Loading campaign details...</div>;
   if (!activeCampaign || error) return notFound();
@@ -214,6 +300,9 @@ export default function DetailPage() {
           stellarTxHash: txHash,
         });
         removePendingDonation(txHash);
+        setConfirmedDonationXlm(0);
+        const latest = await campaignsApi.publicOne(activeCampaign.slug || activeCampaign.id);
+        if (latest.data.data) setLiveSummary(latest.data.data);
         toast.success("Donation synced to LINGAP dashboard.");
       } catch {
         toast.error("Donation sent, but dashboard sync failed. Check API/CORS settings.");

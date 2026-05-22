@@ -46,6 +46,50 @@ export type Campaign = {
   milestones: Milestone[];
 };
 
+export type PublicCampaignSummary = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  raised_amount: number;
+  goal_amount: number;
+  raised_label?: string;
+  goal_label?: string;
+  progress: number;
+  donors: number;
+  institution: string;
+  location: string;
+  image_src?: string | null;
+  updated_at: string;
+  source: string;
+  organizer_name?: string | null;
+};
+
+function pesoLabel(amount: number) {
+  return `₱${Math.round(amount).toLocaleString()}`;
+}
+
+export function applyCampaignSummary(campaign: Campaign, summary?: PublicCampaignSummary): Campaign {
+  if (!summary) return campaign;
+
+  return {
+    ...campaign,
+    raised: summary.raised_amount,
+    raisedLabel: summary.raised_label ?? pesoLabel(summary.raised_amount),
+    goal: summary.goal_amount,
+    goalLabel: summary.goal_label ?? pesoLabel(summary.goal_amount),
+    donors: summary.donors,
+    pct: summary.progress,
+  };
+}
+
+export function mergeCampaignSummaries(summaries: PublicCampaignSummary[]) {
+  const bySlug = new Map(summaries.map((item) => [item.slug, item]));
+  return CAMPAIGNS.map((campaign) => applyCampaignSummary(campaign, bySlug.get(campaign.slug)));
+}
+
 export const CAMPAIGNS: Campaign[] = [
   {
     id: 0,

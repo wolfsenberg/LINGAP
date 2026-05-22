@@ -1,16 +1,16 @@
 "use client";
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useFreighter } from "@/hooks/useFreighter";
-import { donationsApi, paymongoApi } from "@/lib/api";
+import { campaignsApi, donationsApi, paymongoApi } from "@/lib/api";
 import {
   STELLAR_CONFIG,
   buildPaymentTransaction,
   getStellarExpertTxUrl,
   submitSignedTransactionXdr,
 } from "@/lib/stellar";
-import { CAMPAIGNS, getCampaign } from "@/lib/campaigns";
+import { applyCampaignSummary, CAMPAIGNS, getCampaign, type PublicCampaignSummary } from "@/lib/campaigns";
 import { addPendingDonation, removePendingDonation } from "@/lib/pendingDonations";
 import { useAuthStore } from "@/store/authStore";
 import toast from "react-hot-toast";
@@ -93,13 +93,35 @@ function DetailContent() {
   const [payingPhp, setPayingPhp] = useState(false);
   const [confirmedDonationXlm, setConfirmedDonationXlm] = useState(0);
   const [lastTxHash, setLastTxHash] = useState("");
+  const [liveSummary, setLiveSummary] = useState<PublicCampaignSummary | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCampaign() {
+      try {
+        const res = await campaignsApi.publicOne(campaign.slug);
+        if (mounted) setLiveSummary(res.data.data);
+      } catch {
+        if (mounted) setLiveSummary(null);
+      }
+    }
+
+    loadCampaign();
+    const timer = window.setInterval(loadCampaign, 10000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [campaign.slug]);
 
   const effectiveAmount = useCustom ? parseFloat(customAmount) || 0 : selectedAmount;
   const effectivePhp = useCustomPhp ? parseFloat(customPhp) || 0 : selectedPhp;
-  const displayRaised = campaign.raised + confirmedDonationXlm * DEMO_XLM_TO_PHP;
+  const activeCampaign = applyCampaignSummary(campaign, liveSummary ?? undefined);
+  const displayRaised = activeCampaign.raised + confirmedDonationXlm * DEMO_XLM_TO_PHP;
   const displayRaisedLabel = `₱${Math.round(displayRaised).toLocaleString()}`;
-  const displayPct = Math.min(100, Math.round((displayRaised / campaign.goal) * 100));
-  const displayDonors = campaign.donors + (confirmedDonationXlm > 0 ? 1 : 0);
+  const displayPct = Math.min(100, Math.round((displayRaised / activeCampaign.goal) * 100));
+  const displayDonors = activeCampaign.donors + (confirmedDonationXlm > 0 ? 1 : 0);
 
   async function handleDonate() {
     if (!connected || !publicKey) { await connect(); return; }
@@ -143,6 +165,9 @@ function DetailContent() {
           stellarTxHash: txHash,
         });
         removePendingDonation(txHash);
+        setConfirmedDonationXlm(0);
+        const latest = await campaignsApi.publicOne(campaign.slug);
+        if (latest.data.data) setLiveSummary(latest.data.data);
         toast.success("Donation synced to LINGAP dashboard.");
       } catch {
         toast.error("Donation sent, but dashboard sync failed. Check API/CORS settings.");
@@ -245,7 +270,7 @@ function DetailContent() {
             <div className="flex flex-center flex-between mb-16">
               <div>
                 <div style={{ fontFamily: "Sora,sans-serif", fontSize: 28, fontWeight: 800, color: "var(--forest)" }}>{displayRaisedLabel}</div>
-                <div style={{ fontSize: 13, color: "var(--text3)" }}>raised of {campaign.goalLabel} goal</div>
+                <div style={{ fontSize: 13, color: "var(--text3)" }}>raised of {activeCampaign.goalLabel} goal</div>
               </div>
               <div className="text-right">
                 <div style={{ fontSize: 22, fontWeight: 700, color: "var(--canopy)" }}>{displayPct}%</div>
@@ -255,7 +280,7 @@ function DetailContent() {
             <div className="prog-track mb-8" style={{ height: 12 }}><div className="prog-fill prog-emerald" style={{ width: `${displayPct}%` }} /></div>
             <div className="flex flex-center flex-between mb-24" style={{ fontSize: 13, color: "var(--text3)" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Users size={13} /> {displayDonors.toLocaleString()} donors</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={13} /> {campaign.daysLeft} days left</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={13} /> {activeCampaign.daysLeft} days left</span>
             </div>
 
             {/* Tab switcher */}
