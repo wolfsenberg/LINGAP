@@ -88,7 +88,7 @@ docker-compose up --build
 ## 🌐 Deployment
 
 ### Testnet
-- **Contract / App Address:** `GXXXX...`
+- **Contract / App Address:** `CDZTFM2BHBLYQLIJSSF7UOSWCQMQMOUATXEJTDOHKBIZ6R4DFZKB7DDP`
 - 📸 Screenshot — Stellar Expert (Testnet)
 
   ![Testnet Screenshot](./screenshots/testnet.png)
