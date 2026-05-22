@@ -21,9 +21,10 @@ import uuid
 router = APIRouter(prefix="/aid-requests", tags=["aid-requests"])
 
 
-def _enrich(req: AidRequest, beneficiary_name: str) -> dict:
+def _enrich(req: AidRequest, beneficiary_name: str, beneficiary_location: str = "") -> dict:
     d = AidRequestRead.model_validate(req).model_dump()
     d["beneficiary_name"] = beneficiary_name
+    d["location"] = beneficiary_location
     return d
 
 
@@ -72,7 +73,7 @@ async def list_aid_requests(
     enriched = []
     for r in items:
         b = (await db.execute(select(Beneficiary).where(Beneficiary.id == r.beneficiary_id))).scalar_one_or_none()
-        enriched.append(_enrich(r, b.name if b else "Unknown"))
+        enriched.append(_enrich(r, b.name if b else "Unknown", b.location if b else ""))
 
     return {"items": enriched, "total": total, "page": page, "size": size, "pages": -(-total // size)}
 
@@ -86,7 +87,7 @@ async def get_aid_request(
     if not req:
         raise HTTPException(404, "Aid request not found")
     b = (await db.execute(select(Beneficiary).where(Beneficiary.id == req.beneficiary_id))).scalar_one_or_none()
-    return _enrich(req, b.name if b else "Unknown")
+    return _enrich(req, b.name if b else "Unknown", b.location if b else "")
 
 @router.post("", status_code=201)
 async def create_aid_request(
@@ -106,7 +107,7 @@ async def create_aid_request(
     await db.commit()
     await db.refresh(req)
     background.add_task(_risk_rescan_bg, req.id, "aid_request_created")
-    return {"success": True, "message": "Aid request created", "data": _enrich(req, b.name)}
+    return {"success": True, "message": "Aid request created", "data": _enrich(req, b.name, b.location)}
 
 
 @router.patch("/{request_id}/approve")
@@ -128,7 +129,7 @@ async def approve_request(
     await db.refresh(req)
     background.add_task(_risk_rescan_bg, req.id, "aid_request_approved")
     b = (await db.execute(select(Beneficiary).where(Beneficiary.id == req.beneficiary_id))).scalar_one()
-    return {"success": True, "message": "Request approved", "data": _enrich(req, b.name)}
+    return {"success": True, "message": "Request approved", "data": _enrich(req, b.name, b.location)}
 
 
 async def _enforce_disburse_gate(
@@ -228,7 +229,7 @@ async def disburse_request(
     await db.commit()
     await db.refresh(req)
     background.add_task(_credibility_rescan_bg, b.id, "aid_request_disbursed")
-    return {"success": True, "message": "Aid disbursed on-chain", "data": _enrich(req, b.name)}
+    return {"success": True, "message": "Aid disbursed on-chain", "data": _enrich(req, b.name, b.location)}
 
 
 @router.patch("/{request_id}/reject")
@@ -246,4 +247,4 @@ async def reject_request(
     await db.commit()
     await db.refresh(req)
     b = (await db.execute(select(Beneficiary).where(Beneficiary.id == req.beneficiary_id))).scalar_one()
-    return {"success": True, "message": "Request rejected", "data": _enrich(req, b.name)}
+    return {"success": True, "message": "Request rejected", "data": _enrich(req, b.name, b.location)}
