@@ -5,7 +5,7 @@
 
 ---
 
-## 🧩 Problem
+## Problem
 
 During crises, transparency in how donations are distributed is often lacking, leading to mistrust. Aid distribution can be slow, inefficient, and susceptible to fraud. Donors want absolute assurance that their funds directly reach the intended beneficiaries.
 
@@ -16,13 +16,13 @@ Existing platforms treat the transaction endpoint as the moment funds hit the ca
 
 ---
 
-## 🌟 Vision
+## Vision
 
 To create a fully transparent, blockchain-powered ecosystem where every peso donated is tracked, verified, and efficiently disbursed to verified beneficiaries — restoring absolute trust in charitable giving.
 
 ---
 
-## 🎯 Purpose
+## Purpose
 
 LINGAP bridges the gap between donors and verifiable causes. By leveraging blockchain technology, aid operations become immutable, auditable, and transparent, protecting both the donors and the beneficiaries.
 
@@ -32,7 +32,7 @@ A donor is no longer paying a person. **A donor is paying a contract.** And unli
 
 ---
 
-## 👥 Target Users
+## Target Users
 
 - **Donors** — Individuals and organizations looking for transparent, verified campaigns to support without fear of fraud.
 - **Beneficiaries** — Filipinos in need of medical, educational, or disaster relief assistance.
@@ -40,7 +40,7 @@ A donor is no longer paying a person. **A donor is paying a contract.** And unli
 
 ---
 
-## ✨ Features
+## Features
 
 ### Core Features
 
@@ -75,7 +75,7 @@ A donor is no longer paying a person. **A donor is paying a contract.** And unli
 
 ---
 
-## 🚀 How to Run Locally
+## How to Run Locally
 
 ```bash
 git clone https://github.com/wolfsenberg/LINGAP.git
