@@ -415,6 +415,8 @@ export const profilesApi = {
     api.get<ApiResponse<PublicProfileSearchResultApi[]>>("/api/v1/profiles/search", {
       params: { q, limit },
     }),
+  me: () =>
+    api.get<ApiResponse<PublicProfileApi>>("/api/v1/profiles/me"),
   get: (userId: string) =>
     api.get<ApiResponse<PublicProfileApi | null>>(`/api/v1/profiles/${userId}`),
 };

@@ -71,7 +71,8 @@ function campaignNameFromPurpose(purpose?: string) {
 
 export default function DonorPage() {
   const user = useAuthStore((state) => state.user);
-  const firstName = getFirstName(user?.name);
+  const [profileName, setProfileName] = useState(user?.name ?? "");
+  const firstName = getFirstName(profileName || user?.name);
   const [drives, setDrives] = useState<PublicProfileCampaignApi[]>([]);
   const [donations, setDonations] = useState<Donation[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardDonorApi[]>([]);
@@ -98,11 +99,10 @@ export default function DonorPage() {
 
       try {
         if (!user?.id) return;
-        const [profileRes, donationRes, leaderboardRes, impactRes] = await Promise.all([
-          profilesApi.get(user.id),
+        const [profileRes, donationRes, leaderboardRes] = await Promise.all([
+          profilesApi.me(),
           donationsApi.mine(1, 10),
           donorsApi.leaderboard(10),
-          donorsApi.myImpact(),
         ]);
         if (!active) return;
         for (const item of pending) {
@@ -118,15 +118,15 @@ export default function DonorPage() {
             // Keep it locally and retry on the next dashboard visit.
           }
         }
-        const [freshProfileRes, freshDonationRes, freshLeaderboardRes, freshImpactRes] = pending.length > 0
+        const [freshProfileRes, freshDonationRes, freshLeaderboardRes] = pending.length > 0
           ? await Promise.all([
-              profilesApi.get(user.id),
+              profilesApi.me(),
               donationsApi.mine(1, 10),
               donorsApi.leaderboard(10),
-              donorsApi.myImpact(),
             ])
-          : [profileRes, donationRes, leaderboardRes, impactRes];
+          : [profileRes, donationRes, leaderboardRes];
         const publicProfile = freshProfileRes.data.data;
+        setProfileName(publicProfile?.user.display_name ?? user.name);
         const profileActivityFallback: Donation[] = (publicProfile?.activity ?? []).map((activity) => ({
           id: activity.id,
           donorId: user.id,
@@ -143,20 +143,29 @@ export default function DonorPage() {
         setDrives(publicProfile?.campaigns ?? []);
         const remainingPending = getPendingDonations(user?.id).map(toDonation);
         const backendHashes = new Set(freshDonationRes.data.items.map((donation) => donation.stellarTxHash));
+        const profileOnlyDonations = profileActivityFallback.filter((donation) => !backendHashes.has(donation.stellarTxHash));
+        const allKnownHashes = new Set([
+          ...freshDonationRes.data.items.map((donation) => donation.stellarTxHash),
+          ...profileOnlyDonations.map((donation) => donation.stellarTxHash),
+        ]);
         const syncedDonations = [
-          ...remainingPending.filter((donation) => !backendHashes.has(donation.stellarTxHash)),
+          ...remainingPending.filter((donation) => !allKnownHashes.has(donation.stellarTxHash)),
           ...freshDonationRes.data.items,
+          ...profileOnlyDonations,
         ];
-        setDonations(syncedDonations.length > 0 ? syncedDonations : profileActivityFallback);
+        setDonations(syncedDonations);
         setLeaderboard(freshLeaderboardRes.data.data);
         setImpact(publicProfile ? {
-          name: publicProfile.user.display_name,
           total_donated: publicProfile.impact.total_donated_xlm,
           campaigns_helped: publicProfile.impact.donation_count,
           lives_impacted: publicProfile.impact.total_donated_xlm > 0
             ? Math.max(1, Math.floor(publicProfile.impact.total_donated_php / 2000))
             : 0,
-        } : freshImpactRes.data.data);
+        } : {
+          total_donated: 0,
+          campaigns_helped: 0,
+          lives_impacted: 0,
+        });
       } catch {
         if (!active) return;
         setDrives([]);
