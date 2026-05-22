@@ -262,6 +262,10 @@ function DetailContent() {
               ))}
             </div>
           </div>
+
+          <div style={{ marginTop: 24 }}>
+            <VotingPanel campaignId={campaign.id} campaignName={campaign.title} />
+          </div>
         </div>
 
         {/* RIGHT — sticky donate card */}
@@ -378,10 +382,6 @@ function DetailContent() {
               </div>
               <div className="transparency-meter"><div className="tm-fill" style={{ width: `${campaign.transparencyScore}%` }} /></div>
             </div>
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <VotingPanel campaignId={campaign.id} campaignName={campaign.title} />
           </div>
 
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 20, marginBottom: 16 }}>

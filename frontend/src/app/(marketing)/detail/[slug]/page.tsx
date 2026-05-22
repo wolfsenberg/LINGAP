@@ -414,6 +414,10 @@ export default function DetailPage() {
               ))}
             </div>
           </div>
+
+          <div style={{ marginTop: 24 }}>
+            <VotingPanel campaignId={activeCampaign.id} campaignName={activeCampaign.title} />
+          </div>
         </div>
 
         {/* RIGHT — sticky donate card */}
@@ -543,10 +547,6 @@ export default function DetailPage() {
                 <div className="tm-fill" style={{ width: `${activeCampaign.transparencyScore}%` }} />
               </div>
             </div>
-          </div>
-
-          <div style={{ marginBottom: 16 }}>
-            <VotingPanel campaignId={activeCampaign.id} campaignName={activeCampaign.title} />
           </div>
 
           {/* Institution card */}

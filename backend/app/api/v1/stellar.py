@@ -4,7 +4,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.stellar.client import verify_transaction, get_account_info
 from app.stellar import soroban
 from app.core.database import get_db
+from app.core.dependencies import require_admin
 from app.config import settings
+from app.models.user import User
 
 router = APIRouter(prefix="/stellar", tags=["stellar"])
 
@@ -63,7 +65,7 @@ async def submit_xdr(body: SubmitXdrRequest):
 # ── Escrow: admin milestone management ───────────────────────────────────────
 
 @router.post("/escrow/verify/{campaign_id}")
-async def verify_milestone(campaign_id: int):
+async def verify_milestone(campaign_id: int, _: User = Depends(require_admin)):
     try:
         tx_hash = await soroban.admin_verify_milestone(campaign_id)
         return {"success": True, "data": {"tx_hash": tx_hash}}
@@ -72,7 +74,7 @@ async def verify_milestone(campaign_id: int):
 
 
 @router.post("/escrow/release/{campaign_id}")
-async def release_milestone(campaign_id: int):
+async def release_milestone(campaign_id: int, _: User = Depends(require_admin)):
     try:
         tx_hash = await soroban.admin_release_milestone(campaign_id)
         return {"success": True, "data": {"tx_hash": tx_hash}}
@@ -81,7 +83,7 @@ async def release_milestone(campaign_id: int):
 
 
 @router.post("/escrow/pause/{campaign_id}")
-async def pause_campaign(campaign_id: int):
+async def pause_campaign(campaign_id: int, _: User = Depends(require_admin)):
     try:
         tx_hash = await soroban.admin_pause_campaign(campaign_id)
         return {"success": True, "data": {"tx_hash": tx_hash}}
@@ -90,7 +92,7 @@ async def pause_campaign(campaign_id: int):
 
 
 @router.post("/escrow/unpause/{campaign_id}")
-async def unpause_campaign(campaign_id: int):
+async def unpause_campaign(campaign_id: int, _: User = Depends(require_admin)):
     try:
         tx_hash = await soroban.admin_unpause_campaign(campaign_id)
         return {"success": True, "data": {"tx_hash": tx_hash}}
@@ -184,7 +186,7 @@ async def get_vote_status(
 
 
 @router.post("/escrow/clawback/{campaign_id}")
-async def execute_clawback(campaign_id: int):
+async def execute_clawback(campaign_id: int, _: User = Depends(require_admin)):
     """
     Admin: execute proportional clawback of unspent funds to donors.
     Requires campaign paused AND >= 60% vote weight.
