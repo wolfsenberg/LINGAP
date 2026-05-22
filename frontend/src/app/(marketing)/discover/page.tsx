@@ -308,7 +308,7 @@ export default function DiscoverPage() {
             <div style={{ width: 32, height: 32, border: "3px solid var(--canopy-light)", borderTopColor: "var(--canopy)", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 12px" }} />
             Loading campaigns...
           </div>
-        ) : filteredCampaigns.length === 0 ? (
+        ) : displayCount === 0 ? (
           <div style={{ textAlign: "center", padding: "48px 0", color: "var(--text3)" }}>
             <MapPin size={32} color="var(--canopy)" style={{ margin: "0 auto 12px", display: "block", opacity: 0.5 }} />
             <div style={{ fontWeight: 600, color: "var(--forest)", marginBottom: 6 }}>No campaigns found</div>
@@ -316,6 +316,11 @@ export default function DiscoverPage() {
           </div>
         ) : (
           <div className="campaign-grid">
+            {filteredCampaigns.length === 0 && selectedCity === "All Cities" && (
+              <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--text3)" }}>
+                The {CAMPAIGNS.length} campaigns found are displayed in the Featured section above.
+              </div>
+            )}
             {filteredCampaigns.map((c) => (
               <AuthPromptLink key={c.id || c.aid_request_id} href={`/detail/${c.id || c.aid_request_id}`} className="camp-card" style={{ textDecoration: "none" }}>
                 <div className="camp-img" style={{ background: "linear-gradient(135deg,#1a3a2a,#2d5a3d)" }}>
