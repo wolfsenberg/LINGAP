@@ -24,6 +24,39 @@ async def verify_transaction(tx_hash: str) -> dict:
     }
 
 
+async def verify_native_payment(
+    tx_hash: str,
+    *,
+    source_public_key: str,
+    destination_public_key: str,
+    expected_amount: float,
+) -> dict:
+    tx = horizon.transactions().transaction(tx_hash).call()
+    if not tx.get("successful", False):
+        return {"confirmed": False, "reason": "Transaction was not successful"}
+
+    ops = horizon.operations().for_transaction(tx_hash).call().get("_embedded", {}).get("records", [])
+    for op in ops:
+        if op.get("type") != "payment":
+            continue
+        if op.get("from") != source_public_key:
+            continue
+        if op.get("to") != destination_public_key:
+            continue
+        if op.get("asset_type") != "native":
+            continue
+        paid = float(op.get("amount", 0))
+        if abs(paid - expected_amount) <= 0.00001:
+            return {
+                "confirmed": True,
+                "ledger": tx.get("ledger"),
+                "created_at": tx.get("created_at"),
+                "amount": paid,
+            }
+
+    return {"confirmed": False, "reason": "Matching XLM payment operation not found"}
+
+
 async def send_payment(
     destination: str,
     amount: str,

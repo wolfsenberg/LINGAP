@@ -8,6 +8,10 @@ class TopUpSimulateCreate(BaseModel):
     amount_xlm: float | None = Field(default=None, gt=0)
     amount_php: float | None = Field(default=None, gt=0)
     payment_method: str
+    sender_reference: str | None = None
+    sender_name: str | None = None
+    sender_wallet: str | None = None
+    stellar_tx_hash: str | None = None
 
 
 class BalanceTransactionRead(BaseModel):

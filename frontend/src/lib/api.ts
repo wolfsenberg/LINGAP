@@ -442,13 +442,25 @@ export const balanceApi = {
   mine: () => api.get<ApiResponse<BalanceApi>>("/api/v1/me/balance"),
   transactions: (limit = 25) =>
     api.get<ApiResponse<BalanceTransactionApi[]>>("/api/v1/me/transactions", { params: { limit } }),
-  simulateTopUp: (data: { paymentMethod: "pdax" | "gcash" | "maya"; amountXlm?: number; amountPhp?: number }) =>
+  simulateTopUp: (data: {
+    paymentMethod: "pdax" | "gcash" | "maya" | "stellar_wallet";
+    amountXlm?: number;
+    amountPhp?: number;
+    senderReference?: string;
+    senderName?: string;
+    senderWallet?: string;
+    stellarTxHash?: string;
+  }) =>
     api.post<ApiResponse<{ top_up: BalanceTransactionApi; balance: Omit<BalanceApi, "transactions"> }>>(
       "/api/v1/topups/simulate",
       {
         payment_method: data.paymentMethod,
         amount_xlm: data.amountXlm,
         amount_php: data.amountPhp,
+        sender_reference: data.senderReference,
+        sender_name: data.senderName,
+        sender_wallet: data.senderWallet,
+        stellar_tx_hash: data.stellarTxHash,
       }
     ),
 };

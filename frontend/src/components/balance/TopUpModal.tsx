@@ -5,13 +5,23 @@ import { CheckCircle2, CreditCard, Landmark, Smartphone, Wallet, X, type LucideI
 import toast from "react-hot-toast";
 import { balanceApi, type BalanceApi, type BalanceTransactionApi } from "@/lib/api";
 import { useFreighter } from "@/hooks/useFreighter";
-import { getStellarExpertContractUrl } from "@/lib/stellar";
+import {
+  buildPaymentTransaction,
+  getStellarExpertContractUrl,
+  getStellarExpertTxUrl,
+  submitSignedTransactionXdr,
+} from "@/lib/stellar";
 
 type PaymentMethod = "pdax" | "gcash" | "maya" | "stellar_wallet";
 type AmountMode = "xlm" | "php";
 
 const XLM_PRESETS = [5, 10, 25, 50];
 const PHP_PRESETS = [100, 250, 500, 1000];
+
+const NETWORK_PASSPHRASE =
+  process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet"
+    ? "Public Global Stellar Network ; September 2015"
+    : "Test SDF Network ; September 2015";
 
 type TopUpModalProps = {
   open: boolean;
@@ -25,9 +35,8 @@ const methods: Array<{
   title: string;
   label: string;
   Icon: LucideIcon;
-  recommended?: boolean;
 }> = [
-  { id: "pdax", title: "PDAX", label: "Primary Digital Asset Channel", Icon: Landmark, recommended: true },
+  { id: "pdax", title: "PDAX", label: "Primary Digital Asset Channel", Icon: Landmark },
   { id: "gcash", title: "GCash", label: "Local Payment Option", Icon: Smartphone },
   { id: "maya", title: "Maya", label: "Local Payment Option", Icon: CreditCard },
   { id: "stellar_wallet", title: "Stellar Wallet", label: "Direct On-Chain Top-up", Icon: Wallet },
@@ -41,13 +50,31 @@ function formatPhp(value: number) {
   return `₱${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function methodSourceLabel(method: PaymentMethod) {
+  if (method === "gcash") return "GCash mobile number";
+  if (method === "maya") return "Maya mobile number";
+  if (method === "pdax") return "PDAX account email";
+  return "Connected wallet";
+}
+
+function shortAddress(value?: string | null) {
+  if (!value) return "Not configured";
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
 export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpModalProps) {
-  const { connected, publicKey, connect } = useFreighter();
+  const { connected, publicKey, connect, sign } = useFreighter();
   const [method, setMethod] = useState<PaymentMethod>("pdax");
   const [mode, setMode] = useState<AmountMode>("xlm");
   const [amount, setAmount] = useState("10");
+  const [senderReference, setSenderReference] = useState("");
+  const [senderName, setSenderName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [confirmedRef, setConfirmedRef] = useState("");
+  const [confirmedTxHash, setConfirmedTxHash] = useState("");
+
+  const receivingWallet = process.env.NEXT_PUBLIC_LINGAP_RECEIVER_PUBLIC_KEY || "";
+  const vaultContract = process.env.NEXT_PUBLIC_CONTRACT_DONATION_VAULT || "";
   const stellarVaultUrl = getStellarExpertContractUrl();
   const presets = mode === "xlm" ? XLM_PRESETS : PHP_PRESETS;
 
@@ -75,23 +102,57 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
       return;
     }
 
-    if (method === "stellar_wallet") {
-      toast("Connect Stellar Wallet to continue with a direct on-chain top-up.");
+    if ((method === "gcash" || method === "maya") && !senderReference.trim()) {
+      toast.error(`${method === "gcash" ? "GCash" : "Maya"} number is required.`);
       return;
     }
 
+    if (method === "pdax" && !senderReference.trim() && !senderName.trim()) {
+      toast.error("PDAX account email or account name is required.");
+      return;
+    }
+
+    const sourceWallet = publicKey;
     setSubmitting(true);
     setConfirmedRef("");
+    setConfirmedTxHash("");
+
     try {
+      let stellarTxHash: string | undefined;
+
+      if (method === "stellar_wallet") {
+        if (!receivingWallet) {
+          toast.error("LINGAP receiving wallet is not configured.");
+          return;
+        }
+
+        const tx = await buildPaymentTransaction(
+          sourceWallet,
+          receivingWallet,
+          amountXlm.toFixed(2),
+          undefined,
+          "LNGP-TOPUP"
+        );
+        const signedXdr = await sign(tx.toXDR(), NETWORK_PASSPHRASE);
+        const submitResult = await submitSignedTransactionXdr(signedXdr);
+        stellarTxHash = submitResult.hash;
+      }
+
       const res = await balanceApi.simulateTopUp({
         paymentMethod: method,
-        amountXlm: mode === "xlm" ? Number(amountXlm.toFixed(2)) : undefined,
-        amountPhp: mode === "php" ? Number(amountPhp.toFixed(2)) : undefined,
+        amountXlm: method === "stellar_wallet" || mode === "xlm" ? Number(amountXlm.toFixed(2)) : undefined,
+        amountPhp: method !== "stellar_wallet" && mode === "php" ? Number(amountPhp.toFixed(2)) : undefined,
+        senderReference: senderReference.trim() || undefined,
+        senderName: senderName.trim() || undefined,
+        senderWallet: sourceWallet,
+        stellarTxHash,
       });
+
       const tx = res.data.data.top_up;
       setConfirmedRef(tx.payment_reference);
+      setConfirmedTxHash(tx.stellar_tx_hash || stellarTxHash || "");
       onConfirmed(res.data.data.balance, tx);
-      toast.success(`${tx.payment_reference} confirmed.`);
+      toast.success(method === "stellar_wallet" ? "Stellar top-up confirmed." : `${tx.payment_reference} confirmed.`);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } }; message?: string };
       toast.error(err.response?.data?.detail || err.message || "Top-up failed.");
@@ -115,39 +176,78 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
         <div className="section-label">LINGAP WALLET</div>
         <h2 style={{ textAlign: "left" }}>Top Up Your LINGAP Balance</h2>
         <p style={{ marginLeft: 0, maxWidth: 540 }}>
-          Choose a payment channel to add XLM to your LINGAP balance. PDAX, GCash, and Maya create payment confirmations, while Stellar Wallet represents a direct on-chain flow.
+          Choose a payment channel. Local payment options collect sender details for confirmation; Stellar Wallet sends XLM directly from your connected wallet.
         </p>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 10, marginBottom: 16 }}>
-          {methods.map(({ id, title, label, Icon, recommended }) => (
+          {methods.map(({ id, title, label, Icon }) => (
             <button
               key={id}
               type="button"
-              onClick={() => setMethod(id)}
+              onClick={() => {
+                setMethod(id);
+                setConfirmedRef("");
+                setConfirmedTxHash("");
+              }}
               className={`btn ${method === id ? "btn-primary" : "btn-outline"}`}
               style={{ height: "auto", justifyContent: "flex-start", alignItems: "flex-start", padding: 14, textAlign: "left", gap: 10 }}
             >
               <Icon size={18} />
               <span style={{ display: "grid", gap: 3 }}>
-                <span style={{ display: "flex", alignItems: "center", gap: 7, fontWeight: 800 }}>
-                  {title}
-                  {recommended && <span className="badge badge-gold" style={{ fontSize: 10 }}>Recommended</span>}
-                </span>
+                <span style={{ fontWeight: 800 }}>{title}</span>
                 <span style={{ fontSize: 12, opacity: 0.76 }}>{label}</span>
               </span>
             </button>
           ))}
         </div>
 
+        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 16, background: "rgba(255,255,255,.45)" }}>
+          <div style={{ fontWeight: 800, color: "var(--forest)", marginBottom: 10 }}>
+            {method === "stellar_wallet" ? "Source Wallet" : "Payment Source"}
+          </div>
+          {method === "stellar_wallet" ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              <div style={{ padding: "11px 12px", border: "1px solid var(--border)", borderRadius: 10, background: "var(--bg)", fontSize: 13, color: "var(--forest)", fontWeight: 700, overflowWrap: "anywhere" }}>
+                {publicKey || "Connect Stellar Wallet to autofill source wallet"}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>
+                XLM will move from your connected wallet to the LINGAP receiving wallet.
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              <input
+                value={senderReference}
+                onChange={(event) => setSenderReference(event.target.value)}
+                placeholder={methodSourceLabel(method)}
+                style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", fontSize: 15, boxSizing: "border-box" }}
+              />
+              {method === "pdax" && (
+                <input
+                  value={senderName}
+                  onChange={(event) => setSenderName(event.target.value)}
+                  placeholder="PDAX account name"
+                  style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", fontSize: 15, boxSizing: "border-box" }}
+                />
+              )}
+            </div>
+          )}
+        </div>
+
         <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
-          <div style={{ fontWeight: 800, color: "var(--forest)", marginBottom: 10 }}>XLM / PHP Converter</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(160px,1fr))", gap: 8, marginBottom: 10 }}>
-              <button type="button" className={`btn btn-sm ${mode === "xlm" ? "btn-primary" : "btn-outline"}`} onClick={() => { setMode("xlm"); setAmount(String(XLM_PRESETS[1])); }}>
-                Enter amount in XLM
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <div>
+              <div style={{ fontWeight: 800, color: "var(--forest)" }}>Amount</div>
+              <div style={{ fontSize: 12, color: "var(--text3)" }}>1 XLM = {formatPhp(rate)}</div>
+            </div>
+            <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 4, padding: 3, border: "1px solid var(--border)", borderRadius: 999, background: "var(--bg)" }}>
+              <button type="button" className={`btn btn-sm ${mode === "xlm" ? "btn-primary" : "btn-ghost"}`} style={{ borderRadius: 999, minWidth: 58, justifyContent: "center" }} onClick={() => { setMode("xlm"); setAmount(String(XLM_PRESETS[1])); }}>
+                XLM
               </button>
-              <button type="button" className={`btn btn-sm ${mode === "php" ? "btn-primary" : "btn-outline"}`} onClick={() => { setMode("php"); setAmount(String(PHP_PRESETS[2])); }}>
-                Enter amount in PHP
+              <button type="button" className={`btn btn-sm ${mode === "php" ? "btn-primary" : "btn-ghost"}`} style={{ borderRadius: 999, minWidth: 58, justifyContent: "center" }} onClick={() => { setMode("php"); setAmount(String(PHP_PRESETS[2])); }}>
+                PHP
               </button>
+            </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(96px,1fr))", gap: 8, marginBottom: 10 }}>
             {presets.map((preset) => (
@@ -171,27 +271,46 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
             style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 10, padding: "12px 14px", fontSize: 15, boxSizing: "border-box" }}
           />
           <div style={{ marginTop: 10, fontSize: 13, color: "var(--text2)" }}>
-            1 XLM = {formatPhp(rate)} · {formatXlm(amountXlm)} ≈ {formatPhp(amountPhp)}
+            {formatXlm(amountXlm)} ≈ {formatPhp(amountPhp)}
           </div>
         </div>
 
-        <div style={{ padding: 13, background: "rgba(74,155,106,.07)", border: "1px solid rgba(74,155,106,.2)", borderRadius: 10, color: "var(--forest)", fontSize: 13, marginBottom: 14 }}>
-          {connected && publicKey ? `Connected wallet: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}` : "Connect Stellar Wallet to continue before any top-up is confirmed."}
+        <div style={{ padding: 13, background: "rgba(74,155,106,.07)", border: "1px solid rgba(74,155,106,.2)", borderRadius: 10, color: "var(--forest)", fontSize: 13, marginBottom: 14, display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 800 }}>Receiving wallet</span>
+            <span style={{ fontFamily: "Space Mono, monospace", fontSize: 12, color: "var(--text2)" }}>
+              {shortAddress(receivingWallet)}
+            </span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 800 }}>Escrow contract</span>
+            <span style={{ fontFamily: "Space Mono, monospace", fontSize: 12, color: "var(--text2)" }}>
+              {shortAddress(vaultContract)}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: "var(--text2)" }}>
+            {connected && publicKey ? `Connected source: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}` : "Connect Stellar Wallet before confirming a top-up."}
+          </div>
           {stellarVaultUrl && (
-            <a href={stellarVaultUrl} target="_blank" rel="noreferrer" style={{ display: "block", color: "var(--canopy)", fontWeight: 800, marginTop: 6, textDecoration: "none" }}>
-              View LINGAP vault on Stellar
+            <a href={stellarVaultUrl} target="_blank" rel="noreferrer" style={{ color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
+              Open escrow contract on Stellar
             </a>
           )}
         </div>
 
         {confirmedRef && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 13, borderRadius: 10, background: "rgba(74,155,106,.09)", color: "var(--forest)", fontSize: 13, marginBottom: 14 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: 13, borderRadius: 10, background: "rgba(74,155,106,.09)", color: "var(--forest)", fontSize: 13, marginBottom: 14, flexWrap: "wrap" }}>
             <CheckCircle2 size={16} color="var(--canopy)" /> Payment status: Confirmed · {confirmedRef}
+            {confirmedTxHash && (
+              <a href={getStellarExpertTxUrl(confirmedTxHash)} target="_blank" rel="noreferrer" style={{ marginLeft: "auto", color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
+                View Stellar Tx
+              </a>
+            )}
           </div>
         )}
 
         <button type="button" onClick={handleConfirm} disabled={submitting} className="btn btn-emerald btn-lg" style={{ width: "100%", justifyContent: "center" }}>
-          {submitting ? "Confirming..." : !connected ? "Connect Wallet to Continue" : method === "stellar_wallet" ? "Continue with Stellar Wallet" : "Confirm Top-up"}
+          {submitting ? "Confirming..." : !connected ? "Connect Wallet to Continue" : method === "stellar_wallet" ? "Send from Stellar Wallet" : "Confirm Top-up"}
         </button>
       </div>
     </div>
