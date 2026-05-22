@@ -228,7 +228,7 @@ export default function StartCampaignPage() {
               ))}
             </section>
 
-            <div className="flex gap-10" style={{flexDirection:'column'}}>
+            <div className="flex" style={{flexDirection:'column',gap:8}}>
               <button type="submit" disabled={saving} className="btn btn-emerald btn-lg" style={{justifyContent:'center', opacity: saving ? .72 : 1}}><Save size={16}/> {saving ? "Saving..." : "Save for Verification"}</button>
               <Link href="/donor#organized-drives" className="btn btn-outline" style={{justifyContent:'center'}}>Cancel</Link>
             </div>

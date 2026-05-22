@@ -6,6 +6,7 @@ import {
   ArrowRight,
   Award,
   CheckCircle2,
+  Edit3,
   Flame,
   Handshake,
   Heart,
@@ -341,13 +342,16 @@ export default function DonorPage() {
                         <div className="camp-donors"><Users size={12} /> {drive.donors.toLocaleString()} donors</div>
                       </div>
                       <div className="prog-track" style={{ height: 8 }}><div className="prog-fill prog-emerald" style={{ width: `${drive.progress}%` }} /></div>
-                      <div className="camp-footer">
-                        <span style={{ fontSize: 12, color: "var(--text3)" }}>{formatRelativeDate(drive.updated_at)}</span>
-                        <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 700 }}>{drive.progress}%</span>
+                        <div className="camp-footer">
+                          <span style={{ fontSize: 12, color: "var(--text3)" }}>{formatRelativeDate(drive.updated_at)}</span>
+                          <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 700 }}>{drive.progress}%</span>
+                        </div>
+                        <Link href={`/campaigns/${drive.id}/edit`} className="btn btn-outline btn-sm mt-16" style={{ width: "100%", justifyContent: "center" }}>
+                          <Edit3 size={14} /> Edit Campaign
+                        </Link>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
 
               {latestDrives.length === 0 && (

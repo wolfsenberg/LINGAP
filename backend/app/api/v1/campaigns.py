@@ -12,13 +12,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_admin
 from app.models.aid_request import AidRequest
 from app.models.campaign_drive import CampaignDrive, CampaignDriveStatus
+from app.models.campaign_drive_change import CampaignDriveChange
 from app.models.donation import Donation
 from app.models.proof_artifact import ProofArtifact
 from app.models.user import User
-from app.schemas.campaign_drive import CampaignDriveCreate
+from app.schemas.campaign_drive import CampaignDriveCreate, CampaignDriveUpdate
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -213,6 +214,39 @@ async def _serialize_drive(db: AsyncSession, drive: CampaignDrive) -> dict:
         updated_at=drive.updated_at,
         source="database",
     )
+
+
+def _summarize_changes(changed_fields: list[str]) -> str:
+    labels = {
+        "title": "title",
+        "description": "story",
+        "category": "category",
+        "institution": "institution",
+        "location": "location",
+        "goal_amount": "target amount",
+        "image_src": "cover image",
+    }
+    readable = [labels.get(field, field) for field in changed_fields]
+    if not readable:
+        return "No visible campaign details changed."
+    if len(readable) == 1:
+        return f"Updated campaign {readable[0]}."
+    return f"Updated campaign {', '.join(readable[:-1])}, and {readable[-1]}."
+
+
+def _change_log_payload(change: CampaignDriveChange, campaign: CampaignDrive, actor: User) -> dict:
+    return {
+        "id": str(change.id),
+        "campaign_id": str(change.campaign_id),
+        "campaign_title": campaign.title,
+        "actor_id": str(change.actor_id),
+        "actor_name": actor.name,
+        "actor_email": actor.email,
+        "changed_fields": change.changed_fields,
+        "changes": change.changes,
+        "summary": change.summary,
+        "created_at": change.created_at,
+    }
 
 
 async def _serialize_static_campaigns(
@@ -415,6 +449,28 @@ async def get_campaign_upload(filename: str):
     return FileResponse(path, media_type=media_type)
 
 
+@router.get("/admin/change-log")
+async def campaign_change_log(
+    limit: int = 25,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    rows = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .order_by(CampaignDriveChange.created_at.desc())
+            .limit(min(max(limit, 1), 100))
+        )
+    ).all()
+
+    return {
+        "success": True,
+        "data": [_change_log_payload(change, campaign, actor) for change, campaign, actor in rows],
+    }
+
+
 @router.get("/proof-center")
 async def public_proof_center(db: AsyncSession = Depends(get_db)):
     campaigns = await _public_campaigns(db)
@@ -518,6 +574,65 @@ async def my_campaigns(
         items.append(await _serialize_drive(db, drive))
     items.sort(key=lambda item: item["updated_at"], reverse=True)
     return {"success": True, "data": items}
+
+
+@router.patch("/{campaign_id}")
+async def update_campaign(
+    campaign_id: UUID,
+    body: CampaignDriveUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    drive = (
+        await db.execute(
+            select(CampaignDrive).where(
+                CampaignDrive.id == campaign_id,
+                CampaignDrive.organizer_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not drive:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Campaign not found or you do not have permission to edit it.",
+        )
+
+    incoming = body.model_dump(exclude_unset=True)
+    allowed_fields = ["title", "description", "category", "institution", "location", "goal_amount", "image_src"]
+    changes: dict[str, dict] = {}
+
+    for field in allowed_fields:
+        if field not in incoming:
+            continue
+        new_value = incoming[field]
+        if new_value is None and field != "image_src":
+            continue
+        old_value = getattr(drive, field)
+        comparable_old = float(old_value) if field == "goal_amount" and old_value is not None else old_value
+        comparable_new = float(new_value) if field == "goal_amount" and new_value is not None else new_value
+        if comparable_old == comparable_new:
+            continue
+        changes[field] = {"before": comparable_old, "after": comparable_new}
+        setattr(drive, field, new_value)
+
+    if changes:
+        changed_fields = list(changes.keys())
+        change = CampaignDriveChange(
+            campaign_id=drive.id,
+            actor_id=user.id,
+            changed_fields=changed_fields,
+            changes=changes,
+            summary=_summarize_changes(changed_fields),
+        )
+        db.add(change)
+
+    await db.commit()
+    await db.refresh(drive)
+    return {
+        "success": True,
+        "message": "Campaign updated",
+        "data": await _serialize_drive(db, drive),
+    }
 
 
 @router.post("", status_code=201)

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Megaphone, Plus, Users } from "lucide-react";
+import { ArrowLeft, Edit3, Megaphone, Plus, Users } from "lucide-react";
 import { campaignsApi, type CampaignDriveApi } from "@/lib/api";
 
 function formatPeso(value: number) {
@@ -84,6 +84,9 @@ export default function MyCampaignsPage() {
                     <span style={{fontSize:12,color:'var(--text3)'}}>{formatRelativeDate(drive.updated_at)}</span>
                     <span style={{fontSize:12,color:'var(--canopy)',fontWeight:700}}>{drive.progress}% funded</span>
                   </div>
+                  <Link href={`/campaigns/${drive.id}/edit`} className="btn btn-outline btn-sm mt-16" style={{width:'100%',justifyContent:'center'}}>
+                    <Edit3 size={14}/> Edit Campaign
+                  </Link>
                 </div>
               </div>
             ))}

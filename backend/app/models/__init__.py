@@ -9,6 +9,7 @@ from .donor_vote import DonorVote
 from .credibility import CredibilityAssessment, CredibilityTier
 from .volunteer import VolunteerOpportunity, VolunteerSignup, VolunteerCategory, OpportunityStatus, SignupStatus
 from .campaign_drive import CampaignDrive, CampaignDriveStatus
+from .campaign_drive_change import CampaignDriveChange
 
 __all__ = [
     "User", "UserRole",
@@ -20,5 +21,5 @@ __all__ = [
     "DonorVote",
     "CredibilityAssessment", "CredibilityTier",
     "VolunteerOpportunity", "VolunteerSignup", "VolunteerCategory", "OpportunityStatus", "SignupStatus",
-    "CampaignDrive", "CampaignDriveStatus",
+    "CampaignDrive", "CampaignDriveStatus", "CampaignDriveChange",
 ]
