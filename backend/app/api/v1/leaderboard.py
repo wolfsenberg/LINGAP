@@ -21,6 +21,7 @@ async def donor_leaderboard(
                 Donation.donor_id,
                 func.sum(Donation.amount).label("total"),
                 func.count(Donation.id).label("count"),
+                func.max(Donation.updated_at).label("last_donation_at"),
             )
             .group_by(Donation.donor_id)
             .order_by(func.sum(Donation.amount).desc())
@@ -36,9 +37,11 @@ async def donor_leaderboard(
         if user:
             items.append({
                 "rank": rank,
+                "user_id": str(user.id),
                 "name": user.name,
                 "total_donated": float(row.total),
                 "donation_count": int(row.count),
+                "last_donation_at": row.last_donation_at,
             })
 
     return {"success": True, "data": items}

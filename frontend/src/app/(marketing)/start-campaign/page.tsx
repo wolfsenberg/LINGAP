@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import toast from "react-hot-toast";
 import {
@@ -15,15 +16,35 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
+import { campaignsApi } from "@/lib/api";
 
 const categories = ["Medical", "Relief", "Education", "Community"];
 
 export default function StartCampaignPage() {
   const [category, setCategory] = useState("Medical");
+  const [saving, setSaving] = useState(false);
+  const router = useRouter();
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    toast.success("Campaign draft saved for verification.");
+    const form = new FormData(event.currentTarget);
+    setSaving(true);
+    try {
+      await campaignsApi.create({
+        title: String(form.get("title") || ""),
+        description: String(form.get("description") || ""),
+        category,
+        institution: String(form.get("institution") || ""),
+        location: String(form.get("location") || ""),
+        goal_amount: Number(form.get("goal_amount") || 0),
+      });
+      toast.success("Campaign draft saved for verification.");
+      router.push("/donor#organized-drives");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Campaign save failed.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -49,11 +70,11 @@ export default function StartCampaignPage() {
               <div style={{display:'grid',gap:14}}>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Campaign title</span>
-                  <input required placeholder="e.g. Maria Santos cancer treatment fund" className="form-input" />
+                  <input required name="title" placeholder="e.g. Maria Santos cancer treatment fund" className="form-input" />
                 </label>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Short story</span>
-                  <textarea required placeholder="Tell donors who needs help, why it matters, and what proof you can provide." className="form-input" rows={5}/>
+                  <textarea required name="description" placeholder="Tell donors who needs help, why it matters, and what proof you can provide." className="form-input" rows={5}/>
                 </label>
                 <div style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Campaign Photos</span>
@@ -73,7 +94,7 @@ export default function StartCampaignPage() {
                   </label>
                   <label style={{display:'grid',gap:6}}>
                     <span className="small semi muted">Target amount</span>
-                    <input required type="number" min="1" placeholder="250000" className="form-input" />
+                    <input required name="goal_amount" type="number" min="1" placeholder="250000" className="form-input" />
                   </label>
                 </div>
               </div>
@@ -86,17 +107,17 @@ export default function StartCampaignPage() {
               <div style={{display:'grid',gap:14}}>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Beneficiary / recipient name</span>
-                  <input required placeholder="Full name or community name" className="form-input" />
+                  <input required name="beneficiary_name" placeholder="Full name or community name" className="form-input" />
                 </label>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Verified institution receiving funds</span>
-                  <input required placeholder="Hospital, school, pharmacy, NGO, or relief partner" className="form-input" />
+                  <input required name="institution" placeholder="Hospital, school, pharmacy, NGO, or relief partner" className="form-input" />
                 </label>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Location</span>
                   <div style={{position:'relative'}}>
                     <MapPin size={15} style={{position:'absolute',left:12,top:13,color:'var(--text3)'}}/>
-                    <input required placeholder="City, province" className="form-input" style={{paddingLeft:36}} />
+                    <input required name="location" placeholder="City, province" className="form-input" style={{paddingLeft:36}} />
                   </div>
                 </label>
               </div>
@@ -162,7 +183,7 @@ export default function StartCampaignPage() {
             </section>
 
             <div className="flex gap-10" style={{flexDirection:'column'}}>
-              <button type="submit" className="btn btn-emerald btn-lg" style={{justifyContent:'center'}}><Save size={16}/> Save for Verification</button>
+              <button type="submit" disabled={saving} className="btn btn-emerald btn-lg" style={{justifyContent:'center', opacity: saving ? .72 : 1}}><Save size={16}/> {saving ? "Saving..." : "Save for Verification"}</button>
               <Link href="/donor#organized-drives" className="btn btn-outline" style={{justifyContent:'center'}}>Cancel</Link>
             </div>
           </aside>

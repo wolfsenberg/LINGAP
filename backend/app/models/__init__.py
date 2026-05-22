@@ -8,6 +8,7 @@ from .proof_artifact import ProofArtifact, ProofKind
 from .donor_vote import DonorVote
 from .credibility import CredibilityAssessment, CredibilityTier
 from .volunteer import VolunteerOpportunity, VolunteerSignup, VolunteerCategory, OpportunityStatus, SignupStatus
+from .campaign_drive import CampaignDrive, CampaignDriveStatus
 
 __all__ = [
     "User", "UserRole",
@@ -19,4 +20,5 @@ __all__ = [
     "DonorVote",
     "CredibilityAssessment", "CredibilityTier",
     "VolunteerOpportunity", "VolunteerSignup", "VolunteerCategory", "OpportunityStatus", "SignupStatus",
+    "CampaignDrive", "CampaignDriveStatus",
 ]

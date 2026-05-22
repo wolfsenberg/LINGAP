@@ -41,6 +41,35 @@ async def list_donations(
     return {"items": items, "total": total, "page": page, "size": size, "pages": -(-total // size)}
 
 
+@router.get("/me")
+async def my_donations(
+    page: int = 1,
+    size: int = 20,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    offset = (page - 1) * size
+    query = (
+        select(Donation)
+        .where(Donation.donor_id == user.id)
+        .order_by(Donation.created_at.desc())
+    )
+    donations = (await db.execute(query.offset(offset).limit(size))).scalars().all()
+    total = (
+        await db.execute(
+            select(func.count()).select_from(Donation).where(Donation.donor_id == user.id)
+        )
+    ).scalar()
+
+    return {
+        "items": [_read(d, user.name) for d in donations],
+        "total": total,
+        "page": page,
+        "size": size,
+        "pages": -(-total // size),
+    }
+
+
 @router.post("", status_code=201)
 async def create_donation(
     body: DonationCreate,
