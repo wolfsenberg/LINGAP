@@ -235,6 +235,11 @@ select.form-input{appearance:none;background-image:linear-gradient(45deg,transpa
 .proof-card{background:linear-gradient(180deg,var(--surface),#fbf8ef);border:1px solid rgba(222,216,202,.9);border-radius:var(--r);overflow:hidden;box-shadow:var(--shadow)}
 .proof-thumb{height:160px;display:flex;align-items:center;justify-content:center;font-size:48px;position:relative}
 .proof-body{padding:16px}
+.proof-legend{background:rgba(255,253,248,.72);border:1px solid rgba(222,216,202,.88);border-radius:var(--r-sm);padding:14px;margin:-4px 0 22px;box-shadow:0 1px 0 rgba(255,255,255,.78)}
+.proof-legend-title{font-size:13px;font-weight:800;color:var(--forest);margin-bottom:10px}
+.proof-legend-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.proof-legend-item{min-height:44px;border:1px solid;border-radius:9px;padding:8px 9px;display:flex;align-items:center;justify-content:center;gap:6px;text-align:center}
+.proof-legend-item span{font-size:10.5px;font-weight:800;line-height:1.15;letter-spacing:.01em}
 .ai-alert{background:var(--surface);border:1px solid rgba(222,216,202,.88);border-radius:var(--r-sm);padding:16px 16px 16px 34px;margin-bottom:12px;position:relative;box-shadow:0 1px 0 rgba(255,255,255,.7)}
 .ai-alert::before{content:'';position:absolute;top:21px;left:16px;width:8px;height:8px;border-radius:999px;background:var(--alert-dot,var(--canopy));box-shadow:0 0 0 4px var(--alert-halo,rgba(74,155,106,.12))}
 .ai-alert-high{--alert-dot:#DC2626;--alert-halo:rgba(220,38,38,.12);border-color:rgba(220,38,38,.16);background:linear-gradient(180deg,rgba(220,38,38,.035),var(--surface))}
@@ -565,6 +570,7 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-v
   .proof-grid{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
   .proof-filter-head{align-items:flex-start;gap:14px;flex-wrap:wrap}
   .proof-filter-actions{overflow-x:auto;max-width:100%;padding-bottom:4px}
+  .proof-legend-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
   .impact-dashboard-grid{grid-template-columns:1fr}
   .impact-sidebar{position:static}
   .donor-hero{padding:40px 28px}
@@ -643,6 +649,9 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-v
   .proof-feed-row{display:grid!important;grid-template-columns:1fr;gap:8px}
   .proof-filter-actions{width:100%;flex-wrap:nowrap}
   .proof-filter-actions .filter-chip{flex:0 0 auto}
+  .proof-legend{padding:12px;margin-bottom:18px}
+  .proof-legend-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .proof-legend-item{min-height:40px;padding:7px}
   .donor-hero{padding:34px 18px}
   .donor-hero-content h1{font-size:30px!important}
   .donor-stats-row{grid-template-columns:1fr 1fr;gap:10px}
@@ -695,6 +704,8 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-v
   .donation-amount-grid{grid-template-columns:1fr!important}
   .achievement-grid{grid-template-columns:1fr}
   .achievement-panel{padding:15px!important}
+  .proof-legend-grid{grid-template-columns:1fr}
+  .proof-legend-item{justify-content:flex-start;text-align:left}
   .stat-value{font-size:24px}
   .transparency-value{font-size:17px}
   .esc-hero-head{display:grid!important;grid-template-columns:56px minmax(0,1fr);gap:12px!important}
