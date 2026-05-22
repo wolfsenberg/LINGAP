@@ -191,15 +191,20 @@ export default function DetailPage() {
       if (!signedXdr) throw new Error("Freighter did not return a signed transaction.");
       const submitRes = await submitSignedTransactionXdr(signedXdr);
       const txHash = submitRes.hash;
-      await donationsApi.create({
-        amount: effectiveAmount,
-        asset: "XLM",
-        purpose: `campaign:${activeCampaign.slug || activeCampaign.id}`,
-        stellarTxHash: txHash,
-      });
       setConfirmedDonationXlm((current) => current + effectiveAmount);
       setLastTxHash(txHash);
       toast.success(`Donation confirmed! Tx: ${txHash.slice(0, 8)}…`);
+      try {
+        await donationsApi.create({
+          amount: effectiveAmount,
+          asset: "XLM",
+          purpose: `campaign:${activeCampaign.slug || activeCampaign.id}`,
+          stellarTxHash: txHash,
+        });
+        toast.success("Donation synced to LINGAP dashboard.");
+      } catch {
+        toast.error("Donation sent, but dashboard sync failed. Check API/CORS settings.");
+      }
     } catch (e: unknown) {
       toast.error(getDonationErrorMessage(e));
     } finally {
