@@ -105,7 +105,7 @@ docker-compose up --build
 
 - 🔗 **Live App:** [link]
 - 🎬 **Demo Video:** [YouTube / Loom link]
-- 🖼️ **Pitch Deck:** [Google Slides / Canva link]
+- 🖼️ **Pitch Deck:** [[Canva link](https://www.canva.com/design/DAHKOM-6DPY/InVZSRGdgDInMo4TDtR4Hw/edit)]
 
 ---
 
