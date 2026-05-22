@@ -63,16 +63,16 @@ export default function DiscoverPage() {
   // --- Dynamic stats computed from fetched campaigns ---
   const activeCampaigns = liveCampaigns.filter(
     (c) => c.status === "active" || c.status === "approved" || c.status === "pending"
-  ).length + CAMPAIGNS.length;
+  ).length;
 
   const verifiedCampaigns = liveCampaigns.filter(
     (c) => c.is_verified === true
-  ).length + CAMPAIGNS.length;
+  ).length;
 
   const totalRequested = liveCampaigns.reduce(
     (sum: number, c: any) => sum + (c.requested_amount || 0),
     0
-  ) + CAMPAIGNS.reduce((sum, c) => sum + c.goal, 0);
+  );
 
   const confirmedFraud = liveCampaigns.filter(
     (c) => c.status === "fraud" || c.classification === "fraud"
@@ -90,7 +90,7 @@ export default function DiscoverPage() {
     { label: "Verified Only", Icon: CheckCircle2 },
   ];
 
-  const displayCount = selectedCity === "All Cities" ? filteredCampaigns.length + CAMPAIGNS.length : filteredCampaigns.length;
+  const displayCount = filteredCampaigns.length;
 
   return (
     <div>
@@ -316,11 +316,6 @@ export default function DiscoverPage() {
           </div>
         ) : (
           <div className="campaign-grid">
-            {filteredCampaigns.length === 0 && selectedCity === "All Cities" && (
-              <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--text3)" }}>
-                The {CAMPAIGNS.length} campaigns found are displayed in the Featured section above.
-              </div>
-            )}
             {filteredCampaigns.map((c) => (
               <AuthPromptLink key={c.id || c.aid_request_id} href={`/detail/${c.id || c.aid_request_id}`} className="camp-card" style={{ textDecoration: "none" }}>
                 <div className="camp-img" style={{ background: "linear-gradient(135deg,#1a3a2a,#2d5a3d)" }}>
