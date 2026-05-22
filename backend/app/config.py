@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     ALGORITHM: str = "HS256"
+    ADMIN_PASSWORD: str = "lingap12345678"
+    ADMIN_EMAIL: str = "lingap.admin@test.com"
 
     STELLAR_NETWORK: str = "testnet"
     STELLAR_HORIZON_URL: str = "https://horizon-testnet.stellar.org"

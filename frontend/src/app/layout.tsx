@@ -9,9 +9,8 @@ export const metadata: Metadata = {
     "Ledger for Integrity, Need-based Giving, Aid Provenance, and Protection — powered by Stellar blockchain.",
   keywords: ["humanitarian", "aid", "blockchain", "stellar", "transparency", "donations"],
   icons: {
-    icon: "/logo/logo.ico",
-    shortcut: "/logo/logo.ico",
-    apple: "/logo/logo.ico",
+    icon: "/logo/icon.ico",
+    shortcut: "/logo/icon.ico",
   },
 };
 

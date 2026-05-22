@@ -76,6 +76,22 @@ export const authApi = {
       },
     };
   },
+  adminLogin: async (email: string, password: string) => {
+    const res = await api.post<ApiResponse<{ token: string; user: ApiUser }>>("/api/v1/auth/admin-login", {
+      email,
+      password,
+    });
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: {
+          token: res.data.data.token,
+          user: normalizeUser(res.data.data.user),
+        },
+      },
+    };
+  },
   register: async (data: RegisterRequest) => {
     const res = await api.post<ApiResponse<ApiUser>>("/api/v1/auth/register", {
       email: data.email,
