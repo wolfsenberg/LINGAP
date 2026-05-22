@@ -47,6 +47,25 @@ function getSignedXdr(signResult: FreighterSignResult) {
   return signResult.signedTxXdr ?? signResult.signedTxXDR;
 }
 
+function truncateMemo(value: string) {
+  const maxBytes = 28;
+  const encoder = new TextEncoder();
+  if (encoder.encode(value).length <= maxBytes) return value;
+
+  const suffix = "...";
+  let output = "";
+  for (const char of value) {
+    if (encoder.encode(`${output}${char}${suffix}`).length > maxBytes) break;
+    output += char;
+  }
+  return `${output.trimEnd()}${suffix}`;
+}
+
+function getDonationMemo(campaignTitle: string, amount: number) {
+  const safeTitle = campaignTitle.replace(/[^a-zA-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  return truncateMemo(`${formatXlmAmount(amount)}XLM ${safeTitle}`);
+}
+
 const CATEGORY_ICON: Record<string, React.ElementType> = {
   Medical: Hospital,
   "Disaster Relief": Anchor,
@@ -93,7 +112,7 @@ function DetailContent() {
         LINGAP_RECEIVER_PUBLIC_KEY,
         formatXlmAmount(effectiveAmount),
         undefined,
-        `LINGAP:${campaign.id}`
+        getDonationMemo(campaign.title, effectiveAmount)
       );
       const { signTransaction } = await import("@stellar/freighter-api");
       const signResult = (await signTransaction(transaction.toXDR(), { networkPassphrase: STELLAR_CONFIG.network })) as FreighterSignResult;
