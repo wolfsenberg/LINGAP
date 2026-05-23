@@ -1,3 +1,4 @@
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
@@ -21,3 +22,10 @@ async def get_db() -> AsyncSession:
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Widen image_src to TEXT so base64 data URLs fit (idempotent on PostgreSQL)
+        await conn.execute(
+            text(
+                "ALTER TABLE campaign_drives "
+                "ALTER COLUMN image_src TYPE TEXT"
+            )
+        )

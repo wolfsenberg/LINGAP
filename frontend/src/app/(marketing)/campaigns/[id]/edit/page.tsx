@@ -80,9 +80,11 @@ export default function EditCampaignPage() {
     setSaving(true);
     try {
       let imageSrc = campaign.image_src ?? null;
+      let imageChanged = false;
       if (coverFile) {
         const upload = await campaignsApi.uploadCover(coverFile);
         imageSrc = upload.data.data.url;
+        imageChanged = true;
       }
 
       await campaignsApi.update(campaign.id, {
@@ -94,7 +96,12 @@ export default function EditCampaignPage() {
         goal_amount: Number(form.get("goal_amount") || 0),
         image_src: imageSrc,
       });
-      toast.success("Campaign updated.");
+
+      if (imageChanged) {
+        toast.success("Campaign updated. Your new cover photo is pending admin approval before it goes live.");
+      } else {
+        toast.success("Campaign updated.");
+      }
       router.push("/donor#organized-drives");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Campaign update failed.");
@@ -192,6 +199,9 @@ export default function EditCampaignPage() {
                 </label>
                 <div style={{ display: "grid", gap: 6 }}>
                   <span className="small semi muted">Campaign cover image</span>
+                  <div style={{fontSize:11,color:'var(--amber)',fontWeight:700,marginBottom:4,display:'flex',alignItems:'center',gap:5}}>
+                    <span>⏳</span> Cover image changes require admin approval before going live.
+                  </div>
                   <div className="hover-border-canopy" style={{ padding: visibleCover ? 0 : 20, border: "1px dashed var(--border)", borderRadius: "var(--r-sm)", background: "rgba(255,255,255,.5)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", minHeight: 190, overflow: "hidden" }}>
                     <input type="file" accept="image/png, image/jpeg, image/webp" onChange={handleCoverChange} style={{ opacity: 0, position: "absolute", inset: 0, cursor: "pointer", zIndex: 2 }} />
                     {visibleCover ? (

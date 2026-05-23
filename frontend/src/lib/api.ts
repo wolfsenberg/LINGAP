@@ -102,6 +102,17 @@ export type PublicCampaignApi = CampaignDriveApi & {
   organizer_name?: string | null;
 };
 
+export type AdminStatsApi = {
+  total_campaigns: number;
+  verified_institutions: number;
+  funds_escrowed_php: number;
+  released_php: number;
+  donor_count: number;
+  pending_edits: number;
+  pending_deletes: number;
+  pending_releases: number;
+};
+
 export type CampaignReleaseRequestCreate = {
   recipient_name: string;
   recipient_type?: string;
@@ -628,6 +639,12 @@ export const campaignsApi = {
     api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/release-requests/${requestId}/reject`),
   verifyReleaseProof: (requestId: string) =>
     api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/release-requests/${requestId}/verify-proof`),
+  approveImageChange: (changeId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/change-log/${changeId}/approve-image`),
+  rejectImageChange: (changeId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/change-log/${changeId}/reject-image`),
+  adminStats: () =>
+    api.get<ApiResponse<AdminStatsApi>>("/api/v1/campaigns/admin/stats"),
 };
 
 export const donorsApi = {

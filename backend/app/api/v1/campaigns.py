@@ -1,12 +1,9 @@
-import hashlib
-import os
+import base64
 import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
-import aiofiles
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
 from sqlalchemy import distinct, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,13 +22,7 @@ router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
 STATIC_ORGANIZER_EMAIL = "geineldungao012@gmail.com"
 DEMO_XLM_TO_PHP = settings.XLM_TO_PHP_RATE
-CAMPAIGN_UPLOAD_DIR = os.path.join(os.path.dirname(settings.UPLOAD_DIR), "campaigns")
 CAMPAIGN_IMAGE_MIME = {"image/png", "image/jpeg", "image/webp"}
-CAMPAIGN_IMAGE_EXT = {
-    "image/png": ".png",
-    "image/jpeg": ".jpg",
-    "image/webp": ".webp",
-}
 
 STATIC_CAMPAIGNS = [
     {
@@ -82,7 +73,12 @@ def _progress(raised: float, goal: float) -> int:
     return min(100, round((raised / goal) * 100))
 
 
-async def _save_campaign_cover(upload: UploadFile, user: User) -> str:
+async def _cover_to_data_url(upload: UploadFile) -> str:
+    """Read an uploaded image and return it as a base64 data URL.
+
+    This avoids any filesystem dependency — the image is stored directly in
+    the database column and survives container restarts / deploys.
+    """
     mime = (upload.content_type or "").lower()
     if mime not in CAMPAIGN_IMAGE_MIME:
         raise HTTPException(
@@ -91,46 +87,24 @@ async def _save_campaign_cover(upload: UploadFile, user: User) -> str:
         )
 
     max_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
-    os.makedirs(CAMPAIGN_UPLOAD_DIR, exist_ok=True)
-
-    hasher = hashlib.sha256()
+    chunks: list[bytes] = []
     total = 0
-    temp_name = f".tmp-{uuid.uuid4().hex}"
-    temp_path = os.path.join(CAMPAIGN_UPLOAD_DIR, temp_name)
 
-    try:
-        async with aiofiles.open(temp_path, "wb") as out:
-            while True:
-                chunk = await upload.read(1024 * 64)
-                if not chunk:
-                    break
-                total += len(chunk)
-                if total > max_bytes:
-                    raise HTTPException(
-                        status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                        detail=f"Campaign cover exceeds {settings.MAX_UPLOAD_MB} MB.",
-                    )
-                hasher.update(chunk)
-                await out.write(chunk)
-    except Exception:
-        if os.path.exists(temp_path):
-            try:
-                os.remove(temp_path)
-            except OSError:
-                pass
-        raise
+    while True:
+        chunk = await upload.read(1024 * 64)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Campaign cover exceeds {settings.MAX_UPLOAD_MB} MB.",
+            )
+        chunks.append(chunk)
 
-    digest = hasher.hexdigest()
-    ext = CAMPAIGN_IMAGE_EXT[mime]
-    final_name = f"{user.id}-{digest[:16]}{ext}"
-    final_path = os.path.join(CAMPAIGN_UPLOAD_DIR, final_name)
-
-    if os.path.exists(final_path):
-        os.remove(temp_path)
-    else:
-        os.replace(temp_path, final_path)
-
-    return f"/api/v1/campaigns/uploads/{final_name}"
+    raw = b"".join(chunks)
+    encoded = base64.b64encode(raw).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
 
 
 async def _donation_totals(db: AsyncSession, campaign_id: str) -> tuple[float, int]:
@@ -441,6 +415,92 @@ async def _confirmed_donation_proofs(db: AsyncSession, campaigns: list[dict], li
     return items
 
 
+@router.get("/admin/stats")
+async def admin_stats(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Real-time platform stats for the admin dashboard header cards."""
+    # Total campaigns: DB active/funded + static seeded
+    db_campaign_count = (
+        await db.execute(select(func.count()).select_from(CampaignDrive))
+    ).scalar() or 0
+    total_campaigns = db_campaign_count + len(STATIC_CAMPAIGNS)
+
+    # Funds escrowed: sum of all confirmed donation amounts in PHP
+    confirmed_xlm = (
+        await db.execute(
+            select(func.coalesce(func.sum(Donation.amount), 0)).where(
+                Donation.blockchain_confirmed.is_(True)
+            )
+        )
+    ).scalar() or 0
+    funds_escrowed_php = float(confirmed_xlm) * DEMO_XLM_TO_PHP
+
+    # Released (disbursed) PHP — funds that completed the full release flow
+    disbursed_xlm = (
+        await db.execute(
+            select(func.coalesce(func.sum(Donation.disbursed_amount), 0)).where(
+                Donation.disbursed.is_(True)
+            )
+        )
+    ).scalar() or 0
+    released_php = float(disbursed_xlm) * DEMO_XLM_TO_PHP
+
+    # Verified institutions: distinct institution names across all DB campaigns
+    institution_rows = (
+        await db.execute(
+            select(CampaignDrive.institution).distinct()
+        )
+    ).scalars().all()
+    # Add static campaign institutions
+    static_institutions = {c["institution"] for c in STATIC_CAMPAIGNS}
+    all_institutions = set(institution_rows) | static_institutions
+    verified_institutions = len(all_institutions)
+
+    # Pending review counts
+    all_changes = (
+        await db.execute(select(CampaignDriveChange))
+    ).scalars().all()
+
+    pending_edits = sum(
+        1 for c in all_changes
+        if "image_src" in (c.changed_fields or [])
+        and (c.changes or {}).get("image_src", {}).get("pending") is True
+    )
+    pending_deletes = sum(
+        1 for c in all_changes
+        if _delete_request_status(c) == "pending"
+    )
+    pending_releases = sum(
+        1 for c in all_changes
+        if _release_request_status(c) == "pending"
+    )
+
+    # Donor count
+    donor_count = (
+        await db.execute(
+            select(func.count(distinct(Donation.donor_id))).where(
+                Donation.blockchain_confirmed.is_(True)
+            )
+        )
+    ).scalar() or 0
+
+    return {
+        "success": True,
+        "data": {
+            "total_campaigns": total_campaigns,
+            "verified_institutions": verified_institutions,
+            "funds_escrowed_php": round(funds_escrowed_php, 2),
+            "released_php": round(released_php, 2),
+            "donor_count": donor_count,
+            "pending_edits": pending_edits,
+            "pending_deletes": pending_deletes,
+            "pending_releases": pending_releases,
+        },
+    }
+
+
 @router.get("/public")
 async def public_campaigns(db: AsyncSession = Depends(get_db)):
     return {"success": True, "data": await _public_campaigns(db)}
@@ -451,26 +511,12 @@ async def upload_campaign_cover(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
 ):
-    url = await _save_campaign_cover(file, user)
-    return {"success": True, "data": {"url": url}}
+    """Convert an uploaded image to a base64 data URL stored in the DB.
 
-
-@router.get("/uploads/{filename}")
-async def get_campaign_upload(filename: str):
-    if "/" in filename or "\\" in filename:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    path = os.path.join(CAMPAIGN_UPLOAD_DIR, filename)
-    if not os.path.exists(path):
-        raise HTTPException(status_code=404, detail="File not found")
-
-    media_type = "image/webp"
-    if filename.lower().endswith(".png"):
-        media_type = "image/png"
-    elif filename.lower().endswith((".jpg", ".jpeg")):
-        media_type = "image/jpeg"
-
-    return FileResponse(path, media_type=media_type)
+    No filesystem writes — survives container restarts and Render deploys.
+    """
+    data_url = await _cover_to_data_url(file)
+    return {"success": True, "data": {"url": data_url}}
 
 
 @router.get("/admin/change-log")
@@ -586,6 +632,100 @@ async def reject_campaign_delete_request(
     await db.commit()
     await db.refresh(change)
     return {"success": True, "message": "Delete request rejected", "data": _change_log_payload(change, campaign, actor)}
+
+
+@router.post("/admin/change-log/{change_id}/approve-image")
+async def approve_pending_image(
+    change_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Apply a pending cover-image change to the campaign after admin review."""
+    row = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .where(CampaignDriveChange.id == change_id)
+        )
+    ).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Change log entry not found.")
+
+    change, campaign, actor = row
+    image_change = (change.changes or {}).get("image_src", {})
+    if not image_change.get("pending"):
+        raise HTTPException(status_code=400, detail="No pending image change on this entry.")
+
+    new_image = image_change.get("pending_image_src")
+    if not new_image:
+        raise HTTPException(status_code=400, detail="Pending image data is missing.")
+
+    # Apply the image to the campaign
+    campaign.image_src = new_image
+
+    # Mark the change as approved
+    updated_changes = dict(change.changes or {})
+    updated_changes["image_src"] = {
+        **image_change,
+        "pending": False,
+        "approved": True,
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+        "after": "[image applied]",
+    }
+    change.changes = updated_changes
+    change.summary = change.summary.rstrip(".") + " (cover image approved by admin)."
+
+    await db.commit()
+    await db.refresh(change)
+    return {
+        "success": True,
+        "message": "Cover image approved and applied to campaign.",
+        "data": _change_log_payload(change, campaign, actor),
+    }
+
+
+@router.post("/admin/change-log/{change_id}/reject-image")
+async def reject_pending_image(
+    change_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Reject a pending cover-image change without applying it."""
+    row = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .where(CampaignDriveChange.id == change_id)
+        )
+    ).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Change log entry not found.")
+
+    change, campaign, actor = row
+    image_change = (change.changes or {}).get("image_src", {})
+    if not image_change.get("pending"):
+        raise HTTPException(status_code=400, detail="No pending image change on this entry.")
+
+    updated_changes = dict(change.changes or {})
+    updated_changes["image_src"] = {
+        **image_change,
+        "pending": False,
+        "approved": False,
+        "rejected_at": datetime.now(timezone.utc).isoformat(),
+        "after": "[image rejected]",
+    }
+    change.changes = updated_changes
+    change.summary = change.summary.rstrip(".") + " (cover image rejected by admin)."
+
+    await db.commit()
+    await db.refresh(change)
+    return {
+        "success": True,
+        "message": "Cover image change rejected.",
+        "data": _change_log_payload(change, campaign, actor),
+    }
 
 
 @router.get("/proof-center")
@@ -784,8 +924,19 @@ async def update_campaign(
         comparable_new = float(new_value) if field == "goal_amount" and new_value is not None else new_value
         if comparable_old == comparable_new:
             continue
-        changes[field] = {"before": comparable_old, "after": comparable_new}
-        setattr(drive, field, new_value)
+
+        if field == "image_src":
+            # Image changes are held for admin approval — stored in the change
+            # log as pending_image_src and NOT applied to the drive directly.
+            changes[field] = {
+                "before": "[previous image]" if comparable_old and str(comparable_old).startswith("data:") else comparable_old,
+                "after": "[new image pending approval]",
+                "pending_image_src": new_value,
+                "pending": True,
+            }
+        else:
+            changes[field] = {"before": comparable_old, "after": comparable_new}
+            setattr(drive, field, new_value)
 
     if changes:
         changed_fields = list(changes.keys())
