@@ -3,8 +3,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
-import { balanceApi, campaignsApi, donationsApi, escrowApi, type BalanceApi } from "@/lib/api";
-import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash, STELLAR_CONFIG } from "@/lib/stellar";
+import { balanceApi, campaignsApi, donationsApi, type BalanceApi } from "@/lib/api";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash, buildPaymentTransaction, submitSignedTransactionXdr, STELLAR_CONFIG } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
@@ -252,87 +252,68 @@ export default function DetailPage() {
       toast.error("Enter a valid amount.");
       return;
     }
-    if (balance.xlm_balance < effectiveAmount) {
-      toast.error("You do not have enough XLM balance. Please top up first.");
+
+    const receivingWallet = process.env.NEXT_PUBLIC_LINGAP_RECEIVER_PUBLIC_KEY;
+    if (!receivingWallet) {
+      toast.error("LINGAP receiving wallet is not configured.");
       return;
     }
 
     setDonating(true);
-    const donationPurpose = `campaign:${activeCampaign.slug || activeCampaign.id}`;
-    const sorobanId: number | null = activeCampaign.sorobanCampaignId ?? null;
+    const campaignId = activeCampaign.slug || activeCampaign.id;
+    const donationPurpose = `campaign:${campaignId}`;
+    // Stellar text memo max 28 chars
+    const memo = `LNGP-DON-${campaignId}`.slice(0, 28);
 
     try {
-      // ── Path A: On-chain via Soroban + Freighter ──────────────────────────
-      // Only available when the campaign has a registered Soroban campaign ID.
-      if (sorobanId !== null) {
-        // 1. Ask backend to build the unsigned deposit XDR
-        toast("Preparing Stellar transaction...", { icon: "⏳" });
-        let xdr: string;
-        try {
-          const xdrRes = await escrowApi.getDepositXdr(sorobanId, publicKey, effectiveAmount);
-          xdr = xdrRes.data.data.xdr;
-        } catch {
-          // Soroban RPC may be unavailable — fall through to balance path
-          throw new Error("SOROBAN_UNAVAILABLE");
+      // 1. Build unsigned XLM payment to LINGAP receiver
+      const tx = await buildPaymentTransaction(
+        publicKey,
+        receivingWallet,
+        effectiveAmount.toFixed(7),
+        undefined,
+        memo,
+      );
+
+      // 2. Freighter signs → popup appears here
+      toast("Check your Freighter wallet to sign the donation.", { icon: "🔐", duration: 8000 });
+      let signedXdr: string;
+      try {
+        signedXdr = await sign(tx.toXDR(), STELLAR_CONFIG.network);
+      } catch (signErr: unknown) {
+        const msg = signErr instanceof Error ? signErr.message : String(signErr);
+        if (msg.toLowerCase().includes("user declined") || msg.toLowerCase().includes("rejected")) {
+          toast.error("Donation cancelled in Freighter.");
+        } else {
+          toast.error(`Freighter error: ${msg}`);
         }
-
-        // 2. Freighter signs → popup appears here
-        toast("Check your Freighter wallet to sign the transaction.", { icon: "🔐", duration: 8000 });
-        let signedXdr: string;
-        try {
-          signedXdr = await sign(xdr, STELLAR_CONFIG.network);
-        } catch (signErr: unknown) {
-          const msg = signErr instanceof Error ? signErr.message : String(signErr);
-          if (msg.toLowerCase().includes("user declined") || msg.toLowerCase().includes("rejected")) {
-            toast.error("Transaction cancelled in Freighter.");
-          } else {
-            toast.error(`Freighter error: ${msg}`);
-          }
-          return;
-        }
-
-        // 3. Submit signed XDR to Soroban via backend
-        toast("Submitting to Stellar network...", { icon: "🚀", duration: 6000 });
-        const submitRes = await escrowApi.submitSignedXdr(signedXdr);
-        const realTxHash = submitRes.data.data.tx_hash;
-
-        // 4. Record donation in LINGAP DB with the real Stellar tx hash
-        await donationsApi.create({
-          amount: Number(effectiveAmount.toFixed(7)),
-          asset: "XLM",
-          purpose: donationPurpose,
-          stellarTxHash: realTxHash,
-          fundingSource: "stellar_wallet",
-          spendBalance: false,
-          walletAddress: publicKey,
-        });
-
-        setConfirmedDonationXlm((c) => c + effectiveAmount);
-        setLastTxHash(realTxHash);
-        toast.success(`Donation confirmed on Stellar! TX: ${realTxHash.slice(0, 10)}...`);
-
-      } else {
-        // ── Path B: Balance-only (no Soroban campaign slot yet) ──────────────
-        // Funds are deducted from LINGAP balance and recorded in the DB.
-        // A ledger reference is generated — not a real Stellar tx.
-        const donationRes = await donationsApi.create({
-          amount: Number(effectiveAmount.toFixed(7)),
-          asset: "XLM",
-          purpose: donationPurpose,
-          fundingSource: "lingap_balance",
-          spendBalance: true,
-          walletAddress: publicKey,
-        });
-        const txHash = donationRes.data.data.stellarTxHash;
-        setConfirmedDonationXlm((c) => c + effectiveAmount);
-        setLastTxHash(txHash);
-        toast.success(`Donation recorded! Ref: ${txHash.slice(0, 14)}...`);
+        return;
       }
 
-      // Refresh live totals
+      // 3. Submit to Stellar Horizon — real on-chain tx
+      toast("Submitting to Stellar network...", { icon: "🚀", duration: 6000 });
+      const submitResult = await submitSignedTransactionXdr(signedXdr);
+      const realTxHash = submitResult.hash;
+
+      // 4. Record in LINGAP DB with the real Stellar tx hash + deduct balance
+      await donationsApi.create({
+        amount: Number(effectiveAmount.toFixed(7)),
+        asset: "XLM",
+        purpose: donationPurpose,
+        stellarTxHash: realTxHash,
+        fundingSource: "stellar_wallet",
+        spendBalance: true,   // deducts from LINGAP balance AND records real tx hash
+        walletAddress: publicKey,
+      });
+
+      setConfirmedDonationXlm((c) => c + effectiveAmount);
+      setLastTxHash(realTxHash);
+      toast.success(`Donation confirmed on Stellar! TX: ${realTxHash.slice(0, 10)}...`);
+
+      // 5. Refresh live totals
       try {
         const [latest, nextBalance] = await Promise.all([
-          campaignsApi.publicOne(activeCampaign.slug || activeCampaign.id),
+          campaignsApi.publicOne(campaignId),
           balanceApi.mine(),
         ]);
         if (latest.data.data) setLiveSummary(latest.data.data);
@@ -342,28 +323,7 @@ export default function DetailPage() {
       }
 
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg === "SOROBAN_UNAVAILABLE") {
-        // Soroban RPC down — fall back to balance path silently
-        try {
-          const donationRes = await donationsApi.create({
-            amount: Number(effectiveAmount.toFixed(7)),
-            asset: "XLM",
-            purpose: donationPurpose,
-            fundingSource: "lingap_balance",
-            spendBalance: true,
-            walletAddress: publicKey,
-          });
-          const txHash = donationRes.data.data.stellarTxHash;
-          setConfirmedDonationXlm((c) => c + effectiveAmount);
-          setLastTxHash(txHash);
-          toast.success("Donation recorded via LINGAP balance (Soroban RPC temporarily unavailable).");
-        } catch (fallbackErr: unknown) {
-          toast.error(getDonationErrorMessage(fallbackErr));
-        }
-      } else {
-        toast.error(getDonationErrorMessage(e));
-      }
+      toast.error(getDonationErrorMessage(e));
     } finally {
       setDonating(false);
     }
@@ -574,9 +534,7 @@ export default function DetailPage() {
               {donating
                 ? "Submitting to Stellar..."
                 : connected
-                  ? activeCampaign.sorobanCampaignId
-                    ? `Donate ${formatXlmAmount(effectiveAmount)} XLM via Stellar`
-                    : `Donate ${formatXlmAmount(effectiveAmount)} XLM`
+                  ? `Donate ${formatXlmAmount(effectiveAmount)} XLM via Stellar`
                   : "Connect Wallet to Donate"}
             </button>
             {lastTxHash && (

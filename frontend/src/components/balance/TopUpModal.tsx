@@ -96,12 +96,6 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
   }
 
   async function handleConfirm() {
-    if (!connected || !publicKey) {
-      toast.error("Connect your Stellar Wallet before topping up.");
-      await connect();
-      return;
-    }
-
     if (amountXlm <= 0) {
       toast.error("Enter an amount greater than 0.");
       return;
@@ -117,7 +111,6 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
       return;
     }
 
-    const sourceWallet = publicKey;
     setSubmitting(true);
     setConfirmedRef("");
     setConfirmedTxHash("");
@@ -125,39 +118,67 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
     try {
       let stellarTxHash: string | undefined;
 
-      if (method === "stellar_wallet") {
-        if (!receivingWallet) {
-          toast.error("LINGAP receiving wallet is not configured.");
-          return;
-        }
-
-        const tx = await buildPaymentTransaction(
-          sourceWallet,
-          receivingWallet,
-          amountXlm.toFixed(2),
-          undefined,
-          "LNGP-TOPUP"
-        );
-        const signedXdr = await sign(tx.toXDR(), NETWORK_PASSPHRASE);
-        const submitResult = await submitSignedTransactionXdr(signedXdr);
-        stellarTxHash = submitResult.hash;
+      // ── ALL methods: send a real Stellar payment through Freighter ──────────
+      // This makes every top-up visible on stellar.expert regardless of
+      // payment method. The memo identifies the source channel.
+      if (!receivingWallet) {
+        toast.error("LINGAP receiving wallet is not configured.");
+        return;
+      }
+      if (!connected || !publicKey) {
+        toast.error("Connect your Stellar Wallet to continue.");
+        await connect();
+        return;
       }
 
+      const memoLabel =
+        method === "stellar_wallet" ? "LNGP-TOPUP"
+        : method === "gcash"        ? "LNGP-TOPUP-GCASH"
+        : method === "maya"         ? "LNGP-TOPUP-MAYA"
+        :                             "LNGP-TOPUP-PDAX";
+
+      toast("Check your Freighter wallet to sign the top-up.", { icon: "🔐", duration: 8000 });
+
+      const tx = await buildPaymentTransaction(
+        publicKey,
+        receivingWallet,
+        amountXlm.toFixed(7),
+        undefined,
+        memoLabel,
+      );
+
+      let signedXdr: string;
+      try {
+        signedXdr = await sign(tx.toXDR(), NETWORK_PASSPHRASE);
+      } catch (signErr: unknown) {
+        const msg = signErr instanceof Error ? signErr.message : String(signErr);
+        if (msg.toLowerCase().includes("user declined") || msg.toLowerCase().includes("rejected")) {
+          toast.error("Transaction cancelled in Freighter.");
+        } else {
+          toast.error(`Freighter error: ${msg}`);
+        }
+        return;
+      }
+
+      toast("Submitting to Stellar network...", { icon: "🚀", duration: 6000 });
+      const submitResult = await submitSignedTransactionXdr(signedXdr);
+      stellarTxHash = submitResult.hash;
+
+      // ── Record in LINGAP backend ─────────────────────────────────────────
       const res = await balanceApi.simulateTopUp({
         paymentMethod: method,
-        amountXlm: method === "stellar_wallet" || mode === "xlm" ? Number(amountXlm.toFixed(2)) : undefined,
-        amountPhp: method !== "stellar_wallet" && mode === "php" ? Number(amountPhp.toFixed(2)) : undefined,
+        amountXlm: Number(amountXlm.toFixed(7)),
         senderReference: senderReference.trim() || undefined,
         senderName: senderName.trim() || undefined,
-        senderWallet: sourceWallet,
+        senderWallet: publicKey,
         stellarTxHash,
       });
 
-      const tx = res.data.data.top_up;
-      setConfirmedRef(tx.payment_reference);
-      setConfirmedTxHash(tx.stellar_tx_hash || stellarTxHash || "");
-      onConfirmed(res.data.data.balance, tx);
-      toast.success(method === "stellar_wallet" ? "Stellar top-up confirmed." : `${tx.payment_reference} confirmed.`);
+      const topUpTx = res.data.data.top_up;
+      setConfirmedRef(topUpTx.payment_reference);
+      setConfirmedTxHash(topUpTx.stellar_tx_hash || stellarTxHash || "");
+      onConfirmed(res.data.data.balance, topUpTx);
+      toast.success("Top-up confirmed on Stellar!");
       closeModal();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } }; message?: string };
