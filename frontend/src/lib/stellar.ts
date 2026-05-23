@@ -5,7 +5,6 @@ import {
   Asset,
   Keypair,
   Horizon,
-  BASE_FEE,
   Memo,
 } from "@stellar/stellar-sdk";
 
@@ -36,10 +35,13 @@ export async function buildPaymentTransaction(
   asset: Asset = Asset.native(),
   memo?: string
 ) {
+  // Always load a fresh account to get the latest sequence number.
+  // Stale sequences cause tx_bad_seq errors when multiple transactions
+  // are submitted in quick succession.
   const sourceAccount = await loadAccount(sourcePublicKey);
 
   const txBuilder = new TransactionBuilder(sourceAccount, {
-    fee: BASE_FEE,
+    fee: "10000", // 10,000 stroops — avoids tx_insufficient_fee on testnet
     networkPassphrase: STELLAR_CONFIG.network,
   });
 
@@ -49,13 +51,88 @@ export async function buildPaymentTransaction(
 
   if (memo) txBuilder.addMemo(Memo.text(memo));
 
-  txBuilder.setTimeout(180);
+  // 30s timeout — enough for Freighter to sign without the tx expiring
+  txBuilder.setTimeout(30);
   return txBuilder.build();
 }
 
-export async function submitSignedTransactionXdr(signedXdr: string) {
-  const transaction = TransactionBuilder.fromXDR(signedXdr, STELLAR_CONFIG.network);
-  return horizonServer.submitTransaction(transaction);
+export async function submitSignedTransactionXdr(
+  signedXdr: string,
+  retries = 1,
+): Promise<{ hash: string; successful: boolean }> {
+  // Submit the raw signed XDR directly to Horizon via fetch.
+  // Using the SDK's submitTransaction() can silently re-encode the envelope
+  // and drop the Freighter signature, causing tx_bad_auth errors.
+  const params = new URLSearchParams({ tx: signedXdr });
+  const res = await fetch(`${STELLAR_CONFIG.horizonUrl}/transactions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: params.toString(),
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    const codes = data?.extras?.result_codes;
+    const txCode: string = codes?.transaction ?? "";
+    const opCodes: string[] = codes?.operations ?? [];
+
+    // tx_bad_seq means the sequence was stale — the caller should rebuild
+    // the transaction with a fresh sequence and re-sign. We surface this
+    // as a distinct error so the UI can give a clear message.
+    if (txCode === "tx_bad_seq") {
+      throw new Error("TX_BAD_SEQ");
+    }
+
+    // op_underfunded — not enough XLM in the source wallet
+    if (opCodes.includes("op_underfunded")) {
+      throw new Error("Insufficient XLM in your Freighter wallet. Please fund your testnet account via friendbot.stellar.org.");
+    }
+
+    // op_no_destination — destination account doesn't exist on this network
+    if (opCodes.includes("op_no_destination")) {
+      throw new Error("The LINGAP receiving wallet doesn't exist on this network yet. Contact support.");
+    }
+
+    const detail = codes
+      ? `Stellar error: ${JSON.stringify(codes)}`
+      : data?.detail || data?.title || "Transaction failed";
+    throw new Error(detail);
+  }
+
+  return data as { hash: string; successful: boolean };
+}
+
+/**
+ * Build, sign (via Freighter), and submit a payment transaction.
+ * Automatically retries once on tx_bad_seq by rebuilding with a fresh sequence.
+ */
+export async function buildSignAndSubmit(
+  sourcePublicKey: string,
+  destinationPublicKey: string,
+  amount: string,
+  memo: string,
+  signFn: (xdr: string, networkPassphrase: string) => Promise<string>,
+): Promise<{ hash: string }> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const tx = await buildPaymentTransaction(
+      sourcePublicKey,
+      destinationPublicKey,
+      amount,
+      undefined,
+      memo,
+    );
+    const signedXdr = await signFn(tx.toXDR(), STELLAR_CONFIG.network);
+    try {
+      const result = await submitSignedTransactionXdr(signedXdr);
+      return { hash: result.hash };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // On bad sequence, rebuild with fresh account data and retry once
+      if (msg === "TX_BAD_SEQ" && attempt === 0) continue;
+      throw err;
+    }
+  }
+  throw new Error("Transaction failed after retry.");
 }
 
 export function getStellarExpertTxUrl(txHash: string) {
