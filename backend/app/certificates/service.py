@@ -14,6 +14,7 @@ from app.models.aid_request import AidRequest
 from app.models.beneficiary import Beneficiary
 from app.models.user import User
 from app.models.provenance import ProvenanceRecord
+from app.models.campaign_drive import CampaignDrive
 from app.certificates.generator import generate_certificate_pdf
 from app.storage.s3 import upload_certificate_pdf
 
@@ -97,12 +98,20 @@ async def create_certificate_for_donation(
         ).scalar()
         total_donated = float(total_donated_result or 0)
 
-        milestone_description = (
-            aid_request.purpose or f"Donation for {beneficiary.name}"
-        )
+        campaign_title = None
+        if donation.purpose and donation.purpose.startswith("campaign:"):
+            campaign_id = donation.purpose.replace("campaign:", "", 1)
+            campaign = (
+                await db.execute(select(CampaignDrive).where(CampaignDrive.id == campaign_id))
+            ).scalar_one_or_none()
+            if campaign:
+                campaign_title = campaign.title
+
+        milestone_description = aid_request.purpose or campaign_title or f"Donation for {beneficiary.name}"
+        donor_name = donor.name or donor.stellar_public_key or donor.email
 
         pdf_bytes = generate_certificate_pdf(
-            donor_name=donor.name,
+            donor_name=donor_name,
             amount=float(donation.amount),
             beneficiary_name=beneficiary.name,
             milestone_description=milestone_description,
@@ -120,7 +129,7 @@ async def create_certificate_for_donation(
             s3_url=stored.s3_url,
             pdf_hash=stored.pdf_hash,
             is_public=False,
-            donor_name=donor.name,
+            donor_name=donor_name,
             amount=float(donation.amount),
             beneficiary_name=beneficiary.name,
             milestone_description=milestone_description,

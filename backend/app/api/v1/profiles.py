@@ -101,6 +101,11 @@ async def _profile_payload(db: AsyncSession, user: User) -> dict:
     ).one()
 
     campaigns = await _public_campaigns_for_user(db, user)
+    campaign_rows = (
+        await db.execute(select(CampaignDrive.id, CampaignDrive.title))
+    ).all()
+    campaign_titles = {str(row.id): row.title for row in campaign_rows}
+
     cert_rows = (
         await db.execute(
             select(DonationCertificate, Donation)
@@ -116,7 +121,8 @@ async def _profile_payload(db: AsyncSession, user: User) -> dict:
 
     activity_rows = (
         await db.execute(
-            select(Donation)
+            select(Donation, DonationCertificate)
+            .outerjoin(DonationCertificate, DonationCertificate.donation_id == Donation.id)
             .where(
                 Donation.donor_id == user.id,
                 Donation.purpose.like("campaign:%"),
@@ -124,7 +130,7 @@ async def _profile_payload(db: AsyncSession, user: User) -> dict:
             .order_by(Donation.created_at.desc())
             .limit(8)
         )
-    ).scalars().all()
+    ).all()
 
     total_xlm = float(donation_row.total or 0)
     donation_count = int(donation_row.count or 0)
@@ -135,6 +141,8 @@ async def _profile_payload(db: AsyncSession, user: User) -> dict:
             "amount": float(cert.amount),
             "lives_touched": cert.lives_touched,
             "stellar_tx_hash": cert.stellar_tx_hash,
+            "public_url": f"/api/v1/certificates/{cert.id}/public",
+            "download_url": f"/api/v1/certificates/{cert.id}/download",
             "verified": cert.verified,
             "created_at": cert.created_at,
         }
@@ -144,13 +152,17 @@ async def _profile_payload(db: AsyncSession, user: User) -> dict:
         {
             "id": str(donation.id),
             "campaign_id": (donation.purpose or "").replace("campaign:", "", 1),
+            "campaign_name": campaign_titles.get((donation.purpose or "").replace("campaign:", "", 1), "Campaign"),
+            "milestone": cert.milestone_description if cert else None,
             "amount": float(donation.amount),
             "asset": donation.asset,
             "stellar_tx_hash": donation.stellar_tx_hash,
+            "wallet_address": user.stellar_public_key,
+            "certificate_id": str(cert.id) if cert else None,
             "blockchain_confirmed": donation.blockchain_confirmed,
             "created_at": donation.created_at,
         }
-        for donation in activity_rows
+        for donation, cert in activity_rows
     ]
 
     active_campaigns = [item for item in campaigns if item["status"].lower() == "active"]

@@ -19,6 +19,8 @@ from .geo import router as geo_router
 from .campaigns import router as campaigns_router
 from .profiles import router as profiles_router
 from .balance import router as balance_router
+from .certificates import router as certificates_router
+from .onchain_certificates import router as onchain_certificates_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -41,3 +43,5 @@ api_router.include_router(volunteer_router)
 api_router.include_router(campaigns_router)
 api_router.include_router(profiles_router)
 api_router.include_router(balance_router)
+api_router.include_router(certificates_router)
+api_router.include_router(onchain_certificates_router)
