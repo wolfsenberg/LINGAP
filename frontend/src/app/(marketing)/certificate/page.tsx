@@ -70,7 +70,7 @@ export default function CertificatePage() {
         const mapped: Certificate[] = data.map((c: any) => ({
           id: c.id,
           donor: c.donor_name || user?.name || "Anonymous Donor",
-          amount: `₱${parseFloat(c.amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
+          amount: (() => { const n = parseFloat(c.amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); const a = (c.asset || "XLM").toUpperCase(); return a === "PHP" ? `\u20b1${n}` : `${n} ${a}`; })(),
           campaign: c.campaign_name || c.milestone_description || "Campaign Milestone",
           institution: c.beneficiary_name || "LINGAP Verified Network",
           milestone: c.milestone_description || "Milestone Complete",
@@ -276,3 +276,6 @@ export default function CertificatePage() {
     </div>
   );
 }
+
+
+
