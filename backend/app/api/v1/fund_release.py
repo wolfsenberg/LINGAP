@@ -7,7 +7,7 @@ router = APIRouter(prefix="/fund-release", tags=["Fund Release"])
 
 # --- Constants & Thresholds ---
 TIER_1_THRESHOLD_PHP = 15000.00
-EMERGENCY_RELEASE_CAP_PERCENT = 0.50 
+EMERGENCY_RELEASE_CAP_PERCENT = 0.50
 CREDIBILITY_PENALTY = 15.0
 CRITICAL_CREDIBILITY_SCORE = 50.0
 
@@ -70,7 +70,7 @@ async def process_fund_release(request: FundReleaseRequest):
     organizer = evaluate_account_standing(organizer)
     if organizer.is_frozen:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Account frozen: Pending or overdue receipts detected."
         )
 
@@ -78,20 +78,20 @@ async def process_fund_release(request: FundReleaseRequest):
         # Tier 1 Logic: Emergency Quick-Release
         if not organizer.registered_off_ramp_partner:
              raise HTTPException(
-                 status_code=status.HTTP_400_BAD_REQUEST, 
+                 status_code=status.HTTP_400_BAD_REQUEST,
                  detail="Unregistered off-ramp partner. Cannot route emergency funds."
              )
-             
+
         capped_amount = min(request.requested_amount, request.total_pool_balance * EMERGENCY_RELEASE_CAP_PERCENT)
         organizer.receipt_state = ReceiptState.PENDING
-        
+
         return FundReleaseResponse(
             status="APPROVED",
             tier=1,
             released_amount=capped_amount,
             message=f"Emergency funds routed to {organizer.registered_off_ramp_partner}. Post-expenditure receipt required.",
             account_updates={
-                "receipt_state": organizer.receipt_state.value, 
+                "receipt_state": organizer.receipt_state.value,
                 "credibility_score": organizer.credibility_score
             }
         )
@@ -99,22 +99,22 @@ async def process_fund_release(request: FundReleaseRequest):
         # Tier 2 Logic: Milestone-Based Capital
         if not request.current_milestone_id:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, 
+                status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Milestone ID required for Tier 2 capital release."
             )
-            
+
         milestone = milestones_db.get(request.current_milestone_id)
         if not milestone:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Milestone tracking not found.")
-            
+
         if milestone.state != MilestoneState.VERIFIED:
             raise HTTPException(
-                status_code=status.HTTP_423_LOCKED, 
+                status_code=status.HTTP_423_LOCKED,
                 detail="Programmatic lock enforced: Preceding milestone proof of completion not explicitly verified."
             )
-            
+
         allowed_release = min(request.requested_amount, milestone.amount, request.total_pool_balance)
-        
+
         return FundReleaseResponse(
             status="APPROVED",
             tier=2,
@@ -127,8 +127,8 @@ async def milestone_validation_hook(milestone_id: str, proof_url: str):
     milestone = milestones_db.get(milestone_id)
     if not milestone:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Milestone not found.")
-        
+
     milestone.proof_of_completion = proof_url
     milestone.state = MilestoneState.VERIFIED
-    
+
     return {"status": "success", "message": f"Milestone {milestone_id} explicitly verified. Subsequent payouts unlocked."}

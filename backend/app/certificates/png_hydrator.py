@@ -6,7 +6,6 @@ Uses bundled Poppins + RobotoMono TTF fonts for consistent rendering across envi
 from __future__ import annotations
 
 import logging
-import textwrap
 import time
 from io import BytesIO
 from datetime import datetime
