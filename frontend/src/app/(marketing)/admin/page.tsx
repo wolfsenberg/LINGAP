@@ -4,10 +4,12 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import {
-  AlertCircle, ArrowLeft, CheckCircle2, AlertTriangle, Eye, EyeOff, Lock, Network, ShieldCheck, Search, Link2, XCircle, History, Banknote, FileCheck
+  AlertCircle, ArrowLeft, CheckCircle2, AlertTriangle, Eye, EyeOff, Lock, Network,
+  ShieldCheck, Search, Link2, XCircle, History, Banknote, FileCheck, Building2,
+  TrendingUp, RefreshCw,
 } from "lucide-react";
 import { CAMPAIGNS } from "@/lib/campaigns";
-import { authApi, campaignsApi, type CampaignChangeLogApi } from "@/lib/api";
+import { authApi, campaignsApi, type CampaignChangeLogApi, type AdminStatsApi } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 
 export default function AdminPage() {
@@ -19,22 +21,37 @@ export default function AdminPage() {
   const [campaignChanges, setCampaignChanges] = useState<CampaignChangeLogApi[]>([]);
   const [deleteRequests, setDeleteRequests] = useState<CampaignChangeLogApi[]>([]);
   const [releaseRequests, setReleaseRequests] = useState<CampaignChangeLogApi[]>([]);
+  const [stats, setStats] = useState<AdminStatsApi | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
   const isAdmin = isAuthenticated && user?.role === "admin";
 
-  useEffect(() => {
-    if (!isAdmin) return;
-    let active = true;
-    Promise.allSettled([
-      campaignsApi.changeLog(8),
-      campaignsApi.deleteRequests(8),
-      campaignsApi.releaseRequests(20),
-    ]).then(([changes, deletes, releases]) => {
-      if (!active) return;
+  function formatPeso(n: number) {
+    if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1)}M`;
+    if (n >= 1_000) return `₱${(n / 1_000).toFixed(1)}K`;
+    return `₱${Math.round(n).toLocaleString()}`;
+  }
+
+  async function loadAll() {
+    setStatsLoading(true);
+    try {
+      const [changes, deletes, releases, statsRes] = await Promise.allSettled([
+        campaignsApi.changeLog(50),
+        campaignsApi.deleteRequests(50),
+        campaignsApi.releaseRequests(50),
+        campaignsApi.adminStats(),
+      ]);
       setCampaignChanges(changes.status === "fulfilled" ? changes.value.data.data : []);
       setDeleteRequests(deletes.status === "fulfilled" ? deletes.value.data.data : []);
       setReleaseRequests(releases.status === "fulfilled" ? releases.value.data.data : []);
-    });
-    return () => { active = false; };
+      setStats(statsRes.status === "fulfilled" ? statsRes.value.data.data : null);
+    } finally {
+      setStatsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    loadAll();
   }, [isAdmin]);
 
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
@@ -85,6 +102,19 @@ export default function AdminPage() {
       toast.success("Handoff proof verified. Donations marked as disbursed.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to verify proof.");
+    }
+  }
+
+  async function handleImageReview(changeId: string, action: "approve" | "reject") {
+    try {
+      const res =
+        action === "approve"
+          ? await campaignsApi.approveImageChange(changeId)
+          : await campaignsApi.rejectImageChange(changeId);
+      setCampaignChanges((items) => items.map((item) => (item.id === changeId ? res.data.data : item)));
+      toast.success(action === "approve" ? "Cover image approved and applied." : "Cover image change rejected.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to review image change.");
     }
   }
 
@@ -178,82 +208,180 @@ export default function AdminPage() {
     <div>
       <div style={{background:'var(--forest)',padding:'48px 40px'}}>
         <div className="container">
-          <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:16}}>
-            <div style={{background:'rgba(220,38,38,.2)',border:'1px solid rgba(220,38,38,.3)',borderRadius:8,padding:'6px 12px',fontSize:12,fontWeight:700,color:'#FCA5A5',fontFamily:'Space Mono,monospace',display:'flex',alignItems:'center',gap:6}}>
-              <span style={{width:6,height:6,background:'#DC2626',borderRadius:'50%',display:'inline-block'}}/>
-              ADMIN ONLY — READ-ONLY SIMULATION
-            </div>
-          </div>
           <h1 style={{fontSize:36,fontWeight:800,color:'#fff',marginBottom:8}}>Admin Oversight Dashboard</h1>
-          <p style={{color:'rgba(255,255,255,.65)',fontSize:16}}>Platform monitoring, fraud detection, and audit logs. All actions publicly auditable and permanently recorded on-chain.</p>
+          <p style={{color:'rgba(255,255,255,.65)',fontSize:16,marginBottom:0}}>Platform monitoring, fraud detection, and audit logs. All actions permanently recorded on-chain.</p>
         </div>
       </div>
 
       <div className="page-inner">
+        {/* ── Dynamic stat cards ── */}
         <div className="admin-grid mb-28">
           <div className="admin-card" style={{borderLeft:'4px solid var(--canopy)'}}>
-            <div style={{fontSize:11,color:'var(--text3)',marginBottom:8}}>TOTAL CAMPAIGNS</div>
-            <div style={{fontFamily:'Sora,sans-serif',fontSize:30,fontWeight:800,color:'var(--forest)'}}>486</div>
-            <div style={{fontSize:12,color:'var(--text3)'}}>451 verified · 35 pending</div>
+            <div style={{fontSize:11,color:'var(--text3)',marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              TOTAL CAMPAIGNS
+              <TrendingUp size={14} color="var(--canopy)" strokeWidth={1.8}/>
+            </div>
+            <div style={{fontFamily:'Sora,sans-serif',fontSize:30,fontWeight:800,color:'var(--forest)'}}>
+              {stats ? stats.total_campaigns.toLocaleString() : '—'}
+            </div>
+            <div style={{fontSize:12,color:'var(--text3)'}}>
+              {stats ? `${stats.donor_count} verified donors` : 'Loading...'}
+            </div>
           </div>
           <div className="admin-card" style={{borderLeft:'4px solid var(--forest-mid)'}}>
-            <div style={{fontSize:11,color:'var(--text3)',marginBottom:8}}>VERIFIED INSTITUTIONS</div>
-            <div style={{fontFamily:'Sora,sans-serif',fontSize:30,fontWeight:800,color:'var(--forest)'}}>127</div>
+            <div style={{fontSize:11,color:'var(--text3)',marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              VERIFIED INSTITUTIONS
+              <Building2 size={14} color="var(--forest-mid)" strokeWidth={1.8}/>
+            </div>
+            <div style={{fontFamily:'Sora,sans-serif',fontSize:30,fontWeight:800,color:'var(--forest)'}}>
+              {stats ? stats.verified_institutions.toLocaleString() : '—'}
+            </div>
             <div style={{fontSize:12,color:'var(--text3)'}}>Hospitals, pharmacies, schools, NGOs</div>
           </div>
           <div className="admin-card" style={{borderLeft:'4px solid var(--amber)'}}>
-            <div style={{fontSize:11,color:'var(--text3)',marginBottom:8}}>FUNDS ESCROWED</div>
-            <div style={{fontFamily:'Sora,sans-serif',fontSize:30,fontWeight:800,color:'var(--forest)'}}>₱48.2M</div>
-            <div style={{fontSize:12,color:'var(--text3)'}}>Across all active campaigns</div>
+            <div style={{fontSize:11,color:'var(--text3)',marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              FUNDS ESCROWED
+              <Banknote size={14} color="var(--amber)" strokeWidth={1.8}/>
+            </div>
+            <div style={{fontFamily:'Sora,sans-serif',fontSize:30,fontWeight:800,color:'var(--forest)'}}>
+              {stats ? formatPeso(stats.funds_escrowed_php) : '—'}
+            </div>
+            <div style={{fontSize:12,color:'var(--text3)'}}>Across all confirmed donations</div>
           </div>
-          <div className="admin-card" style={{borderLeft:'4px solid #DC2626'}}>
-            <div style={{fontSize:11,color:'var(--text3)',marginBottom:8}}>FRAUD PREVENTED</div>
-            <div style={{fontFamily:'Sora,sans-serif',fontSize:30,fontWeight:800,color:'#DC2626'}}>₱3.1M</div>
-            <div style={{fontSize:12,color:'var(--text3)'}}>14 suspicious campaigns blocked</div>
+          <div className="admin-card" style={{borderLeft:'4px solid var(--canopy)'}}>
+            <div style={{fontSize:11,color:'var(--text3)',marginBottom:8,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              FUNDS RELEASED
+              <CheckCircle2 size={14} color="var(--canopy)" strokeWidth={1.8}/>
+            </div>
+            <div style={{fontFamily:'Sora,sans-serif',fontSize:30,fontWeight:800,color:'var(--forest)'}}>
+              {stats ? formatPeso(stats.released_php) : '—'}
+            </div>
+            <div style={{fontSize:12,color:'var(--text3)'}}>Verified handoff releases</div>
           </div>
         </div>
+
+        {/* ── Pending actions summary ── */}
+        {stats && (stats.pending_edits + stats.pending_deletes + stats.pending_releases) > 0 && (
+          <div style={{background:'rgba(200,134,10,.07)',border:'1px solid rgba(200,134,10,.22)',borderRadius:'var(--r)',padding:'14px 18px',marginBottom:24,display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+            <AlertTriangle size={16} color="var(--amber)" strokeWidth={1.8}/>
+            <span style={{fontSize:13,fontWeight:700,color:'var(--forest)'}}>Pending reviews:</span>
+            {stats.pending_edits > 0 && <span className="badge badge-gold">{stats.pending_edits} image {stats.pending_edits === 1 ? 'change' : 'changes'}</span>}
+            {stats.pending_deletes > 0 && <span className="badge badge-red">{stats.pending_deletes} deletion {stats.pending_deletes === 1 ? 'request' : 'requests'}</span>}
+            {stats.pending_releases > 0 && <span className="badge badge-gold">{stats.pending_releases} fund release {stats.pending_releases === 1 ? 'request' : 'requests'}</span>}
+            <button type="button" className="btn btn-sm btn-outline" style={{marginLeft:'auto'}} onClick={loadAll} disabled={statsLoading}>
+              <RefreshCw size={12}/> {statsLoading ? 'Refreshing...' : 'Refresh'}
+            </button>
+          </div>
+        )}
 
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24,marginBottom:24}}>
           <div className="flex flex-center flex-between mb-20" style={{gap:16,flexWrap:'wrap'}}>
             <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',display:'flex',alignItems:'center',gap:8}}>
               <History size={18} color="var(--canopy)" strokeWidth={1.8}/> Campaign Edit Review
             </h3>
-            <span className="badge badge-emerald">{campaignChanges.length} recent changes</span>
+            <div style={{display:'flex',gap:8,alignItems:'center'}}>
+              {stats && stats.pending_edits > 0 && (
+                <span className="badge badge-gold">{stats.pending_edits} pending image {stats.pending_edits === 1 ? 'review' : 'reviews'}</span>
+              )}
+              <span className="badge badge-emerald">{campaignChanges.length} total changes</span>
+            </div>
           </div>
 
           {campaignChanges.length > 0 ? (
-            <div style={{overflowX:'auto'}}>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                <thead>
-                  <tr style={{borderBottom:'2px solid var(--border)'}}>
-                    {['TIME','ORGANIZER','CAMPAIGN','FIELDS CHANGED','SUMMARY'].map((h)=>(
-                      <th key={h} style={{textAlign:'left',padding:'10px 12px',color:'var(--text3)',fontWeight:600,fontSize:12}}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {campaignChanges.map((change)=>(
-                    <tr key={change.id} style={{borderBottom:'1px solid var(--border)'}}>
-                      <td style={{padding:'10px 12px',color:'var(--text2)',fontFamily:'Space Mono,monospace',fontSize:12}}>
-                        {new Date(change.created_at).toLocaleString('en-PH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}
-                      </td>
-                      <td style={{padding:'10px 12px'}}>
-                        <div style={{fontWeight:700,color:'var(--forest)'}}>{change.actor_name}</div>
-                        <div style={{fontSize:11,color:'var(--text3)'}}>{change.actor_email}</div>
-                      </td>
-                      <td style={{padding:'10px 12px',fontWeight:700,color:'var(--forest)'}}>{change.campaign_title}</td>
-                      <td style={{padding:'10px 12px'}}>
-                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-                          {change.changed_fields.map((field)=>(
-                            <span key={field} className="badge badge-navy" style={{fontSize:10}}>{field.replace('_',' ')}</span>
-                          ))}
+            <div style={{display:'grid',gap:10}}>
+              {campaignChanges.map((change)=>{
+                const imgChange = change.changes?.image_src;
+                const hasPendingImage = imgChange?.pending === true;
+                const imgApproved = imgChange?.approved === true;
+                const imgRejected = imgChange?.approved === false && imgChange?.rejected_at;
+                const pendingDataUrl: string | undefined = imgChange?.pending_image_src;
+
+                // Non-image field changes to display
+                const fieldChanges = Object.entries(change.changes || {}).filter(
+                  ([k]) => k !== "image_src" && k !== "delete_request" && k !== "release_request"
+                );
+
+                return (
+                  <div key={change.id} style={{border:`1px solid ${hasPendingImage ? 'rgba(200,134,10,.3)' : 'var(--border)'}`,borderRadius:12,padding:14,display:'grid',gap:10,background: hasPendingImage ? 'rgba(200,134,10,.025)' : 'transparent'}}>
+                    {/* Top row */}
+                    <div style={{display:'grid',gridTemplateColumns:'auto 1fr auto',gap:12,alignItems:'start'}}>
+                      <div style={{fontFamily:'Space Mono,monospace',fontSize:11,color:'var(--text3)',paddingTop:2,whiteSpace:'nowrap'}}>
+                        {new Date(change.created_at).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+                      </div>
+                      <div>
+                        <div style={{fontWeight:800,color:'var(--forest)',marginBottom:2}}>{change.campaign_title}</div>
+                        <div style={{fontSize:12,color:'var(--text2)'}}>{change.actor_name} <span style={{color:'var(--text3)'}}>·</span> {change.actor_email}</div>
+                        <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>{change.summary}</div>
+                      </div>
+                      <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                        {change.changed_fields.map((field)=>(
+                          <span key={field} className={`badge ${field==='image_src' && hasPendingImage ? 'badge-gold' : 'badge-navy'}`} style={{fontSize:10}}>
+                            {field.replace(/_/g,' ')}
+                            {field==='image_src' && hasPendingImage && ' ⏳'}
+                            {field==='image_src' && imgApproved && ' ✓'}
+                            {field==='image_src' && imgRejected && ' ✗'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Before/after for non-image fields */}
+                    {fieldChanges.length > 0 && (
+                      <div style={{display:'grid',gap:6}}>
+                        {fieldChanges.map(([field, diff]: [string, any]) => (
+                          <div key={field} style={{display:'grid',gridTemplateColumns:'120px 1fr 1fr',gap:8,fontSize:12,background:'rgba(26,58,42,.03)',border:'1px solid rgba(26,58,42,.07)',borderRadius:8,padding:'8px 10px',alignItems:'start'}}>
+                            <span style={{fontWeight:800,color:'var(--text3)',textTransform:'uppercase',fontSize:10,letterSpacing:'.06em',paddingTop:1}}>{field.replace(/_/g,' ')}</span>
+                            <div>
+                              <div style={{fontSize:10,color:'var(--text3)',marginBottom:2}}>BEFORE</div>
+                              <div style={{color:'#991B1B',wordBreak:'break-word'}}>{String(diff?.before ?? '—')}</div>
+                            </div>
+                            <div>
+                              <div style={{fontSize:10,color:'var(--text3)',marginBottom:2}}>AFTER</div>
+                              <div style={{color:'var(--forest)',fontWeight:600,wordBreak:'break-word'}}>{String(diff?.after ?? '—')}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Pending image preview + actions */}
+                    {hasPendingImage && pendingDataUrl && (
+                      <div style={{display:'grid',gridTemplateColumns:'120px 1fr',gap:14,alignItems:'center',background:'rgba(200,134,10,.06)',border:'1px solid rgba(200,134,10,.2)',borderRadius:10,padding:12}}>
+                        <img
+                          src={pendingDataUrl}
+                          alt="Pending cover"
+                          style={{width:120,height:80,objectFit:'cover',borderRadius:8,border:'1px solid rgba(200,134,10,.25)',display:'block'}}
+                        />
+                        <div>
+                          <div style={{fontSize:12,fontWeight:800,color:'var(--amber)',marginBottom:6}}>⏳ Cover image pending approval</div>
+                          <div style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>
+                            The organizer uploaded a new cover photo. Approve to make it live, or reject to keep the current image.
+                          </div>
+                          <div style={{display:'flex',gap:8}}>
+                            <button type="button" className="btn btn-sm btn-emerald" onClick={()=>handleImageReview(change.id,'approve')}>
+                              <CheckCircle2 size={13}/> Approve Image
+                            </button>
+                            <button type="button" className="btn btn-sm btn-outline" style={{color:'#991B1B',borderColor:'rgba(220,38,38,.24)'}} onClick={()=>handleImageReview(change.id,'reject')}>
+                              <XCircle size={13}/> Reject
+                            </button>
+                          </div>
                         </div>
-                      </td>
-                      <td style={{padding:'10px 12px',color:'var(--text2)'}}>{change.summary}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    )}
+
+                    {imgApproved && (
+                      <div style={{fontSize:12,color:'var(--canopy)',fontWeight:700,display:'flex',alignItems:'center',gap:5}}>
+                        <CheckCircle2 size={12}/> Cover image approved and live.
+                      </div>
+                    )}
+                    {imgRejected && (
+                      <div style={{fontSize:12,color:'#991B1B',fontWeight:700,display:'flex',alignItems:'center',gap:5}}>
+                        <XCircle size={12}/> Cover image rejected — original kept.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <div style={{padding:18,border:'1px dashed var(--border)',borderRadius:10,color:'var(--text2)',fontSize:13}}>
@@ -269,7 +397,6 @@ export default function AdminPage() {
             </h3>
             <span className="badge badge-gold">{deleteRequests.filter((item)=>item.changes?.delete_request?.status === 'pending').length} pending</span>
           </div>
-
           {deleteRequests.length > 0 ? (
             <div style={{display:'grid',gap:10}}>
               {deleteRequests.map((request)=>{
@@ -415,7 +542,8 @@ export default function AdminPage() {
           )}
         </div>
 
-        <div className="grid-2 mb-24" style={{alignItems:'start'}}>          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24}}>
+        <div className="grid-2 mb-24" style={{alignItems:'start'}}>
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24}}>
             <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',marginBottom:20,display:'flex',alignItems:'center',gap:8}}>
               <ShieldCheck size={18} color="var(--canopy)" strokeWidth={1.8}/> Escrow Health Monitor
             </h3>
@@ -528,9 +656,9 @@ export default function AdminPage() {
               </tbody>
             </table>
           </div>
-          <div style={{marginTop:20,padding:16,background:'rgba(220,38,38,.04)',border:'1px solid rgba(220,38,38,.15)',borderRadius:10,display:'flex',gap:10,alignItems:'flex-start'}}>
-            <AlertTriangle size={18} color="#DC2626" strokeWidth={1.8} style={{flexShrink:0,marginTop:1}}/>
-            <div style={{fontSize:13,color:'#991B1B',lineHeight:1.6}}><strong>All actions are publicly auditable and permanently recorded on-chain.</strong> This dashboard is a read-only simulation. All administrative decisions are executed via Soroban smart contracts and cannot be unilaterally reversed. Community consensus is required for all clawback and fraud resolution events.</div>
+          <div style={{marginTop:20,padding:16,background:'rgba(74,155,106,.04)',border:'1px solid rgba(74,155,106,.15)',borderRadius:10,display:'flex',gap:10,alignItems:'flex-start'}}>
+            <ShieldCheck size={18} color="var(--canopy)" strokeWidth={1.8} style={{flexShrink:0,marginTop:1}}/>
+            <div style={{fontSize:13,color:'var(--forest)',lineHeight:1.6}}><strong>All admin actions are permanently recorded on-chain.</strong> Administrative decisions are executed via Soroban smart contracts and cannot be unilaterally reversed. Community consensus is required for all clawback and fraud resolution events.</div>
           </div>
         </div>
       </div>

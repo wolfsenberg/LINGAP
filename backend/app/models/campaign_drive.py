@@ -31,6 +31,7 @@ class CampaignDrive(Base, TimestampMixin):
     status: Mapped[CampaignDriveStatus] = mapped_column(
         Enum(CampaignDriveStatus), default=CampaignDriveStatus.under_review, index=True
     )
-    image_src: Mapped[str | None] = mapped_column(String(512))
+    # Text (unbounded) so base64 data URLs fit without truncation
+    image_src: Mapped[str | None] = mapped_column(Text)
 
     organizer: Mapped["User"] = relationship("User")  # noqa: F821
