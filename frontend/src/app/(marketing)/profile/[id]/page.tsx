@@ -130,7 +130,7 @@ export default function PublicProfilePage() {
         <div className="profile-impact-grid">
           {[
             { Icon: Heart, label: "Public Donations", value: formatPeso(profile.impact.total_donated_php), sub: formatXlm(profile.impact.total_donated_xlm) },
-            { Icon: Megaphone, label: "Campaigns Organized", value: profile.impact.campaigns_organized.toString(), sub: `${profile.impact.active_campaigns} active · ${profile.impact.completed_campaigns} completed` },
+            { Icon: Megaphone, label: "Campaigns Organized", value: profile.impact.campaigns_organized.toString(), sub: `${profile.impact.active_campaigns} active Â· ${profile.impact.completed_campaigns} completed` },
             { Icon: Award, label: "Public Certificates", value: profile.impact.public_certificates.toString(), sub: `${earnedBadges.length} earned badges` },
             { Icon: Network, label: "Stellar Activity", value: profile.impact.donation_count.toString(), sub: formatDate(profile.impact.last_activity_at) },
           ].map((item) => (
@@ -276,7 +276,7 @@ export default function PublicProfilePage() {
                   {profile.certificates.map((cert) => (
                     <div key={cert.id} className="profile-cert-item">
                       <strong>{cert.beneficiary_name}</strong>
-                      <span>{formatXlm(cert.amount)} · {cert.lives_touched} lives touched</span>
+                      <span>{formatXlm(cert.amount)} Â· {cert.lives_touched} lives touched</span>
                       <div className="donation-proof-row">
                         <Link href={`/certificate?cert=${cert.id}`} className="badge badge-emerald">View</Link>
                         <a href={`/api/v1/certificates/${cert.id}/download`} className="badge badge-gray">PDF</a>
