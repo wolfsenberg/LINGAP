@@ -3,8 +3,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
-import { balanceApi, campaignsApi, donationsApi, type BalanceApi } from "@/lib/api";
-import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
+import { balanceApi, campaignsApi, donationsApi, escrowApi, type BalanceApi } from "@/lib/api";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash, STELLAR_CONFIG } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
@@ -95,7 +95,7 @@ export default function DetailPage() {
 
   const campaign = CAMPAIGNS.find((c) => c.slug === slug);
   const user = useAuthStore((state) => state.user);
-  const { connected, publicKey, connect } = useFreighter();
+  const { connected, publicKey, connect, sign } = useFreighter();
   const [selectedAmount, setSelectedAmount] = useState(500);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
@@ -253,40 +253,117 @@ export default function DetailPage() {
       return;
     }
     if (balance.xlm_balance < effectiveAmount) {
-      toast.error("You do not have enough XLM balance to complete this donation. Please top up first.");
+      toast.error("You do not have enough XLM balance. Please top up first.");
       return;
     }
+
     setDonating(true);
+    const donationPurpose = `campaign:${activeCampaign.slug || activeCampaign.id}`;
+    const sorobanId: number | null = activeCampaign.sorobanCampaignId ?? null;
+
     try {
-      const donationPurpose = `campaign:${activeCampaign.slug || activeCampaign.id}`;
-      const donationRes = await donationsApi.create({
-        amount: Number(effectiveAmount.toFixed(2)),
-        asset: "XLM",
-        purpose: donationPurpose,
-        fundingSource: "lingap_balance",
-        spendBalance: true,
-        walletAddress: publicKey,
-      });
-      const txHash = donationRes.data.data.stellarTxHash;
-      setConfirmedDonationXlm((current) => current + effectiveAmount);
-      setLastTxHash(txHash);
-      setBalance((current) => ({
-        ...current,
-        xlm_balance: Math.max(current.xlm_balance - effectiveAmount, 0),
-        php_equivalent: Math.max((current.xlm_balance - effectiveAmount) * conversionRate, 0),
-      }));
-      setConfirmedDonationXlm(0);
+      // ── Path A: On-chain via Soroban + Freighter ──────────────────────────
+      // Only available when the campaign has a registered Soroban campaign ID.
+      if (sorobanId !== null) {
+        // 1. Ask backend to build the unsigned deposit XDR
+        toast("Preparing Stellar transaction...", { icon: "⏳" });
+        let xdr: string;
+        try {
+          const xdrRes = await escrowApi.getDepositXdr(sorobanId, publicKey, effectiveAmount);
+          xdr = xdrRes.data.data.xdr;
+        } catch {
+          // Soroban RPC may be unavailable — fall through to balance path
+          throw new Error("SOROBAN_UNAVAILABLE");
+        }
+
+        // 2. Freighter signs → popup appears here
+        toast("Check your Freighter wallet to sign the transaction.", { icon: "🔐", duration: 8000 });
+        let signedXdr: string;
+        try {
+          signedXdr = await sign(xdr, STELLAR_CONFIG.network);
+        } catch (signErr: unknown) {
+          const msg = signErr instanceof Error ? signErr.message : String(signErr);
+          if (msg.toLowerCase().includes("user declined") || msg.toLowerCase().includes("rejected")) {
+            toast.error("Transaction cancelled in Freighter.");
+          } else {
+            toast.error(`Freighter error: ${msg}`);
+          }
+          return;
+        }
+
+        // 3. Submit signed XDR to Soroban via backend
+        toast("Submitting to Stellar network...", { icon: "🚀", duration: 6000 });
+        const submitRes = await escrowApi.submitSignedXdr(signedXdr);
+        const realTxHash = submitRes.data.data.tx_hash;
+
+        // 4. Record donation in LINGAP DB with the real Stellar tx hash
+        await donationsApi.create({
+          amount: Number(effectiveAmount.toFixed(7)),
+          asset: "XLM",
+          purpose: donationPurpose,
+          stellarTxHash: realTxHash,
+          fundingSource: "stellar_wallet",
+          spendBalance: false,
+          walletAddress: publicKey,
+        });
+
+        setConfirmedDonationXlm((c) => c + effectiveAmount);
+        setLastTxHash(realTxHash);
+        toast.success(`Donation confirmed on Stellar! TX: ${realTxHash.slice(0, 10)}...`);
+
+      } else {
+        // ── Path B: Balance-only (no Soroban campaign slot yet) ──────────────
+        // Funds are deducted from LINGAP balance and recorded in the DB.
+        // A ledger reference is generated — not a real Stellar tx.
+        const donationRes = await donationsApi.create({
+          amount: Number(effectiveAmount.toFixed(7)),
+          asset: "XLM",
+          purpose: donationPurpose,
+          fundingSource: "lingap_balance",
+          spendBalance: true,
+          walletAddress: publicKey,
+        });
+        const txHash = donationRes.data.data.stellarTxHash;
+        setConfirmedDonationXlm((c) => c + effectiveAmount);
+        setLastTxHash(txHash);
+        toast.success(`Donation recorded! Ref: ${txHash.slice(0, 14)}...`);
+      }
+
+      // Refresh live totals
       try {
-        const latest = await campaignsApi.publicOne(activeCampaign.slug || activeCampaign.id);
+        const [latest, nextBalance] = await Promise.all([
+          campaignsApi.publicOne(activeCampaign.slug || activeCampaign.id),
+          balanceApi.mine(),
+        ]);
         if (latest.data.data) setLiveSummary(latest.data.data);
-        const nextBalance = await balanceApi.mine();
         setBalance(nextBalance.data.data);
       } catch {
-        // Donation is already recorded; the polling loop will pick up fresh totals.
+        // Non-critical — polling loop will catch up
       }
-      toast.success(`Donation confirmed! Ref: ${txHash.slice(0, 12)}...`);
+
     } catch (e: unknown) {
-      toast.error(getDonationErrorMessage(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg === "SOROBAN_UNAVAILABLE") {
+        // Soroban RPC down — fall back to balance path silently
+        try {
+          const donationRes = await donationsApi.create({
+            amount: Number(effectiveAmount.toFixed(7)),
+            asset: "XLM",
+            purpose: donationPurpose,
+            fundingSource: "lingap_balance",
+            spendBalance: true,
+            walletAddress: publicKey,
+          });
+          const txHash = donationRes.data.data.stellarTxHash;
+          setConfirmedDonationXlm((c) => c + effectiveAmount);
+          setLastTxHash(txHash);
+          toast.success("Donation recorded via LINGAP balance (Soroban RPC temporarily unavailable).");
+        } catch (fallbackErr: unknown) {
+          toast.error(getDonationErrorMessage(fallbackErr));
+        }
+      } else {
+        toast.error(getDonationErrorMessage(e));
+      }
     } finally {
       setDonating(false);
     }
@@ -495,9 +572,11 @@ export default function DetailPage() {
               style={{ width: "100%", justifyContent: "center", marginBottom: 12, opacity: donating ? 0.7 : 1 }}
             >
               {donating
-                ? "Submitting to LINGAP..."
+                ? "Submitting to Stellar..."
                 : connected
-                  ? `Donate ${formatXlmAmount(effectiveAmount)} XLM`
+                  ? activeCampaign.sorobanCampaignId
+                    ? `Donate ${formatXlmAmount(effectiveAmount)} XLM via Stellar`
+                    : `Donate ${formatXlmAmount(effectiveAmount)} XLM`
                   : "Connect Wallet to Donate"}
             </button>
             {lastTxHash && (
