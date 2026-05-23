@@ -90,6 +90,11 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
 
   if (!open) return null;
 
+  function closeModal() {
+    if (submitting) return;
+    onClose();
+  }
+
   async function handleConfirm() {
     if (!connected || !publicKey) {
       toast.error("Connect your Stellar Wallet before topping up.");
@@ -153,6 +158,7 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
       setConfirmedTxHash(tx.stellar_tx_hash || stellarTxHash || "");
       onConfirmed(res.data.data.balance, tx);
       toast.success(method === "stellar_wallet" ? "Stellar top-up confirmed." : `${tx.payment_reference} confirmed.`);
+      closeModal();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } }; message?: string };
       toast.error(err.response?.data?.detail || err.message || "Top-up failed.");
@@ -162,24 +168,32 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
   }
 
   return (
-    <div className="auth-prompt-backdrop" role="dialog" aria-modal="true" aria-label="Top up balance">
-      <div className="auth-prompt-modal" style={{ width: "min(100%, 620px)", textAlign: "left" }}>
+    <div
+      className="auth-prompt-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Top up balance"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) closeModal();
+      }}
+    >
+      <div className="auth-prompt-modal topup-modal" style={{ width: "min(100%, 560px)", textAlign: "left" }}>
         <button
           type="button"
-          onClick={onClose}
+          onClick={closeModal}
           aria-label="Close top-up modal"
-          style={{ position: "absolute", right: 16, top: 16, border: 0, background: "transparent", cursor: "pointer", color: "var(--text3)" }}
+          className="auth-prompt-close"
         >
           <X size={19} />
         </button>
 
         <div className="section-label">LINGAP WALLET</div>
-        <h2 style={{ textAlign: "left" }}>Top Up Your LINGAP Balance</h2>
+        <h2 style={{ textAlign: "left", fontSize: 24 }}>Top Up Your LINGAP Balance</h2>
         <p style={{ marginLeft: 0, maxWidth: 540 }}>
           Choose a payment channel. Local payment options collect sender details for confirmation; Stellar Wallet sends XLM directly from your connected wallet.
         </p>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(210px,1fr))", gap: 10, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,minmax(0,1fr))", gap: 8, marginBottom: 12 }}>
           {methods.map(({ id, title, label, Icon }) => (
             <button
               key={id}
@@ -190,19 +204,19 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
                 setConfirmedTxHash("");
               }}
               className={`btn ${method === id ? "btn-primary" : "btn-outline"}`}
-              style={{ height: "auto", justifyContent: "flex-start", alignItems: "flex-start", padding: 14, textAlign: "left", gap: 10 }}
+              style={{ height: "auto", justifyContent: "flex-start", alignItems: "flex-start", padding: "11px 12px", textAlign: "left", gap: 9 }}
             >
               <Icon size={18} />
               <span style={{ display: "grid", gap: 3 }}>
-                <span style={{ fontWeight: 800 }}>{title}</span>
+                <span style={{ fontWeight: 800, fontSize: 14 }}>{title}</span>
                 <span style={{ fontSize: 12, opacity: 0.76 }}>{label}</span>
               </span>
             </button>
           ))}
         </div>
 
-        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 16, background: "rgba(255,255,255,.45)" }}>
-          <div style={{ fontWeight: 800, color: "var(--forest)", marginBottom: 10 }}>
+        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 12, background: "rgba(255,255,255,.45)" }}>
+          <div style={{ fontWeight: 800, color: "var(--forest)", marginBottom: 8 }}>
             {method === "stellar_wallet" ? "Source Wallet" : "Payment Source"}
           </div>
           {method === "stellar_wallet" ? (
@@ -234,7 +248,7 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
           )}
         </div>
 
-        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 14, marginBottom: 16 }}>
+        <div style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 10 }}>
             <div>
               <div style={{ fontWeight: 800, color: "var(--forest)" }}>Amount</div>
@@ -275,18 +289,14 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
           </div>
         </div>
 
-        <div style={{ padding: 13, background: "rgba(74,155,106,.07)", border: "1px solid rgba(74,155,106,.2)", borderRadius: 10, color: "var(--forest)", fontSize: 13, marginBottom: 14, display: "grid", gap: 8 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontWeight: 800 }}>Receiving wallet</span>
-            <span style={{ fontFamily: "Space Mono, monospace", fontSize: 12, color: "var(--text2)" }}>
-              {shortAddress(receivingWallet)}
-            </span>
+        <div style={{ padding: "9px 11px", background: "rgba(74,155,106,.07)", border: "1px solid rgba(74,155,106,.2)", borderRadius: 10, color: "var(--forest)", fontSize: 12, marginBottom: 12, display: "grid", gap: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8 }}>
+            <span style={{ fontWeight: 800 }}>Receiver</span>
+            <span style={{ fontFamily: "Space Mono, monospace", color: "var(--text2)" }}>{shortAddress(receivingWallet)}</span>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-            <span style={{ fontWeight: 800 }}>Escrow contract</span>
-            <span style={{ fontFamily: "Space Mono, monospace", fontSize: 12, color: "var(--text2)" }}>
-              {shortAddress(vaultContract)}
-            </span>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8 }}>
+            <span style={{ fontWeight: 800 }}>Escrow</span>
+            <span style={{ fontFamily: "Space Mono, monospace", color: "var(--text2)" }}>{shortAddress(vaultContract)}</span>
           </div>
           <div style={{ fontSize: 12, color: "var(--text2)" }}>
             {connected && publicKey ? `Connected source: ${publicKey.slice(0, 6)}...${publicKey.slice(-4)}` : "Connect Stellar Wallet before confirming a top-up."}
