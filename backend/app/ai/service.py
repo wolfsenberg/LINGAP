@@ -33,7 +33,9 @@ PERSISTED_SEVERITY_THRESHOLD = "medium"
 
 
 def _pick_engine() -> RiskEngine:
-    if settings.RISK_ENGINE == "llm" and settings.OPENAI_API_KEY:
+    # Support both LLM_API_KEY (Groq/any provider) and legacy OPENAI_API_KEY
+    has_key = bool(settings.LLM_API_KEY or settings.OPENAI_API_KEY)
+    if settings.RISK_ENGINE == "llm" and has_key:
         from .llm import llm_engine  # local import keeps openai optional
         return llm_engine
     return rules_engine
