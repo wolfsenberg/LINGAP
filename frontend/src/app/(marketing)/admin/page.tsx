@@ -9,7 +9,7 @@ import {
   TrendingUp, RefreshCw,
 } from "lucide-react";
 import { CAMPAIGNS } from "@/lib/campaigns";
-import { authApi, campaignsApi, type CampaignChangeLogApi, type AdminStatsApi } from "@/lib/api";
+import { authApi, campaignsApi, type CampaignChangeLogApi, type AdminStatsApi, type AiAlertApi, type EscrowHealthApi } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 
 export default function AdminPage() {
@@ -22,6 +22,8 @@ export default function AdminPage() {
   const [deleteRequests, setDeleteRequests] = useState<CampaignChangeLogApi[]>([]);
   const [releaseRequests, setReleaseRequests] = useState<CampaignChangeLogApi[]>([]);
   const [stats, setStats] = useState<AdminStatsApi | null>(null);
+  const [aiAlerts, setAiAlerts] = useState<AiAlertApi[]>([]);
+  const [escrowHealth, setEscrowHealth] = useState<EscrowHealthApi | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
   const [reviewModal, setReviewModal] = useState<CampaignChangeLogApi | null>(null);
   const isAdmin = isAuthenticated && user?.role === "admin";
@@ -35,16 +37,20 @@ export default function AdminPage() {
   async function loadAll() {
     setStatsLoading(true);
     try {
-      const [changes, deletes, releases, statsRes] = await Promise.allSettled([
+      const [changes, deletes, releases, statsRes, alertsRes, healthRes] = await Promise.allSettled([
         campaignsApi.changeLog(50),
         campaignsApi.deleteRequests(50),
         campaignsApi.releaseRequests(50),
         campaignsApi.adminStats(),
+        campaignsApi.aiAlerts(),
+        campaignsApi.escrowHealth(),
       ]);
       setCampaignChanges(changes.status === "fulfilled" ? changes.value.data.data : []);
       setDeleteRequests(deletes.status === "fulfilled" ? deletes.value.data.data : []);
       setReleaseRequests(releases.status === "fulfilled" ? releases.value.data.data : []);
       setStats(statsRes.status === "fulfilled" ? statsRes.value.data.data : null);
+      setAiAlerts(alertsRes.status === "fulfilled" ? alertsRes.value.data.data : []);
+      setEscrowHealth(healthRes.status === "fulfilled" ? healthRes.value.data.data : null);
     } finally {
       setStatsLoading(false);
     }
@@ -652,74 +658,109 @@ export default function AdminPage() {
         </div>
 
         <div className="grid-2 mb-24" style={{alignItems:'start'}}>
+          {/* ── Escrow Health Monitor (live data) ── */}
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24}}>
             <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',marginBottom:20,display:'flex',alignItems:'center',gap:8}}>
               <ShieldCheck size={18} color="var(--canopy)" strokeWidth={1.8}/> Escrow Health Monitor
             </h3>
-            <div style={{display:'flex',flexDirection:'column',gap:14}}>
-              {[
-                {label:'Medical Campaigns',pct:98,health:'98.2% healthy',color:'prog-emerald',textColor:'var(--canopy)'},
-                {label:'Disaster Relief',pct:94,health:'94.5% healthy',color:'prog-emerald',textColor:'var(--canopy)'},
-                {label:'Education Funds',pct:87,health:'87.1% healthy',color:'prog-gold',textColor:'var(--amber)'},
-                {label:'Community Projects',pct:96,health:'96.0% healthy',color:'prog-emerald',textColor:'var(--canopy)'},
-              ].map((s)=>(
-                <div key={s.label}>
-                  <div className="flex flex-center flex-between mb-6">
-                    <span style={{fontSize:13,color:'var(--text2)'}}>{s.label}</span>
-                    <span style={{fontSize:13,fontWeight:600,color:s.textColor}}>{s.health}</span>
-                  </div>
-                  <div className="prog-track" style={{height:8}}>
-                    <div className={`prog-fill ${s.color}`} style={{width:`${s.pct}%`}}/>
+            {escrowHealth && escrowHealth.categories.length > 0 ? (
+              <>
+                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                  {escrowHealth.categories.slice(0,5).map((cat)=>{
+                    const pct = cat.health_pct;
+                    const isGood = pct >= 80;
+                    const color = pct >= 80 ? 'prog-emerald' : pct >= 60 ? 'prog-gold' : 'prog-navy';
+                    const textColor = pct >= 80 ? 'var(--canopy)' : pct >= 60 ? 'var(--amber)' : '#DC2626';
+                    return (
+                      <div key={cat.category}>
+                        <div className="flex flex-center flex-between mb-6">
+                          <span style={{fontSize:13,color:'var(--text2)'}}>{cat.category} <span style={{fontSize:11,color:'var(--text3)'}}>({cat.campaign_count})</span></span>
+                          <span style={{fontSize:13,fontWeight:600,color:textColor}}>{pct.toFixed(1)}% {isGood ? 'healthy' : 'needs attention'}</span>
+                        </div>
+                        <div className="prog-track" style={{height:8}}>
+                          <div className={`prog-fill ${color}`} style={{width:`${pct}%`}}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{marginTop:20,padding:14,background:'rgba(74,155,106,.06)',border:'1px solid rgba(74,155,106,.2)',borderRadius:10,display:'flex',alignItems:'center',gap:8}}>
+                  <CheckCircle2 size={14} color="var(--forest-light)" strokeWidth={2}/>
+                  <div>
+                    <div style={{fontSize:13,color:'var(--forest-light)',fontWeight:600}}>
+                      Platform Overall Health: {escrowHealth.overall_health_pct.toFixed(1)}%
+                    </div>
+                    <div style={{fontSize:12,color:'var(--text3)',marginTop:2}}>
+                      Based on {escrowHealth.categories.reduce((s,c)=>s+c.campaign_count,0)} active campaigns across {escrowHealth.categories.length} categories.
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-            <div style={{marginTop:20,padding:14,background:'rgba(74,155,106,.06)',border:'1px solid rgba(74,155,106,.2)',borderRadius:10,display:'flex',alignItems:'center',gap:8}}>
-              <CheckCircle2 size={14} color="var(--forest-light)" strokeWidth={2}/>
-              <div>
-                <div style={{fontSize:13,color:'var(--forest-light)',fontWeight:600}}>Platform Overall Health: 94.2%</div>
-                <div style={{fontSize:12,color:'var(--text3)',marginTop:2}}>No critical issues detected. 3 campaigns under manual review.</div>
+              </>
+            ) : (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                {/* Skeleton while loading */}
+                {[1,2,3,4].map(i=>(
+                  <div key={i}>
+                    <div className="flex flex-center flex-between mb-6">
+                      <span style={{fontSize:13,color:'var(--text3)'}}>Loading...</span>
+                    </div>
+                    <div className="prog-track" style={{height:8}}><div className="prog-fill prog-emerald" style={{width:'0%'}}/></div>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
           </div>
 
+          {/* ── AI Alert Feed (live data) ── */}
           <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24}}>
             <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',marginBottom:20,display:'flex',alignItems:'center',gap:8}}>
               <AlertCircle size={18} color="#DC2626" strokeWidth={1.8}/> AI Alert Feed
+              {aiAlerts.some(a=>a.source==='llm') && (
+                <span className="badge badge-emerald" style={{fontSize:10,marginLeft:4}}>AI-powered</span>
+              )}
             </h3>
-            <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              <div style={{padding:14,background:'rgba(220,38,38,.05)',border:'1px solid rgba(220,38,38,.2)',borderRadius:10}}>
-                <div className="flex flex-center flex-between mb-6">
-                  <span className="badge badge-red" style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><XCircle size={10}/> HIGH</span>
-                  <span style={{fontSize:11,color:'var(--text3)'}}>10 min ago</span>
-                </div>
-                <div style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>Duplicate Campaign Detected</div>
-                <div style={{fontSize:12,color:'var(--text2)'}}>94% image match with existing campaign. Account age: 2 days. Auto-paused.</div>
-                <div className="flex gap-8 mt-8">
-                  <button className="btn btn-sm" style={{background:'#DC2626',color:'#fff',border:'none'}}>Block</button>
-                  <button className="btn btn-outline btn-sm">Investigate</button>
-                </div>
+            {aiAlerts.length > 0 ? (
+              <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                {aiAlerts.slice(0,5).map((alert,i)=>{
+                  const isHigh = alert.severity === 'HIGH';
+                  const isMed = alert.severity === 'MEDIUM';
+                  const bg = isHigh ? 'rgba(220,38,38,.05)' : isMed ? 'rgba(200,134,10,.05)' : 'rgba(74,155,106,.05)';
+                  const border = isHigh ? 'rgba(220,38,38,.2)' : isMed ? 'rgba(200,134,10,.2)' : 'rgba(74,155,106,.2)';
+                  const badgeClass = isHigh ? 'badge-red' : isMed ? 'badge-gold' : 'badge-emerald';
+                  const Icon = isHigh ? XCircle : isMed ? AlertTriangle : CheckCircle2;
+                  const timeAgo = alert.created_at
+                    ? (() => {
+                        const diff = Math.floor((Date.now() - new Date(alert.created_at).getTime()) / 60000);
+                        if (diff < 1) return 'just now';
+                        if (diff < 60) return `${diff}m ago`;
+                        if (diff < 1440) return `${Math.floor(diff/60)}h ago`;
+                        return `${Math.floor(diff/1440)}d ago`;
+                      })()
+                    : '';
+                  return (
+                    <div key={i} style={{padding:14,background:bg,border:`1px solid ${border}`,borderRadius:10}}>
+                      <div className="flex flex-center flex-between mb-6">
+                        <span className={`badge ${badgeClass}`} style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}>
+                          <Icon size={10}/> {alert.severity}
+                        </span>
+                        <span style={{fontSize:11,color:'var(--text3)'}}>{timeAgo}</span>
+                      </div>
+                      <div style={{fontSize:13,fontWeight:600,color:'var(--forest)',marginBottom:4}}>{alert.title}</div>
+                      <div style={{fontSize:12,color:'var(--text2)'}}>{alert.message}</div>
+                      {alert.pct_funded > 0 && (
+                        <div style={{marginTop:8,fontSize:11,color:'var(--text3)'}}>
+                          {alert.pct_funded}% funded · ₱{Math.round(alert.raised_php).toLocaleString()} raised
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div style={{padding:14,background:'rgba(200,134,10,.05)',border:'1px solid rgba(200,134,10,.2)',borderRadius:10}}>
-                <div className="flex flex-center flex-between mb-6">
-                  <span className="badge badge-gold" style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><AlertTriangle size={10}/> MEDIUM</span>
-                  <span style={{fontSize:11,color:'var(--text3)'}}>1 hr ago</span>
-                </div>
-                <div style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>Milestone Delay — 8 Days</div>
-                <div style={{fontSize:12,color:'var(--text2)'}}>Reyes Rehab Center campaign. Invoice amount mismatch ₱2,300. Review required.</div>
-                <div className="flex gap-8 mt-8">
-                  <button className="btn btn-outline btn-sm">Review</button>
-                </div>
+            ) : (
+              <div style={{padding:24,textAlign:'center',border:'1px dashed var(--border)',borderRadius:10,color:'var(--text3)',fontSize:13}}>
+                {statsLoading ? 'Analyzing campaigns...' : 'No alerts at this time. All campaigns look healthy.'}
               </div>
-              <div style={{padding:14,background:'rgba(74,155,106,.05)',border:'1px solid rgba(74,155,106,.2)',borderRadius:10}}>
-                <div className="flex flex-center flex-between mb-6">
-                  <span className="badge badge-emerald" style={{fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><CheckCircle2 size={10}/> LOW</span>
-                  <span style={{fontSize:11,color:'var(--text3)'}}>2 hrs ago</span>
-                </div>
-                <div style={{fontSize:13,fontWeight:600,color:'var(--forest)'}}>All Clear — {CAMPAIGNS[0].shortTitle}</div>
-                <div style={{fontSize:12,color:'var(--text2)'}}>Documents verified. Spending pattern normal. Milestone 2 in progress.</div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
 

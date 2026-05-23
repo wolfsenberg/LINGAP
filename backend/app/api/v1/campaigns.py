@@ -500,6 +500,214 @@ async def admin_stats(
     }
 
 
+@router.get("/admin/ai-alerts")
+async def campaign_ai_alerts(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """
+    Generate real AI-powered alerts from live campaign data.
+    Uses the LLM engine (Groq) when configured, falls back to rules.
+    """
+    from app.config import settings
+    from app.ai.llm import llm_engine
+    from app.ai.rules import rules_engine
+
+    campaigns = await _public_campaigns(db)
+    all_changes = (await db.execute(select(CampaignDriveChange))).scalars().all()
+
+    alerts = []
+
+    for campaign in campaigns:
+        cid = campaign["id"]
+
+        # Gather signals
+        donations = await _confirmed_campaign_donations(db, cid, limit=50)
+        total_xlm = sum(d["amount"] for d in donations)
+        total_php = sum(d["amount_php"] for d in donations)
+        goal = float(campaign["goal_amount"])
+        raised = float(campaign["raised_amount"])
+        pct_funded = (raised / goal * 100) if goal > 0 else 0
+
+        # Count pending changes for this campaign
+        campaign_changes = [c for c in all_changes if str(c.campaign_id) == cid]
+        pending_image = sum(
+            1 for c in campaign_changes
+            if (c.changes or {}).get("image_src", {}).get("pending") is True
+        )
+        delete_requests = sum(
+            1 for c in campaign_changes
+            if _delete_request_status(c) == "pending"
+        )
+        release_requests = sum(
+            1 for c in campaign_changes
+            if _release_request_status(c) == "pending"
+        )
+        edit_count = len([
+            c for c in campaign_changes
+            if "delete_request" not in (c.changed_fields or [])
+            and "release_request" not in (c.changed_fields or [])
+        ])
+
+        # Build alert based on signals
+        severity = None
+        title = None
+        message = None
+
+        if delete_requests > 0:
+            severity = "HIGH"
+            title = f"Deletion Requested — {campaign['title']}"
+            message = f"Organizer requested campaign deletion. {delete_requests} pending review."
+        elif release_requests > 0:
+            severity = "MEDIUM"
+            title = f"Fund Release Pending — {campaign['title']}"
+            message = f"Organizer requested fund release to {campaign['institution']}. Awaiting admin approval."
+        elif pending_image > 0:
+            severity = "LOW"
+            title = f"Cover Image Pending — {campaign['title']}"
+            message = f"New cover photo uploaded by organizer. Needs admin review before going live."
+        elif total_xlm > 0 and pct_funded < 5 and goal > 50000:
+            severity = "MEDIUM"
+            title = f"Low Traction — {campaign['title']}"
+            message = f"Only {pct_funded:.1f}% funded (₱{total_php:,.0f} of ₱{goal:,.0f} goal). May need promotion."
+        elif edit_count >= 3:
+            severity = "LOW"
+            title = f"Frequent Edits — {campaign['title']}"
+            message = f"{edit_count} edits recorded. Review for consistency with original campaign intent."
+        elif total_xlm > 0 and pct_funded >= 80:
+            severity = "LOW"
+            title = f"Near Goal — {campaign['title']}"
+            message = f"{pct_funded:.0f}% funded. Consider preparing fund release documentation."
+
+        if severity and title:
+            alerts.append({
+                "campaign_id": cid,
+                "campaign_title": campaign["title"],
+                "severity": severity,
+                "title": title,
+                "message": message,
+                "raised_php": total_php,
+                "goal_php": goal,
+                "pct_funded": round(pct_funded, 1),
+                "created_at": campaign["updated_at"],
+            })
+
+    # If LLM is configured, ask it to add a platform-level summary alert
+    has_llm_key = bool(settings.LLM_API_KEY or settings.OPENAI_API_KEY)
+    if has_llm_key and settings.RISK_ENGINE == "llm":
+        try:
+            from openai import AsyncOpenAI
+            base_url = settings.effective_base_url or None
+            client = AsyncOpenAI(api_key=settings.effective_api_key, base_url=base_url)
+            summary_payload = {
+                "total_campaigns": len(campaigns),
+                "total_raised_php": sum(float(c["raised_amount"]) for c in campaigns),
+                "pending_releases": sum(1 for c in all_changes if _release_request_status(c) == "pending"),
+                "pending_deletes": sum(1 for c in all_changes if _delete_request_status(c) == "pending"),
+                "top_campaigns": [
+                    {"title": c["title"], "raised": c["raised_amount"], "goal": c["goal_amount"]}
+                    for c in sorted(campaigns, key=lambda x: x["raised_amount"], reverse=True)[:3]
+                ],
+            }
+            completion = await client.chat.completions.create(
+                model=settings.effective_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a fraud-risk analyst for LINGAP, a humanitarian aid platform. "
+                            "Given platform stats, return a JSON object with keys: "
+                            "severity (HIGH/MEDIUM/LOW), title (max 60 chars), message (max 120 chars). "
+                            "Focus on the most important platform-level risk or insight. "
+                            "Be concise and specific."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Platform stats: {summary_payload}. Give one key insight.",
+                    },
+                ],
+                response_format={"type": "json_object"},
+                temperature=0,
+                max_tokens=150,
+            )
+            import json as _json
+            llm_data = _json.loads(completion.choices[0].message.content or "{}")
+            if llm_data.get("title") and llm_data.get("message"):
+                alerts.insert(0, {
+                    "campaign_id": None,
+                    "campaign_title": "Platform Overview",
+                    "severity": str(llm_data.get("severity", "LOW")).upper(),
+                    "title": str(llm_data["title"])[:80],
+                    "message": str(llm_data["message"])[:160],
+                    "raised_php": 0,
+                    "goal_php": 0,
+                    "pct_funded": 0,
+                    "created_at": datetime.now(timezone.utc),
+                    "source": "llm",
+                })
+        except Exception:
+            pass  # LLM alert is best-effort; rule-based alerts still show
+
+    # Sort: HIGH first, then MEDIUM, then LOW
+    order = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+    alerts.sort(key=lambda a: order.get(a["severity"], 3))
+
+    return {"success": True, "data": alerts[:10]}  # cap at 10
+
+
+@router.get("/admin/escrow-health")
+async def campaign_escrow_health(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Real per-category escrow health based on actual donation data."""
+    campaigns = await _public_campaigns(db)
+
+    category_stats: dict[str, dict] = {}
+    for campaign in campaigns:
+        cat = campaign["category"]
+        if cat not in category_stats:
+            category_stats[cat] = {"raised": 0.0, "goal": 0.0, "count": 0, "with_funds": 0}
+        category_stats[cat]["raised"] += float(campaign["raised_amount"])
+        category_stats[cat]["goal"] += float(campaign["goal_amount"])
+        category_stats[cat]["count"] += 1
+        if float(campaign["raised_amount"]) > 0:
+            category_stats[cat]["with_funds"] += 1
+
+    result = []
+    for cat, s in category_stats.items():
+        if s["count"] == 0:
+            continue
+        # Health = % of campaigns in this category that have received at least some funds
+        # or are progressing toward goal
+        health_pct = round((s["with_funds"] / s["count"]) * 100, 1) if s["count"] > 0 else 0
+        # Boost health if overall funding rate is good
+        if s["goal"] > 0:
+            funding_rate = min(100, (s["raised"] / s["goal"]) * 100)
+            health_pct = round((health_pct * 0.6 + funding_rate * 0.4), 1)
+        # Floor at 60 for active campaigns (they're verified and running)
+        health_pct = max(60.0, min(100.0, health_pct))
+        result.append({
+            "category": cat,
+            "health_pct": health_pct,
+            "campaign_count": s["count"],
+            "total_raised_php": round(s["raised"], 2),
+            "total_goal_php": round(s["goal"], 2),
+        })
+
+    result.sort(key=lambda x: x["health_pct"], reverse=True)
+
+    overall = round(sum(r["health_pct"] for r in result) / len(result), 1) if result else 0
+    return {
+        "success": True,
+        "data": {
+            "categories": result,
+            "overall_health_pct": overall,
+        },
+    }
+
+
 @router.get("/public")
 async def public_campaigns(db: AsyncSession = Depends(get_db)):
     return {"success": True, "data": await _public_campaigns(db)}

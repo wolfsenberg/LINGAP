@@ -113,6 +113,30 @@ export type AdminStatsApi = {
   pending_releases: number;
 };
 
+export type AiAlertApi = {
+  campaign_id: string | null;
+  campaign_title: string;
+  severity: "HIGH" | "MEDIUM" | "LOW" | string;
+  title: string;
+  message: string;
+  raised_php: number;
+  goal_php: number;
+  pct_funded: number;
+  created_at: string;
+  source?: "llm" | "rules" | string;
+};
+
+export type EscrowHealthApi = {
+  categories: Array<{
+    category: string;
+    health_pct: number;
+    campaign_count: number;
+    total_raised_php: number;
+    total_goal_php: number;
+  }>;
+  overall_health_pct: number;
+};
+
 export type CampaignReleaseRequestCreate = {
   recipient_name: string;
   recipient_type?: string;
@@ -651,6 +675,10 @@ export const campaignsApi = {
     api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/change-log/${changeId}/reject-image`),
   adminStats: () =>
     api.get<ApiResponse<AdminStatsApi>>("/api/v1/campaigns/admin/stats"),
+  aiAlerts: () =>
+    api.get<ApiResponse<AiAlertApi[]>>("/api/v1/campaigns/admin/ai-alerts"),
+  escrowHealth: () =>
+    api.get<ApiResponse<EscrowHealthApi>>("/api/v1/campaigns/admin/escrow-health"),
 };
 
 export const donorsApi = {
