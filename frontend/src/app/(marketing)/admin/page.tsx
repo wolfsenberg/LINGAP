@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [releaseRequests, setReleaseRequests] = useState<CampaignChangeLogApi[]>([]);
   const [stats, setStats] = useState<AdminStatsApi | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  const [reviewModal, setReviewModal] = useState<CampaignChangeLogApi | null>(null);
   const isAdmin = isAuthenticated && user?.role === "admin";
 
   function formatPeso(n: number) {
@@ -274,6 +275,7 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* ── Campaign Edit Review ── */}
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24,marginBottom:24}}>
           <div className="flex flex-center flex-between mb-20" style={{gap:16,flexWrap:'wrap'}}>
             <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',display:'flex',alignItems:'center',gap:8}}>
@@ -283,112 +285,219 @@ export default function AdminPage() {
               {stats && stats.pending_edits > 0 && (
                 <span className="badge badge-gold">{stats.pending_edits} pending image {stats.pending_edits === 1 ? 'review' : 'reviews'}</span>
               )}
-              <span className="badge badge-emerald">{campaignChanges.length} total changes</span>
+              <span className="badge badge-navy">{campaignChanges.length} total</span>
             </div>
           </div>
 
           {campaignChanges.length > 0 ? (
-            <div style={{display:'grid',gap:10}}>
-              {campaignChanges.map((change)=>{
+            <div style={{display:'grid',gap:8}}>
+              {campaignChanges.map((change) => {
                 const imgChange = change.changes?.image_src;
                 const hasPendingImage = imgChange?.pending === true;
                 const imgApproved = imgChange?.approved === true;
                 const imgRejected = imgChange?.approved === false && imgChange?.rejected_at;
-                const pendingDataUrl: string | undefined = imgChange?.pending_image_src;
-
-                // Non-image field changes to display
-                const fieldChanges = Object.entries(change.changes || {}).filter(
-                  ([k]) => k !== "image_src" && k !== "delete_request" && k !== "release_request"
-                );
+                const nonImageFields = change.changed_fields.filter(f => f !== 'image_src' && f !== 'delete_request' && f !== 'release_request');
 
                 return (
-                  <div key={change.id} style={{border:`1px solid ${hasPendingImage ? 'rgba(200,134,10,.3)' : 'var(--border)'}`,borderRadius:12,padding:14,display:'grid',gap:10,background: hasPendingImage ? 'rgba(200,134,10,.025)' : 'transparent'}}>
-                    {/* Top row */}
-                    <div style={{display:'grid',gridTemplateColumns:'auto 1fr auto',gap:12,alignItems:'start'}}>
-                      <div style={{fontFamily:'Space Mono,monospace',fontSize:11,color:'var(--text3)',paddingTop:2,whiteSpace:'nowrap'}}>
-                        {new Date(change.created_at).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+                  <div
+                    key={change.id}
+                    onClick={() => setReviewModal(change)}
+                    style={{
+                      display:'grid',
+                      gridTemplateColumns:'1fr auto',
+                      gap:12,
+                      alignItems:'center',
+                      padding:'12px 16px',
+                      border:`1px solid ${hasPendingImage ? 'rgba(200,134,10,.35)' : 'var(--border)'}`,
+                      borderRadius:10,
+                      background: hasPendingImage ? 'rgba(200,134,10,.04)' : 'var(--surface)',
+                      cursor:'pointer',
+                      transition:'border-color .15s,background .15s',
+                    }}
+                    onMouseEnter={e=>(e.currentTarget.style.borderColor = hasPendingImage ? 'rgba(200,134,10,.6)' : 'rgba(74,155,106,.4)')}
+                    onMouseLeave={e=>(e.currentTarget.style.borderColor = hasPendingImage ? 'rgba(200,134,10,.35)' : 'var(--border)')}
+                  >
+                    <div style={{minWidth:0}}>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3,flexWrap:'wrap'}}>
+                        <span style={{fontWeight:800,color:'var(--forest)',fontSize:14}}>{change.campaign_title}</span>
+                        {hasPendingImage && <span className="badge badge-gold" style={{fontSize:10}}>⏳ Image needs review</span>}
+                        {imgApproved && <span className="badge badge-emerald" style={{fontSize:10}}>✓ Image approved</span>}
+                        {imgRejected && <span className="badge badge-navy" style={{fontSize:10}}>✗ Image rejected</span>}
                       </div>
-                      <div>
-                        <div style={{fontWeight:800,color:'var(--forest)',marginBottom:2}}>{change.campaign_title}</div>
-                        <div style={{fontSize:12,color:'var(--text2)'}}>{change.actor_name} <span style={{color:'var(--text3)'}}>·</span> {change.actor_email}</div>
-                        <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>{change.summary}</div>
+                      <div style={{fontSize:12,color:'var(--text2)'}}>
+                        {change.actor_name} · {change.actor_email}
+                        <span style={{color:'var(--text3)',marginLeft:8,fontFamily:'Space Mono,monospace',fontSize:11}}>
+                          {new Date(change.created_at).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+                        </span>
                       </div>
-                      <div style={{display:'flex',gap:5,flexWrap:'wrap',justifyContent:'flex-end'}}>
-                        {change.changed_fields.map((field)=>(
-                          <span key={field} className={`badge ${field==='image_src' && hasPendingImage ? 'badge-gold' : 'badge-navy'}`} style={{fontSize:10}}>
-                            {field.replace(/_/g,' ')}
-                            {field==='image_src' && hasPendingImage && ' ⏳'}
-                            {field==='image_src' && imgApproved && ' ✓'}
-                            {field==='image_src' && imgRejected && ' ✗'}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Before/after for non-image fields */}
-                    {fieldChanges.length > 0 && (
-                      <div style={{display:'grid',gap:6}}>
-                        {fieldChanges.map(([field, diff]: [string, any]) => (
-                          <div key={field} style={{display:'grid',gridTemplateColumns:'120px 1fr 1fr',gap:8,fontSize:12,background:'rgba(26,58,42,.03)',border:'1px solid rgba(26,58,42,.07)',borderRadius:8,padding:'8px 10px',alignItems:'start'}}>
-                            <span style={{fontWeight:800,color:'var(--text3)',textTransform:'uppercase',fontSize:10,letterSpacing:'.06em',paddingTop:1}}>{field.replace(/_/g,' ')}</span>
-                            <div>
-                              <div style={{fontSize:10,color:'var(--text3)',marginBottom:2}}>BEFORE</div>
-                              <div style={{color:'#991B1B',wordBreak:'break-word'}}>{String(diff?.before ?? '—')}</div>
-                            </div>
-                            <div>
-                              <div style={{fontSize:10,color:'var(--text3)',marginBottom:2}}>AFTER</div>
-                              <div style={{color:'var(--forest)',fontWeight:600,wordBreak:'break-word'}}>{String(diff?.after ?? '—')}</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Pending image preview + actions */}
-                    {hasPendingImage && pendingDataUrl && (
-                      <div style={{display:'grid',gridTemplateColumns:'120px 1fr',gap:14,alignItems:'center',background:'rgba(200,134,10,.06)',border:'1px solid rgba(200,134,10,.2)',borderRadius:10,padding:12}}>
-                        <img
-                          src={pendingDataUrl}
-                          alt="Pending cover"
-                          style={{width:120,height:80,objectFit:'cover',borderRadius:8,border:'1px solid rgba(200,134,10,.25)',display:'block'}}
-                        />
-                        <div>
-                          <div style={{fontSize:12,fontWeight:800,color:'var(--amber)',marginBottom:6}}>⏳ Cover image pending approval</div>
-                          <div style={{fontSize:12,color:'var(--text2)',marginBottom:10}}>
-                            The organizer uploaded a new cover photo. Approve to make it live, or reject to keep the current image.
-                          </div>
-                          <div style={{display:'flex',gap:8}}>
-                            <button type="button" className="btn btn-sm btn-emerald" onClick={()=>handleImageReview(change.id,'approve')}>
-                              <CheckCircle2 size={13}/> Approve Image
-                            </button>
-                            <button type="button" className="btn btn-sm btn-outline" style={{color:'#991B1B',borderColor:'rgba(220,38,38,.24)'}} onClick={()=>handleImageReview(change.id,'reject')}>
-                              <XCircle size={13}/> Reject
-                            </button>
-                          </div>
+                      {nonImageFields.length > 0 && (
+                        <div style={{display:'flex',gap:5,flexWrap:'wrap',marginTop:6}}>
+                          {nonImageFields.map(f => (
+                            <span key={f} className="badge badge-navy" style={{fontSize:10}}>{f.replace(/_/g,' ')}</span>
+                          ))}
                         </div>
-                      </div>
-                    )}
-
-                    {imgApproved && (
-                      <div style={{fontSize:12,color:'var(--canopy)',fontWeight:700,display:'flex',alignItems:'center',gap:5}}>
-                        <CheckCircle2 size={12}/> Cover image approved and live.
-                      </div>
-                    )}
-                    {imgRejected && (
-                      <div style={{fontSize:12,color:'#991B1B',fontWeight:700,display:'flex',alignItems:'center',gap:5}}>
-                        <XCircle size={12}/> Cover image rejected — original kept.
-                      </div>
-                    )}
+                      )}
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
+                      <span style={{fontSize:12,color:'var(--canopy)',fontWeight:700}}>Review →</span>
+                    </div>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div style={{padding:18,border:'1px dashed var(--border)',borderRadius:10,color:'var(--text2)',fontSize:13}}>
-              No organizer campaign edits have been recorded yet.
+            <div style={{padding:32,textAlign:'center',border:'1px dashed var(--border)',borderRadius:10,color:'var(--text3)',fontSize:13}}>
+              No organizer campaign edits recorded yet.
             </div>
           )}
         </div>
+
+        {/* ── Review Modal ── */}
+        {reviewModal && (() => {
+          const imgChange = reviewModal.changes?.image_src;
+          const hasPendingImage = imgChange?.pending === true;
+          const imgApproved = imgChange?.approved === true;
+          const imgRejected = imgChange?.approved === false && imgChange?.rejected_at;
+          const pendingDataUrl: string | undefined = imgChange?.pending_image_src;
+          const fieldChanges = Object.entries(reviewModal.changes || {}).filter(
+            ([k]) => k !== 'image_src' && k !== 'delete_request' && k !== 'release_request'
+          );
+
+          return (
+            <div
+              style={{position:'fixed',inset:0,zIndex:300,background:'rgba(10,18,14,.55)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:24}}
+              onClick={() => setReviewModal(null)}
+            >
+              <div
+                style={{width:'min(100%,620px)',maxHeight:'90vh',overflowY:'auto',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:16,boxShadow:'0 32px 80px rgba(10,18,14,.28)',display:'grid',gap:0}}
+                onClick={e => e.stopPropagation()}
+              >
+                {/* Modal header */}
+                <div style={{padding:'20px 24px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12}}>
+                  <div>
+                    <div style={{fontSize:11,fontWeight:800,color:'var(--canopy)',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:4}}>Campaign Edit Review</div>
+                    <div style={{fontSize:18,fontWeight:800,color:'var(--forest)',lineHeight:1.2}}>{reviewModal.campaign_title}</div>
+                    <div style={{fontSize:12,color:'var(--text2)',marginTop:4}}>
+                      {reviewModal.actor_name} · {reviewModal.actor_email} ·{' '}
+                      <span style={{fontFamily:'Space Mono,monospace',fontSize:11}}>
+                        {new Date(reviewModal.created_at).toLocaleString('en-PH',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReviewModal(null)}
+                    style={{width:32,height:32,borderRadius:999,border:'1px solid var(--border)',background:'transparent',color:'var(--text3)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}
+                  >
+                    <XCircle size={16}/>
+                  </button>
+                </div>
+
+                <div style={{padding:'20px 24px',display:'grid',gap:16}}>
+                  {/* Summary */}
+                  <div style={{fontSize:13,color:'var(--text2)',background:'rgba(26,58,42,.04)',border:'1px solid rgba(26,58,42,.08)',borderRadius:8,padding:'10px 14px'}}>
+                    {reviewModal.summary}
+                  </div>
+
+                  {/* Field-by-field diff */}
+                  {fieldChanges.length > 0 && (
+                    <div>
+                      <div style={{fontSize:11,fontWeight:800,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:10}}>Changes</div>
+                      <div style={{display:'grid',gap:8}}>
+                        {fieldChanges.map(([field, diff]: [string, any]) => (
+                          <div key={field} style={{borderRadius:10,border:'1px solid var(--border)',overflow:'hidden'}}>
+                            <div style={{padding:'6px 12px',background:'rgba(26,58,42,.04)',fontSize:11,fontWeight:800,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.08em'}}>
+                              {field.replace(/_/g,' ')}
+                            </div>
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr'}}>
+                              <div style={{padding:'10px 12px',borderRight:'1px solid var(--border)',background:'rgba(185,28,28,.03)'}}>
+                                <div style={{fontSize:10,fontWeight:800,color:'#991B1B',marginBottom:4}}>BEFORE</div>
+                                <div style={{fontSize:13,color:'#991B1B',wordBreak:'break-word',lineHeight:1.5}}>{String(diff?.before ?? '—')}</div>
+                              </div>
+                              <div style={{padding:'10px 12px',background:'rgba(74,155,106,.03)'}}>
+                                <div style={{fontSize:10,fontWeight:800,color:'var(--canopy)',marginBottom:4}}>AFTER</div>
+                                <div style={{fontSize:13,color:'var(--forest)',fontWeight:600,wordBreak:'break-word',lineHeight:1.5}}>{String(diff?.after ?? '—')}</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Image review */}
+                  {(hasPendingImage || imgApproved || imgRejected) && (
+                    <div>
+                      <div style={{fontSize:11,fontWeight:800,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.1em',marginBottom:10}}>Cover Image</div>
+                      {hasPendingImage && pendingDataUrl ? (
+                        <div style={{border:'1px solid rgba(200,134,10,.3)',borderRadius:12,overflow:'hidden',background:'rgba(200,134,10,.03)'}}>
+                          <img
+                            src={pendingDataUrl}
+                            alt="Proposed cover"
+                            style={{width:'100%',maxHeight:260,objectFit:'cover',display:'block'}}
+                          />
+                          <div style={{padding:'14px 16px'}}>
+                            <div style={{fontSize:13,color:'var(--text2)',marginBottom:12}}>
+                              The organizer uploaded a new cover photo. Approve to make it live on the campaign card, or reject to keep the current image.
+                            </div>
+                            <div style={{display:'flex',gap:10}}>
+                              <button
+                                type="button"
+                                className="btn btn-emerald"
+                                style={{flex:1,justifyContent:'center'}}
+                                onClick={async () => {
+                                  await handleImageReview(reviewModal.id, 'approve');
+                                  setReviewModal(null);
+                                  loadAll();
+                                }}
+                              >
+                                <CheckCircle2 size={15}/> Approve Image
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                style={{flex:1,justifyContent:'center',color:'#991B1B',borderColor:'rgba(220,38,38,.3)'}}
+                                onClick={async () => {
+                                  await handleImageReview(reviewModal.id, 'reject');
+                                  setReviewModal(null);
+                                  loadAll();
+                                }}
+                              >
+                                <XCircle size={15}/> Reject Image
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : imgApproved ? (
+                        <div style={{display:'flex',alignItems:'center',gap:8,padding:'12px 14px',background:'rgba(74,155,106,.07)',border:'1px solid rgba(74,155,106,.2)',borderRadius:10,fontSize:13,color:'var(--canopy)',fontWeight:700}}>
+                          <CheckCircle2 size={15}/> Cover image was approved and is now live.
+                        </div>
+                      ) : (
+                        <div style={{display:'flex',alignItems:'center',gap:8,padding:'12px 14px',background:'rgba(185,28,28,.05)',border:'1px solid rgba(185,28,28,.15)',borderRadius:10,fontSize:13,color:'#991B1B',fontWeight:700}}>
+                          <XCircle size={15}/> Cover image change was rejected — original kept.
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* No actions needed */}
+                  {!hasPendingImage && fieldChanges.length === 0 && !imgApproved && !imgRejected && (
+                    <div style={{fontSize:13,color:'var(--text3)',textAlign:'center',padding:'8px 0'}}>
+                      This change has no pending actions.
+                    </div>
+                  )}
+                </div>
+
+                {/* Modal footer */}
+                <div style={{padding:'14px 24px',borderTop:'1px solid var(--border)',display:'flex',justifyContent:'flex-end'}}>
+                  <button type="button" className="btn btn-outline" onClick={() => setReviewModal(null)}>
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24,marginBottom:24}}>
           <div className="flex flex-center flex-between mb-20" style={{gap:16,flexWrap:'wrap'}}>
