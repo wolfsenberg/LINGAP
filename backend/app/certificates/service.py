@@ -23,20 +23,6 @@ def _fallback_campaign_title(campaign_id: str) -> str:
     return campaign_id.replace("-", " ").replace("_", " ").title()
 
 
-def _certificate_hash_seed(donation: Donation, donor_name: str, milestone_description: str) -> str:
-    payload = "|".join(
-        [
-            str(donation.id),
-            str(donation.donor_id),
-            str(float(donation.amount)),
-            donation.stellar_tx_hash or "",
-            donor_name,
-            milestone_description,
-        ]
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
 async def create_certificate_for_donation(
     donation: Donation,
     db: AsyncSession,
@@ -88,7 +74,7 @@ async def create_certificate_for_donation(
             await db.execute(
                 select(func.sum(Donation.amount)).where(
                     Donation.donor_id == donation.donor_id,
-                    Donation.blockchain_confirmed,
+                    Donation.blockchain_confirmed == True,
                 )
             )
         ).scalar()
@@ -107,11 +93,23 @@ async def create_certificate_for_donation(
             beneficiary_name = campaign_title or "LINGAP Campaign"
             lives_touched = 0
 
-            cert_hash = _certificate_hash_seed(donation, donor_name, milestone_description)
+            pdf_bytes = generate_certificate_pdf(
+                donor_name=donor_name,
+                amount=float(donation.amount),
+                beneficiary_name=beneficiary_name,
+                milestone_description=milestone_description,
+                lives_touched=lives_touched,
+                total_donated=total_donated,
+                current_donation=float(donation.amount),
+                donation_date=donation.created_at,
+                stellar_tx_hash=donation.stellar_tx_hash,
+            )
+
+            stored = await upload_certificate_pdf(pdf_bytes, str(donation.id))
             certificate = DonationCertificate(
                 donation_id=donation.id,
-                s3_url="",
-                pdf_hash=cert_hash,
+                s3_url=stored.s3_url,
+                pdf_hash=stored.pdf_hash,
                 is_public=True,
                 donor_name=donor_name,
                 amount=float(donation.amount),
@@ -156,12 +154,25 @@ async def create_certificate_for_donation(
         lives_touched = lives_touched_result or 0
 
         milestone_description = aid_request.purpose or campaign_title or f"Donation for {beneficiary.name}"
-        cert_hash = _certificate_hash_seed(donation, donor_name, milestone_description)
+
+        pdf_bytes = generate_certificate_pdf(
+            donor_name=donor_name,
+            amount=float(donation.amount),
+            beneficiary_name=beneficiary.name,
+            milestone_description=milestone_description,
+            lives_touched=lives_touched,
+            total_donated=total_donated,
+            current_donation=float(donation.amount),
+            donation_date=donation.created_at,
+            stellar_tx_hash=donation.stellar_tx_hash,
+        )
+
+        stored = await upload_certificate_pdf(pdf_bytes, str(donation.id))
 
         certificate = DonationCertificate(
             donation_id=donation.id,
-            s3_url="",
-            pdf_hash=cert_hash,
+            s3_url=stored.s3_url,
+            pdf_hash=stored.pdf_hash,
             is_public=True,
             donor_name=donor_name,
             amount=float(donation.amount),
