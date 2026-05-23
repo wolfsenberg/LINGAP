@@ -183,18 +183,30 @@ async def create_donation(
 
     if body.spend_balance:
         campaign_id = body.purpose.replace("campaign:", "", 1) if body.purpose and body.purpose.startswith("campaign:") else None
+        # If a real Stellar tx hash was provided, the XLM came from the user's
+        # Freighter wallet AND the LINGAP balance is deducted to keep them in sync.
+        payment_method = (
+            BalancePaymentMethod.stellar_wallet
+            if body.stellar_tx_hash and not body.stellar_tx_hash.startswith("LNGP-")
+            else BalancePaymentMethod.lingap_balance
+        )
         balance_tx = BalanceTransaction(
             user_id=user.id,
             kind=BalanceTransactionKind.donation,
             amount_xlm=body.amount,
             amount_php=_php(body.amount),
-            payment_method=BalancePaymentMethod.lingap_balance,
+            payment_method=payment_method,
             payment_reference=tx_hash,
             payment_status=BalancePaymentStatus.confirmed,
             campaign_id=campaign_id,
             donation_id=donation.id,
             stellar_tx_hash=tx_hash,
-            note=f"Donation locked to campaign vault from LINGAP balance. Wallet: {body.wallet_address or 'not provided'}",
+            note=(
+                f"Donation to campaign via Stellar Wallet. TX: {tx_hash}. "
+                f"Wallet: {body.wallet_address or 'not provided'}."
+            ) if payment_method == BalancePaymentMethod.stellar_wallet else (
+                f"Donation locked to campaign vault from LINGAP balance. Wallet: {body.wallet_address or 'not provided'}."
+            ),
         )
         db.add(balance_tx)
         await db.commit()
