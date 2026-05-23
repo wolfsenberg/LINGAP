@@ -41,7 +41,7 @@ export default function TopNav() {
               <Heart size={14} strokeWidth={2}/>
               My Impact
             </Link>
-            <Link href="/discover" className="btn btn-emerald">Donate Now</Link>
+            <Link href="/discover" className="btn btn-emerald btn-sm">Donate Now</Link>
             <WalletButton />
             <button type="button" onClick={clearAuth} className="nav-logout" aria-label="Sign out" title="Sign out">
               <LogOut size={13}/>
@@ -52,7 +52,7 @@ export default function TopNav() {
             <Link href="/login" className={`nav-login${pathname === "/login" ? " active" : ""}`}>
               Sign In
             </Link>
-            <Link href="/discover" className="btn btn-emerald">Donate Now</Link>
+            <Link href="/discover" className="btn btn-emerald btn-sm">Donate Now</Link>
           </>
         )}
       </div>
