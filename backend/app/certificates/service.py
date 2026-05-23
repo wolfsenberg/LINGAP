@@ -1,8 +1,8 @@
 """Certificate creation service - orchestrates certificate generation and storage."""
 from __future__ import annotations
 
+import hashlib
 import logging
-import uuid
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,8 +15,6 @@ from app.models.beneficiary import Beneficiary
 from app.models.user import User
 from app.models.provenance import ProvenanceRecord
 from app.models.campaign_drive import CampaignDrive
-from app.certificates.generator import generate_certificate_pdf
-from app.storage.s3 import upload_certificate_pdf
 
 logger = logging.getLogger(__name__)
 
