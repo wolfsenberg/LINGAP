@@ -14,7 +14,6 @@ from app.models.volunteer import (
     VolunteerSignup,
     VolunteerCategory,
     OpportunityStatus,
-    SignupStatus,
 )
 
 router = APIRouter(prefix="/volunteer", tags=["volunteer"])

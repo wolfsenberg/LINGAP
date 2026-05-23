@@ -771,8 +771,6 @@ def generate_svg_certificate(
         merkle_proof=merkle_proof,
         onchain_hash=onchain_hash,
     )
-    html_escaped = html.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
-
     svg = f"""<?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 800 1100" xmlns="http://www.w3.org/2000/svg"
      xmlns:xlink="http://www.w3.org/1999/xlink"

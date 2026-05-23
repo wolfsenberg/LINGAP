@@ -226,7 +226,7 @@ async def list_donor_certificates(
     if not user or (user.id != donor_id and user.role.value != "admin"):
         query = select(DonationCertificate).where(
             DonationCertificate.donation.has(donor_id=donor_id),
-            DonationCertificate.is_public == True,
+            DonationCertificate.is_public,
         )
     else:
         query = select(DonationCertificate).where(

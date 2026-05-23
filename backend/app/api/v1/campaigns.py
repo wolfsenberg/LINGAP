@@ -1,5 +1,4 @@
 import base64
-import uuid
 from datetime import datetime, timezone
 from uuid import UUID
 
