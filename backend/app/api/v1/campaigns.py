@@ -510,8 +510,6 @@ async def campaign_ai_alerts(
     Uses the LLM engine (Groq) when configured, falls back to rules.
     """
     from app.config import settings
-    from app.ai.llm import llm_engine
-    from app.ai.rules import rules_engine
 
     campaigns = await _public_campaigns(db)
     all_changes = (await db.execute(select(CampaignDriveChange))).scalars().all()
@@ -565,7 +563,7 @@ async def campaign_ai_alerts(
         elif pending_image > 0:
             severity = "LOW"
             title = f"Cover Image Pending — {campaign['title']}"
-            message = f"New cover photo uploaded by organizer. Needs admin review before going live."
+            message = "New cover photo uploaded by organizer. Needs admin review before going live."
         elif total_xlm > 0 and pct_funded < 5 and goal > 50000:
             severity = "MEDIUM"
             title = f"Low Traction — {campaign['title']}"
