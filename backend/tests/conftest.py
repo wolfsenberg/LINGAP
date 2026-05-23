@@ -153,7 +153,7 @@ async def seed_aid_request(db_session: AsyncSession):
     req = AidRequest(
         id=uuid.uuid4(),
         beneficiary_id=b.id,
-        requested_amount=15000,
+        requested_amount=1000,
         asset="PHP",
         purpose="Home repair — installation of doors, windows, and structural fixtures for a family dwelling in Manila.",
         status=AidRequestStatus.pending,
