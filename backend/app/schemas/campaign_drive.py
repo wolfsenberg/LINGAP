@@ -26,6 +26,14 @@ class CampaignDriveUpdate(BaseModel):
     image_src: str | None = None
 
 
+class CampaignReleaseRequestCreate(BaseModel):
+    recipient_name: str
+    recipient_type: str = "Verified recipient"
+    recipient_reference: str | None = None
+    amount_xlm: float | None = None
+    note: str | None = None
+
+
 class CampaignDriveRead(BaseModel):
     id: str
     organizer_id: UUID | None = None

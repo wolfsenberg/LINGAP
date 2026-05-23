@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import {
-  AlertCircle, ArrowLeft, CheckCircle2, AlertTriangle, Eye, EyeOff, Lock, Network, ShieldCheck, Search, Link2, XCircle, History
+  AlertCircle, ArrowLeft, CheckCircle2, AlertTriangle, Eye, EyeOff, Lock, Network, ShieldCheck, Search, Link2, XCircle, History, Banknote, FileCheck
 } from "lucide-react";
 import { CAMPAIGNS } from "@/lib/campaigns";
 import { authApi, campaignsApi, type CampaignChangeLogApi } from "@/lib/api";
@@ -18,19 +18,23 @@ export default function AdminPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [campaignChanges, setCampaignChanges] = useState<CampaignChangeLogApi[]>([]);
   const [deleteRequests, setDeleteRequests] = useState<CampaignChangeLogApi[]>([]);
+  const [releaseRequests, setReleaseRequests] = useState<CampaignChangeLogApi[]>([]);
   const isAdmin = isAuthenticated && user?.role === "admin";
 
   useEffect(() => {
     if (!isAdmin) return;
     let active = true;
-    Promise.allSettled([campaignsApi.changeLog(8), campaignsApi.deleteRequests(8)]).then(([changes, deletes]) => {
+    Promise.allSettled([
+      campaignsApi.changeLog(8),
+      campaignsApi.deleteRequests(8),
+      campaignsApi.releaseRequests(20),
+    ]).then(([changes, deletes, releases]) => {
       if (!active) return;
       setCampaignChanges(changes.status === "fulfilled" ? changes.value.data.data : []);
       setDeleteRequests(deletes.status === "fulfilled" ? deletes.value.data.data : []);
+      setReleaseRequests(releases.status === "fulfilled" ? releases.value.data.data : []);
     });
-    return () => {
-      active = false;
-    };
+    return () => { active = false; };
   }, [isAdmin]);
 
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
@@ -58,6 +62,29 @@ export default function AdminPage() {
       toast.success(action === "approve" ? "Campaign deletion approved." : "Campaign deletion rejected.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to review delete request.");
+    }
+  }
+
+  async function reviewReleaseRequest(requestId: string, action: "approve" | "reject") {
+    try {
+      const res =
+        action === "approve"
+          ? await campaignsApi.approveReleaseRequest(requestId)
+          : await campaignsApi.rejectReleaseRequest(requestId);
+      setReleaseRequests((items) => items.map((item) => (item.id === requestId ? res.data.data : item)));
+      toast.success(action === "approve" ? "Fund release approved. Organizer must now upload proof." : "Fund release rejected.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to review release request.");
+    }
+  }
+
+  async function handleVerifyProof(requestId: string) {
+    try {
+      const res = await campaignsApi.verifyReleaseProof(requestId);
+      setReleaseRequests((items) => items.map((item) => (item.id === requestId ? res.data.data : item)));
+      toast.success("Handoff proof verified. Donations marked as disbursed.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to verify proof.");
     }
   }
 
@@ -275,8 +302,120 @@ export default function AdminPage() {
           )}
         </div>
 
-        <div className="grid-2 mb-24" style={{alignItems:'start'}}>
-          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24}}>
+        {/* ── Fund Release Requests ── */}
+        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24,marginBottom:24}}>
+          <div className="flex flex-center flex-between mb-20" style={{gap:16,flexWrap:'wrap'}}>
+            <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',display:'flex',alignItems:'center',gap:8}}>
+              <Banknote size={18} color="var(--canopy)" strokeWidth={1.8}/> Fund Release Requests
+            </h3>
+            <span className="badge badge-gold">
+              {releaseRequests.filter((r)=>r.changes?.release_request?.status==='pending').length} pending
+            </span>
+          </div>
+
+          {releaseRequests.length > 0 ? (
+            <div style={{display:'grid',gap:10}}>
+              {releaseRequests.map((req)=>{
+                const rr = req.changes?.release_request ?? {};
+                const rrStatus: string = rr.status ?? 'pending';
+                const isPending = rrStatus === 'pending';
+                const isApproved = rrStatus === 'approved' || rrStatus === 'proof_uploaded';
+                const isClosed = rrStatus === 'closed';
+                const badgeClass = isPending ? 'badge-gold' : isApproved ? 'badge-emerald' : isClosed ? 'badge-navy' : 'badge-red';
+
+                return (
+                  <div key={req.id} style={{border:'1px solid var(--border)',borderRadius:12,padding:16,display:'grid',gap:12}}>
+                    {/* Header row */}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr auto',gap:12,alignItems:'start'}}>
+                      <div>
+                        <div style={{fontWeight:800,color:'var(--forest)',marginBottom:4,fontSize:15}}>{req.campaign_title}</div>
+                        <div style={{fontSize:12,color:'var(--text2)'}}>
+                          Requested by <strong>{req.actor_name}</strong> · {new Date(req.created_at).toLocaleString('en-PH',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
+                        </div>
+                      </div>
+                      <span className={`badge ${badgeClass}`} style={{whiteSpace:'nowrap'}}>
+                        {rrStatus.replace('_',' ')}
+                      </span>
+                    </div>
+
+                    {/* Release details */}
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:8}}>
+                      {rr.recipient_name && (
+                        <div style={{background:'rgba(74,155,106,.06)',border:'1px solid rgba(74,155,106,.15)',borderRadius:8,padding:'8px 10px'}}>
+                          <div style={{fontSize:10,fontWeight:800,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:3}}>Recipient</div>
+                          <div style={{fontSize:13,fontWeight:700,color:'var(--forest)'}}>{rr.recipient_name}</div>
+                          {rr.recipient_type && <div style={{fontSize:11,color:'var(--text3)'}}>{rr.recipient_type}</div>}
+                        </div>
+                      )}
+                      {rr.amount_xlm && (
+                        <div style={{background:'rgba(200,134,10,.06)',border:'1px solid rgba(200,134,10,.15)',borderRadius:8,padding:'8px 10px'}}>
+                          <div style={{fontSize:10,fontWeight:800,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:3}}>Amount</div>
+                          <div style={{fontSize:13,fontWeight:700,color:'var(--forest)'}}>{rr.amount_xlm} XLM</div>
+                        </div>
+                      )}
+                      {rr.note && (
+                        <div style={{background:'rgba(26,58,42,.04)',border:'1px solid rgba(26,58,42,.08)',borderRadius:8,padding:'8px 10px',gridColumn:'1 / -1'}}>
+                          <div style={{fontSize:10,fontWeight:800,color:'var(--text3)',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:3}}>Note</div>
+                          <div style={{fontSize:12,color:'var(--text2)'}}>{rr.note}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Flow steps */}
+                    <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',fontSize:11,fontWeight:700}}>
+                      {[
+                        {label:'1. Request sent',done:true},
+                        {label:'2. Admin approves',done:isApproved||isClosed},
+                        {label:'3. Organizer uploads proof',done:rrStatus==='proof_uploaded'||isClosed},
+                        {label:'4. Admin verifies & closes',done:isClosed},
+                      ].map((step,i)=>(
+                        <span key={i} style={{display:'inline-flex',alignItems:'center',gap:4,padding:'4px 8px',borderRadius:999,
+                          background: step.done ? 'rgba(74,155,106,.1)' : 'rgba(26,58,42,.04)',
+                          border: `1px solid ${step.done ? 'rgba(74,155,106,.25)' : 'rgba(26,58,42,.08)'}`,
+                          color: step.done ? 'var(--forest-light)' : 'var(--text3)'}}>
+                          {step.done ? <CheckCircle2 size={10}/> : <span style={{width:10,height:10,borderRadius:'50%',border:'1.5px solid currentColor',display:'inline-block'}}/>}
+                          {step.label}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Action buttons */}
+                    {(isPending || isApproved) && (
+                      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+                        {isPending && (
+                          <>
+                            <button type="button" className="btn btn-sm btn-emerald" onClick={()=>reviewReleaseRequest(req.id,'approve')}>
+                              <CheckCircle2 size={13}/> Approve Release
+                            </button>
+                            <button type="button" className="btn btn-sm btn-outline" onClick={()=>reviewReleaseRequest(req.id,'reject')}>
+                              <XCircle size={13}/> Reject
+                            </button>
+                          </>
+                        )}
+                        {isApproved && (
+                          <button type="button" className="btn btn-sm btn-emerald" onClick={()=>handleVerifyProof(req.id)}>
+                            <FileCheck size={13}/> Verify Handoff Proof &amp; Close
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {isClosed && (
+                      <div style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'var(--canopy)',fontWeight:700}}>
+                        <CheckCircle2 size={13}/> Release closed — donations marked as disbursed.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{padding:18,border:'1px dashed var(--border)',borderRadius:10,color:'var(--text2)',fontSize:13}}>
+              No fund release requests yet. Organizers can request a release from their campaign edit page.
+            </div>
+          )}
+        </div>
+
+        <div className="grid-2 mb-24" style={{alignItems:'start'}}>          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24}}>
             <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',marginBottom:20,display:'flex',alignItems:'center',gap:8}}>
               <ShieldCheck size={18} color="var(--canopy)" strokeWidth={1.8}/> Escrow Health Monitor
             </h3>

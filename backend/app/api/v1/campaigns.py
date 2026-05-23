@@ -19,7 +19,7 @@ from app.models.campaign_drive_change import CampaignDriveChange
 from app.models.donation import Donation
 from app.models.proof_artifact import ProofArtifact
 from app.models.user import User
-from app.schemas.campaign_drive import CampaignDriveCreate, CampaignDriveUpdate
+from app.schemas.campaign_drive import CampaignDriveCreate, CampaignDriveUpdate, CampaignReleaseRequestCreate
 
 router = APIRouter(prefix="/campaigns", tags=["campaigns"])
 
@@ -804,6 +804,235 @@ async def update_campaign(
         "success": True,
         "message": "Campaign updated",
         "data": await _serialize_drive(db, drive),
+    }
+
+
+def _release_request_status(change: CampaignDriveChange) -> str | None:
+    if "release_request" not in (change.changed_fields or []):
+        return None
+    payload = (change.changes or {}).get("release_request") or {}
+    return payload.get("status")
+
+
+@router.post("/{campaign_id}/release-request")
+async def request_fund_release(
+    campaign_id: UUID,
+    body: CampaignReleaseRequestCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Organizer requests that collected funds be handed down to the recipient."""
+    drive = (
+        await db.execute(
+            select(CampaignDrive).where(
+                CampaignDrive.id == campaign_id,
+                CampaignDrive.organizer_id == user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not drive:
+        raise HTTPException(status_code=404, detail="Campaign not found or you do not have permission.")
+
+    # Block duplicate pending requests
+    existing_changes = (
+        await db.execute(
+            select(CampaignDriveChange).where(
+                CampaignDriveChange.campaign_id == drive.id,
+            ).order_by(CampaignDriveChange.created_at.desc())
+        )
+    ).scalars().all()
+    pending = next(
+        (c for c in existing_changes if _release_request_status(c) == "pending"),
+        None,
+    )
+    if pending:
+        return {
+            "success": True,
+            "message": "Release request already pending",
+            "data": _change_log_payload(pending, drive, user),
+        }
+
+    change = CampaignDriveChange(
+        campaign_id=drive.id,
+        actor_id=user.id,
+        changed_fields=["release_request"],
+        changes={
+            "release_request": {
+                "status": "pending",
+                "recipient_name": body.recipient_name,
+                "recipient_type": body.recipient_type,
+                "recipient_reference": body.recipient_reference,
+                "amount_xlm": body.amount_xlm,
+                "note": body.note,
+                "requested_at": datetime.now(timezone.utc).isoformat(),
+            }
+        },
+        summary=f"{user.name} requested fund release for {drive.title} → {body.recipient_name}.",
+    )
+    db.add(change)
+    await db.commit()
+    await db.refresh(change)
+    return {
+        "success": True,
+        "message": "Fund release request sent to admin",
+        "data": _change_log_payload(change, drive, user),
+    }
+
+
+@router.get("/admin/release-requests")
+async def campaign_release_requests(
+    limit: int = 25,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    rows = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .order_by(CampaignDriveChange.created_at.desc())
+        )
+    ).all()
+    rows = [row for row in rows if "release_request" in (row[0].changed_fields or [])][: min(max(limit, 1), 100)]
+    return {
+        "success": True,
+        "data": [_change_log_payload(change, campaign, actor) for change, campaign, actor in rows],
+    }
+
+
+@router.post("/admin/release-requests/{request_id}/approve")
+async def approve_release_request(
+    request_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .where(CampaignDriveChange.id == request_id)
+        )
+    ).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Release request not found.")
+
+    change, campaign, actor = row
+    if _release_request_status(change) != "pending":
+        raise HTTPException(status_code=400, detail="Release request is no longer pending.")
+
+    change.changes = {
+        **(change.changes or {}),
+        "release_request": {
+            **((change.changes or {}).get("release_request") or {}),
+            "status": "approved",
+            "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+    change.summary = f"Admin approved fund release for {campaign.title}. Organizer must now upload handoff proof."
+    await db.commit()
+    await db.refresh(change)
+    return {
+        "success": True,
+        "message": "Release approved. Organizer must upload handoff proof.",
+        "data": _change_log_payload(change, campaign, actor),
+    }
+
+
+@router.post("/admin/release-requests/{request_id}/reject")
+async def reject_release_request(
+    request_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    row = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .where(CampaignDriveChange.id == request_id)
+        )
+    ).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Release request not found.")
+
+    change, campaign, actor = row
+    if _release_request_status(change) != "pending":
+        raise HTTPException(status_code=400, detail="Release request is no longer pending.")
+
+    change.changes = {
+        **(change.changes or {}),
+        "release_request": {
+            **((change.changes or {}).get("release_request") or {}),
+            "status": "rejected",
+            "reviewed_at": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+    change.summary = f"Admin rejected fund release request for {campaign.title}."
+    await db.commit()
+    await db.refresh(change)
+    return {
+        "success": True,
+        "message": "Release request rejected.",
+        "data": _change_log_payload(change, campaign, actor),
+    }
+
+
+@router.post("/admin/release-requests/{request_id}/verify-proof")
+async def verify_release_proof(
+    request_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """Admin marks the handoff proof as verified, closing the release loop."""
+    row = (
+        await db.execute(
+            select(CampaignDriveChange, CampaignDrive, User)
+            .join(CampaignDrive, CampaignDrive.id == CampaignDriveChange.campaign_id)
+            .join(User, User.id == CampaignDriveChange.actor_id)
+            .where(CampaignDriveChange.id == request_id)
+        )
+    ).one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Release request not found.")
+
+    change, campaign, actor = row
+    current_status = _release_request_status(change)
+    if current_status not in ("approved", "proof_uploaded"):
+        raise HTTPException(
+            status_code=400,
+            detail="Can only verify proof on an approved release that has proof uploaded.",
+        )
+
+    change.changes = {
+        **(change.changes or {}),
+        "release_request": {
+            **((change.changes or {}).get("release_request") or {}),
+            "status": "closed",
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+        },
+    }
+    change.summary = f"Admin verified handoff proof for {campaign.title}. Release closed."
+
+    # Mark all campaign donations as disbursed
+    donations = (
+        await db.execute(
+            select(Donation).where(
+                Donation.purpose == f"campaign:{campaign.id}",
+                Donation.blockchain_confirmed.is_(True),
+            )
+        )
+    ).scalars().all()
+    for donation in donations:
+        donation.disbursed = True
+        donation.disbursed_amount = float(donation.amount)
+
+    await db.commit()
+    await db.refresh(change)
+    return {
+        "success": True,
+        "message": "Handoff proof verified. All campaign donations marked as disbursed.",
+        "data": _change_log_payload(change, campaign, actor),
     }
 
 
