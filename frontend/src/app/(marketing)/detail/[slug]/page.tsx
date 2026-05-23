@@ -400,8 +400,8 @@ export default function DetailPage() {
         </div>
 
         {/* RIGHT — sticky donate card */}
-        <div>
-          <div className="detail-donate-card" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28, marginBottom: 20, position: "sticky", top: 84 }}>
+        <div className="detail-side-stack" style={{ position: "sticky", top: 84, alignSelf: "start" }}>
+          <div className="detail-donate-card" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28, marginBottom: 20 }}>
             <div className="flex flex-center flex-between mb-16">
               <div>
                 <div style={{ fontFamily: "Sora,sans-serif", fontSize: 28, fontWeight: 800, color: "var(--forest)" }}>
