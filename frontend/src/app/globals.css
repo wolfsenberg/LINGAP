@@ -40,9 +40,9 @@ h1,h2,h3,h4,h5{font-family:'Sora',sans-serif;line-height:1.2}
 .nav-link:hover{background:rgba(26,58,42,.05);color:var(--navy);border-color:rgba(26,58,42,.06)}
 .nav-link.active{background:rgba(26,58,42,.08);color:var(--navy);border-color:rgba(26,58,42,.12)}
 .nav-right{display:flex;align-items:center;gap:7px;margin-left:auto}
-.nav-impact{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.44);border:1px solid rgba(200,134,10,.25);color:var(--forest);font-size:13px;font-weight:800;text-decoration:none;white-space:nowrap;transition:background .18s,border-color .18s,transform .18s}
+.nav-impact{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:999px;background:rgba(255,255,255,.44);border:1px solid rgba(200,134,10,.25);color:var(--forest);font-size:13.5px;font-weight:800;text-decoration:none;white-space:nowrap;line-height:1.12;transition:background .18s,border-color .18s,transform .18s}
 .nav-impact:hover,.nav-impact.active{background:rgba(200,134,10,.1);border-color:rgba(200,134,10,.34);transform:translateY(-1px)}
-.nav-login{display:inline-flex;align-items:center;padding:8px 12px;border-radius:8px;border:1px solid rgba(26,58,42,.14);background:rgba(255,255,255,.48);color:var(--forest);font-size:13px;font-weight:800;text-decoration:none;white-space:nowrap;transition:background .18s,border-color .18s,transform .18s}
+.nav-login{display:inline-flex;align-items:center;padding:8px 12px;border-radius:8px;border:1px solid rgba(26,58,42,.14);background:rgba(255,255,255,.48);color:var(--forest);font-size:13.5px;font-weight:800;text-decoration:none;white-space:nowrap;line-height:1.12;transition:background .18s,border-color .18s,transform .18s}
 .nav-login:hover,.nav-login.active{background:rgba(26,58,42,.06);border-color:rgba(26,58,42,.26);transform:translateY(-1px)}
 .nav-logout{width:30px;height:30px;border-radius:8px;border:1px solid rgba(26,58,42,.12);background:rgba(255,255,255,.44);color:var(--text2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;transition:background .18s,color .18s,border-color .18s}
 .nav-logout:hover{background:rgba(220,38,38,.06);border-color:rgba(220,38,38,.18);color:#991B1B}
