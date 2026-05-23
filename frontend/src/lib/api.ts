@@ -229,15 +229,21 @@ export type PublicProfileApi = {
     amount: number;
     lives_touched: number;
     stellar_tx_hash?: string | null;
+    public_url?: string | null;
+    download_url?: string | null;
     verified: boolean;
     created_at: string;
   }>;
   activity: Array<{
     id: string;
     campaign_id: string;
+    campaign_name?: string;
+    milestone?: string | null;
     amount: number;
     asset: string;
     stellar_tx_hash: string;
+    wallet_address?: string | null;
+    certificate_id?: string | null;
     blockchain_confirmed?: boolean;
     created_at: string;
   }>;
@@ -794,6 +800,8 @@ export const certificatesApi = {
   listByDonor: (donorId: string) =>
     api.get<ApiResponse<any[]>>(`/api/v1/certificates`, { params: { donor_id: donorId } }),
   get: (id: string) => api.get<ApiResponse<any>>(`/api/v1/certificates/${id}`),
+  downloadUrl: (id: string) => `${getApiBaseUrl()}/api/v1/certificates/${id}/download`,
+  publicUrl: (id: string) => `${getApiBaseUrl()}/api/v1/certificates/${id}/public`,
 };
 
 export const paymongoApi = {

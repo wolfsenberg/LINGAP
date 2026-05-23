@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Award,
@@ -48,13 +49,18 @@ const themeAccent = {
 
 export default function CertificatePage() {
   const { user } = useAuthStore();
+  const searchParams = useSearchParams();
   const [selected, setSelected] = useState<Certificate | null>(null);
   const [userCertificates, setUserCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // FORCE using the mock user ID for demonstration purposes so you can always see the certificates!
-    const donorId = "ec108cc1-c6fa-4d91-953c-df1324ce17d9";
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    const donorId = user.id;
+    const preselectCertId = searchParams.get("cert");
 
     certificatesApi.listByDonor(donorId)
       .then((res) => {
@@ -63,7 +69,7 @@ export default function CertificatePage() {
           id: c.id,
           donor: c.donor_name || user?.name || "Anonymous Donor",
           amount: `₱${parseFloat(c.amount || "0").toLocaleString(undefined, { minimumFractionDigits: 2 })}`,
-          campaign: c.milestone_description || "Campaign Milestone",
+          campaign: c.campaign_name || c.milestone_description || "Campaign Milestone",
           institution: c.beneficiary_name || "LINGAP Verified Network",
           milestone: c.milestone_description || "Milestone Complete",
           date: new Date(c.created_at).toLocaleDateString(),
@@ -73,6 +79,10 @@ export default function CertificatePage() {
           theme: "medical",
         }));
         setUserCertificates(mapped);
+        if (preselectCertId) {
+          const match = mapped.find((item) => item.id === preselectCertId);
+          if (match) setSelected(match);
+        }
       })
       .catch((err) => {
         console.error(err);
@@ -81,7 +91,7 @@ export default function CertificatePage() {
       .finally(() => {
         setLoading(false);
       });
-  }, [user]);
+  }, [user, searchParams]);
 
   const hasCertificates = userCertificates.length > 0;
   const selectedShareUrl = useMemo(() => selected?.stellarUrl ?? "", [selected]);
@@ -237,7 +247,7 @@ export default function CertificatePage() {
 
             <div className="cert-wrap" style={{margin:'24px auto',padding:'0 24px'}}>
               <iframe 
-                src={`http://localhost:8000/api/v1/certificates/${selected.id}/view`}
+                src={certificatesApi.publicUrl(selected.id)}
                 style={{ width: '100%', height: '800px', border: 'none', borderRadius: '8px', background: 'white' }}
                 title="Certificate Preview"
               />
@@ -245,7 +255,7 @@ export default function CertificatePage() {
 
             <div style={{display:'flex',gap:10,flexWrap:'wrap',justifyContent:'center',padding:'0 24px 24px'}}>
               <button onClick={() => printCertificate(selected)} className="btn btn-primary"><Printer size={16}/> Print Certificate</button>
-              <a href={`http://localhost:8000/api/v1/certificates/${selected.id}/download`} className="btn btn-emerald" download><Download size={16}/> Download PDF</a>
+              <a href={certificatesApi.downloadUrl(selected.id)} className="btn btn-emerald" download><Download size={16}/> Download PDF</a>
               <button onClick={() => openShare(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(selectedShareUrl)}`)} className="btn" style={{background:'#1877F2',color:'#fff'}}><Facebook size={16}/> Facebook</button>
               <button onClick={() => openShare(`https://twitter.com/intent/tweet?url=${encodeURIComponent(selectedShareUrl)}&text=${encodeURIComponent(`My verified LINGAP impact certificate: ${selected.campaign}`)}`)} className="btn" style={{background:'#111',color:'#fff'}}><Twitter size={16}/> X</button>
               <button onClick={() => shareNative(selected)} className="btn btn-outline"><Instagram size={16}/> Share</button>

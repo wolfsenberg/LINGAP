@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  ArrowRight,
   Award,
   BadgeCheck,
   Calendar,
@@ -22,7 +21,7 @@ import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxU
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 
 function formatPeso(value: number) {
-  return `₱${Math.round(value).toLocaleString()}`;
+  return `?${Math.round(value).toLocaleString()}`;
 }
 
 function formatXlm(value: number) {
@@ -131,7 +130,7 @@ export default function PublicProfilePage() {
         <div className="profile-impact-grid">
           {[
             { Icon: Heart, label: "Public Donations", value: formatPeso(profile.impact.total_donated_php), sub: formatXlm(profile.impact.total_donated_xlm) },
-            { Icon: Megaphone, label: "Campaigns Organized", value: profile.impact.campaigns_organized.toString(), sub: `${profile.impact.active_campaigns} active · ${profile.impact.completed_campaigns} completed` },
+            { Icon: Megaphone, label: "Campaigns Organized", value: profile.impact.campaigns_organized.toString(), sub: `${profile.impact.active_campaigns} active � ${profile.impact.completed_campaigns} completed` },
             { Icon: Award, label: "Public Certificates", value: profile.impact.public_certificates.toString(), sub: `${earnedBadges.length} earned badges` },
             { Icon: Network, label: "Stellar Activity", value: profile.impact.donation_count.toString(), sub: formatDate(profile.impact.last_activity_at) },
           ].map((item) => (
@@ -212,25 +211,29 @@ export default function PublicProfilePage() {
                   </div>
                 ) : (
                   profile.activity.map((item) => (
-                    <a
-                      key={item.id}
-                      href={isStellarTxHash(item.stellar_tx_hash) ? getStellarExpertTxUrl(item.stellar_tx_hash) : getStellarExpertContractUrl() || "#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="donation-row profile-activity-row"
-                    >
+                    <div key={item.id} className="donation-row profile-activity-row">
                       <div className="donation-dot is-done" />
                       <div className="donation-main">
-                        <div className="donation-title">{formatXlm(item.amount)} → {item.campaign_id}</div>
+                        <div className="donation-title">{formatXlm(item.amount)} to {item.campaign_name || item.campaign_id}</div>
                         <div className="donation-sub">{formatDate(item.created_at)}</div>
+                        {item.milestone ? <div className="donation-sub">Milestone: {item.milestone}</div> : null}
                         <div className="donation-proof-row">
                           <span><Network size={12} /> {shortHash(item.stellar_tx_hash)}</span>
+                          {item.wallet_address ? <span>Wallet: {shortHash(item.wallet_address)}</span> : null}
+                          {item.certificate_id ? (
+                            <Link href={`/certificate?cert=${item.certificate_id}`} className="badge badge-emerald">Certificate</Link>
+                          ) : null}
                         </div>
                       </div>
-                      <span className="badge badge-emerald">
+                      <a
+                        href={isStellarTxHash(item.stellar_tx_hash) ? getStellarExpertTxUrl(item.stellar_tx_hash) : getStellarExpertContractUrl() || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="badge badge-emerald"
+                      >
                         {isStellarTxHash(item.stellar_tx_hash) ? "Stellar" : "Ledger"} <ExternalLink size={10} />
-                      </span>
-                    </a>
+                      </a>
+                    </div>
                   ))
                 )}
               </div>
@@ -273,7 +276,11 @@ export default function PublicProfilePage() {
                   {profile.certificates.map((cert) => (
                     <div key={cert.id} className="profile-cert-item">
                       <strong>{cert.beneficiary_name}</strong>
-                      <span>{formatXlm(cert.amount)} · {cert.lives_touched} lives touched</span>
+                      <span>{formatXlm(cert.amount)} � {cert.lives_touched} lives touched</span>
+                      <div className="donation-proof-row">
+                        <Link href={`/certificate?cert=${cert.id}`} className="badge badge-emerald">View</Link>
+                        <a href={`/api/v1/certificates/${cert.id}/download`} className="badge badge-gray">PDF</a>
+                      </div>
                     </div>
                   ))}
                 </div>
