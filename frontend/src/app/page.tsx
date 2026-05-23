@@ -88,17 +88,17 @@ export default function HomePage() {
 
       {/* TRUST STRIP */}
       <div style={{background:'var(--surface2)',borderBottom:'1px solid var(--border)',padding:'20px 40px'}}>
-        <div className="container flex flex-center gap-24" style={{flexWrap:'wrap',justifyContent:'center'}}>
+        <div className="container flex flex-center gap-24 trust-strip" style={{flexWrap:'wrap',justifyContent:'center'}}>
           <div className="flex flex-center gap-8"><Hospital size={16} color="var(--canopy)"/><span className="small muted">Accredited Hospitals</span></div>
-          <div style={{color:'var(--border2)'}}>|</div>
+          <div className="trust-strip-sep" style={{color:'var(--border2)'}}>|</div>
           <div className="flex flex-center gap-8"><Pill size={16} color="var(--canopy)"/><span className="small muted">Verified Pharmacies</span></div>
-          <div style={{color:'var(--border2)'}}>|</div>
+          <div className="trust-strip-sep" style={{color:'var(--border2)'}}>|</div>
           <div className="flex flex-center gap-8"><School size={16} color="var(--canopy)"/><span className="small muted">Registered Schools</span></div>
-          <div style={{color:'var(--border2)'}}>|</div>
+          <div className="trust-strip-sep" style={{color:'var(--border2)'}}>|</div>
           <div className="flex flex-center gap-8"><Handshake size={16} color="var(--canopy)"/><span className="small muted">Accredited NGOs</span></div>
-          <div style={{color:'var(--border2)'}}>|</div>
+          <div className="trust-strip-sep" style={{color:'var(--border2)'}}>|</div>
           <div className="flex flex-center gap-8"><Anchor size={16} color="var(--canopy)"/><span className="small muted">Typhoon Relief Partners</span></div>
-          <div style={{color:'var(--border2)'}}>|</div>
+          <div className="trust-strip-sep" style={{color:'var(--border2)'}}>|</div>
           <div className="flex flex-center gap-8"><Link2 size={16} color="var(--canopy)"/><span className="small muted">Stellar Blockchain</span></div>
         </div>
       </div>
@@ -164,7 +164,7 @@ export default function HomePage() {
       <section className="section" style={{background:'var(--forest)',overflow:'hidden',position:'relative'}}>
         <div style={{position:'absolute',right:-60,top:-60,width:400,height:400,background:'radial-gradient(circle,rgba(74,155,106,.15),transparent 70%)',pointerEvents:'none'}}/>
         <div className="container">
-          <div className="grid-2" style={{alignItems:'center',gap:80}}>
+          <div className="grid-2 mascot-section-grid" style={{alignItems:'center',gap:80}}>
             <div>
               <div style={{fontSize:12,fontWeight:700,letterSpacing:2,color:'var(--canopy)',marginBottom:16}}>WHY DONORS LOVE LINGAP</div>
               <h2 style={{fontSize:40,fontWeight:800,color:'#fff',lineHeight:1.15,marginBottom:24}}>Every peso remembered,<br/>every peso protected.</h2>
@@ -258,7 +258,7 @@ export default function HomePage() {
       </section>
 
       {/* CTA BANNER */}
-      <section style={{background:'linear-gradient(135deg,var(--forest-light),var(--canopy))',padding:'80px 40px',textAlign:'center'}}>
+      <section className="cta-banner" style={{background:'linear-gradient(135deg,var(--forest-light),var(--canopy))',padding:'80px 40px',textAlign:'center'}}>
         <div className="container">
           <div style={{display:'flex',justifyContent:'center',marginBottom:18}}>
             <img className="cta-icon-img" src="/images/donate.png" alt="" />
@@ -274,7 +274,7 @@ export default function HomePage() {
 
       {/* FOOTER */}
       <footer style={{background:'var(--forest)',padding:'48px 40px 32px',color:'rgba(255,255,255,.6)'}}>
-        <div className="container">
+        <div className="container footer-inner" style={{padding:'48px 40px 32px'}}>
           <div className="grid-4 mb-32">
             <div>
               <div style={{fontFamily:'Sora,sans-serif',fontWeight:800,fontSize:22,color:'#fff',letterSpacing:-1,marginBottom:12}}>LIN<span style={{color:'var(--canopy)'}}>GAP</span></div>
@@ -310,7 +310,7 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-          <div style={{borderTop:'1px solid rgba(255,255,255,.1)',paddingTop:24,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,fontSize:12}}>
+          <div className="footer-bottom" style={{borderTop:'1px solid rgba(255,255,255,.1)',paddingTop:24,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8,fontSize:12}}>
             <div>© 2025 LINGAP. All rights reserved. Built with care for the Filipino people.</div>
             <div style={{fontFamily:'Space Mono,monospace',fontSize:10,color:'rgba(255,255,255,.3)'}}>STELLAR:LINGAP-MAINNET-v1.0.0</div>
           </div>

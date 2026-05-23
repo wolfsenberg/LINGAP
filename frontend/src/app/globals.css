@@ -791,3 +791,135 @@ h1,h2,h3,h4,p,.camp-title,.donation-title,.tx-hash,.lb-name,.camp-raised,.stat-v
   .esc-hero-head{display:grid!important;grid-template-columns:56px minmax(0,1fr);gap:12px!important}
   .esc-hero-head h1{font-size:25px!important;line-height:1.16}
 }
+
+/* ── Mobile & Tablet Hardening Pass ─────────────────────────────────────── */
+
+/* Trust strip — hide separators and wrap cleanly on small screens */
+@media(max-width:768px){
+  .trust-strip-sep{display:none}
+  .trust-strip{flex-wrap:wrap;gap:12px 20px;justify-content:center;padding:16px 20px!important}
+}
+
+/* Hero — fix float cards overlapping on tablet */
+@media(max-width:1024px){
+  .hero-float-card{display:none}
+}
+
+/* Detail page — sticky donate card must not overlap on mobile */
+@media(max-width:900px){
+  .detail-grid{padding:20px 20px 96px!important}
+  .detail-side-stack{position:static!important;top:auto!important;align-self:auto!important}
+}
+@media(max-width:640px){
+  .detail-grid{padding:16px 16px 96px!important}
+  .detail-img{height:200px!important;margin-bottom:16px!important}
+  .detail-donate-card{padding:18px!important}
+  .detail-grid h1[style]{font-size:clamp(22px,7vw,28px)!important}
+}
+
+/* Spend bar — stack on mobile so label/amount don't overflow */
+@media(max-width:640px){
+  .spend-bar{flex-wrap:wrap;gap:6px}
+  .spend-label{width:100%!important;flex-shrink:unset}
+  .spend-track{width:100%;flex:none}
+  .spend-amount{margin-left:0!important;width:100%}
+}
+
+/* Donor stats row — 2 cols on tablet, 1 col on small phone */
+@media(max-width:900px){
+  .donor-stats-row{grid-template-columns:repeat(2,minmax(0,1fr))!important;max-width:none!important}
+}
+@media(max-width:420px){
+  .donor-stats-row{grid-template-columns:1fr!important}
+}
+
+/* Home page mascot section — reduce gap on tablet */
+@media(max-width:1024px){
+  .mascot-section-grid{gap:40px!important}
+}
+@media(max-width:768px){
+  .mascot-section-grid{grid-template-columns:1fr!important;gap:32px!important}
+  .mascot-section-grid .text-center{order:-1}
+}
+
+/* Footer — stack on mobile */
+@media(max-width:768px){
+  .footer-inner{padding:36px 20px 28px!important}
+  .footer-inner .grid-4{grid-template-columns:1fr 1fr!important;gap:24px!important}
+  .footer-bottom{flex-direction:column!important;gap:8px!important;text-align:center}
+}
+@media(max-width:480px){
+  .footer-inner .grid-4{grid-template-columns:1fr!important}
+}
+
+/* CTA banner — reduce padding on mobile */
+@media(max-width:640px){
+  .cta-banner{padding:56px 20px!important}
+  .cta-banner h2{font-size:clamp(26px,8vw,36px)!important}
+  .cta-banner p{font-size:16px!important}
+  .cta-banner .flex{flex-direction:column;align-items:stretch}
+  .cta-banner .flex .btn{width:100%;justify-content:center}
+}
+
+/* Proof legend — 3 cols on tablet, 2 on mobile */
+@media(max-width:900px){
+  .proof-legend-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
+@media(max-width:480px){
+  .proof-legend-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+
+/* Community leaderboard — 1 col on tablet */
+@media(max-width:900px){
+  .community-leaderboard-grid{grid-template-columns:1fr!important}
+}
+
+/* Admin grid — 2 cols on tablet, 1 on mobile */
+@media(max-width:900px){
+  .admin-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:480px){
+  .admin-grid{grid-template-columns:1fr!important}
+}
+
+/* Impact certificate callout — stack on mobile */
+@media(max-width:640px){
+  .impact-certificate-callout{grid-template-columns:1fr!important;gap:14px!important}
+  .impact-certificate-callout .btn{width:100%;justify-content:center}
+}
+
+/* Donation proof row — wrap pills cleanly */
+@media(max-width:480px){
+  .donation-proof-row{gap:6px}
+  .donation-proof-row span,.donation-proof-link{font-size:11px;padding:4px 7px}
+}
+
+/* Escrow page chain steps — horizontal scroll on mobile */
+@media(max-width:640px){
+  .chain-steps{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:8px}
+  .chain-step{min-width:110px}
+}
+
+/* Topup modal — full width on small screens */
+@media(max-width:480px){
+  .auth-prompt-modal.topup-modal{width:100%!important;border-radius:14px 14px 0 0!important;position:fixed!important;bottom:0!important;left:0!important;right:0!important;top:auto!important;max-height:92vh!important;transform:none!important}
+  .auth-prompt-backdrop{align-items:flex-end!important;padding:0!important}
+}
+
+/* Prevent any fixed-width inline styles from overflowing */
+@media(max-width:640px){
+  [style*="minWidth: 58"],[style*="min-width: 58px"]{min-width:0!important}
+  [style*="width: 160px"]{width:auto!important}
+  [style*="maxWidth: 900px"]{max-width:100%!important}
+  [style*="gap: 80"]{gap:32px!important}
+  [style*="gap:80"]{gap:32px!important}
+  [style*="padding: 28px"]{padding:18px!important}
+  [style*="padding:28px"]{padding:18px!important}
+  [style*="fontSize: 40"]{font-size:clamp(26px,8vw,36px)!important}
+  [style*="fontSize: 36"]{font-size:clamp(24px,7vw,32px)!important}
+  [style*="fontSize: 32"]{font-size:clamp(22px,7vw,28px)!important}
+}
+
+/* Ensure no horizontal overflow anywhere */
+html,body{overflow-x:hidden;max-width:100vw}
+.topnav,.mobile-nav{max-width:100vw;overflow:hidden}
