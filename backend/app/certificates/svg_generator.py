@@ -1,4 +1,4 @@
-"""Enhanced HTML certificate generation for LINGAP with PNG fallback wrapper."""
+﻿"""Enhanced HTML certificate generation for LINGAP with PNG fallback wrapper."""
 from datetime import datetime
 import hashlib
 
@@ -19,46 +19,24 @@ def generate_html_certificate(
     network: str = "Stellar Mainnet",
     certifying_officer: str = "LINGAP Foundation",
 ) -> str:
-    """Generate a polished HTML certificate for a LINGAP donation.
-
-    Args:
-        donor_name: Full name of the donor
-        amount: This donation amount in PHP
-        beneficiary_name: Name of the campaign beneficiary
-        milestone_description: Milestone reached (e.g. "Chemo Cycle 3 of 6 Completed")
-        lives_touched: Number of lives impacted
-        total_donated: Cumulative amount donated by this donor
-        donation_date: Date of the donation
-        stellar_tx_hash: Full Stellar blockchain transaction hash
-        merkle_proof: Optional Merkle proof string
-        onchain_hash: Optional on-chain hash reference
-        certificate_id: Optional certificate ID (auto-generated if not provided)
-        block_number: Optional Stellar ledger block number
-        network: Blockchain network name (default: "Stellar Mainnet")
-        certifying_officer: Name for the signature block
-
-    Returns:
-        Full standalone HTML document as a string
-    """
+    """Generate a polished HTML certificate for a LINGAP donation."""
     date_str = donation_date.strftime("%B %d, %Y")
     tx_preview = stellar_tx_hash[:20] + "..."
     merkle_preview = (merkle_proof[:20] + "...") if merkle_proof else "N/A"
     onchain_preview = (onchain_hash[:20] + "...") if onchain_hash else "N/A"
 
-    # Auto-generate certificate ID from tx hash if not provided
     if not certificate_id:
         short = hashlib.sha256(stellar_tx_hash.encode()).hexdigest()[:6].upper()
         year = donation_date.year
         certificate_id = f"LNG-{year}-{short}"
 
-    block_display = f" · Block {block_number}" if block_number else ""
+    block_display = f" &middot; Block {block_number}" if block_number else ""
 
-    # Build the 4 verification statement lines
     verification_statements = [
         "Blockchain transaction verified on Stellar Mainnet",
         "Beneficiary campaign identity independently confirmed",
         "Funds disbursed directly to verified medical providers",
-        "Immutable record — publicly accessible at any time",
+        "Immutable record - publicly accessible at any time",
     ]
     statements_html = "\n".join(
         f"""
@@ -79,86 +57,132 @@ def generate_html_certificate(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta property="og:title" content="LINGAP Certificate of Humanitarian Impact — {donor_name}">
-  <meta property="og:description" content="Blockchain-verified donation of ₱{amount:,.2f} to {beneficiary_name}">
+  <meta property="og:title" content="LINGAP Certificate of Humanitarian Impact - {donor_name}">
+  <meta property="og:description" content="Blockchain-verified donation of ?{amount:,.2f} to {beneficiary_name}">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
-  <title>LINGAP Certificate — {certificate_id}</title>
+  <title>LINGAP Certificate - {certificate_id}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
 
+    :root {{
+      --green-deep:   #064E3B;
+      --green-mid:    #059669;
+      --green-bright: #10B981;
+      --green-light:  #D1FAE5;
+      --green-pale:   #ECFDF5;
+      --gold:         #B45309;
+      --gold-light:   #FEF3C7;
+      --gold-pale:    #FFFBEB;
+      --ink:          #0C1A12;
+      --ink-mid:      #1C3A28;
+      --slate:        #475569;
+      --muted:        #94A3B8;
+      --rule:         #E2E8F0;
+      --bg:           #F0F7F4;
+    }}
+
     body {{
-      background: #f0f4f8;
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      font-family: 'DM Sans', sans-serif;
       display: flex;
       justify-content: center;
-      padding: 32px 16px;
+      align-items: flex-start;
+      padding: 40px 16px;
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
     }}
 
-    /* ── Outer wrapper ── */
     .cert-wrap {{
       width: 100%;
-      max-width: 800px;
+      max-width: 820px;
       background: #fff;
-      border-radius: 2px;
+      border-radius: 4px;
       overflow: hidden;
-      box-shadow: 0 4px 32px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.08);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.06),
+        0 8px 48px rgba(6,78,59,0.10),
+        0 2px 8px rgba(0,0,0,0.06);
+      position: relative;
     }}
 
-    /* ── Accent bands ── */
-    .top-band,
-    .bottom-band {{
-      height: 6px;
-      background: linear-gradient(90deg, #10B891 0%, #059669 100%);
+    .cert-wrap::before {{
+      content: '';
+      position: absolute;
+      inset: 10px;
+      border: 1px solid rgba(16,185,129,0.15);
+      border-radius: 2px;
+      pointer-events: none;
+      z-index: 1;
     }}
 
-    /* ── Main content area ── */
+    .top-band {{
+      height: 8px;
+      background: linear-gradient(90deg, var(--green-deep) 0%, var(--green-bright) 50%, var(--green-deep) 100%);
+    }}
+
+    .cert-bg {{
+      position: absolute;
+      inset: 0;
+      opacity: 0.025;
+      background-image:
+        radial-gradient(circle at 15% 50%, var(--green-bright) 0%, transparent 60%),
+        radial-gradient(circle at 85% 20%, var(--green-bright) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }}
+
     .cert-inner {{
-      padding: 48px 56px 40px;
+      padding: 52px 64px 44px;
+      position: relative;
+      z-index: 2;
     }}
 
-    /* ── Header row: brand + cert label ── */
     .header-row {{
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
-      margin-bottom: 36px;
+      margin-bottom: 40px;
     }}
 
     .brand {{
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 16px;
     }}
 
     .brand-mark {{
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      background: #10B891;
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--green-deep) 0%, var(--green-mid) 100%);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(6,78,59,0.30);
     }}
 
     .brand-name {{
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: 3px;
-      color: #0F172A;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: var(--ink);
       line-height: 1;
     }}
 
     .brand-tagline {{
-      font-size: 10px;
-      color: #94A3B8;
-      letter-spacing: 0.5px;
-      margin-top: 3px;
-      line-height: 1.4;
+      font-size: 9.5px;
+      color: var(--muted);
+      letter-spacing: 0.3px;
+      margin-top: 4px;
+      line-height: 1.5;
       max-width: 260px;
+      font-weight: 400;
     }}
 
     .cert-label {{
@@ -167,255 +191,313 @@ def generate_html_certificate(
 
     .cert-label-title {{
       font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: #10B891;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: var(--green-mid);
       text-transform: uppercase;
     }}
 
     .cert-label-sub {{
-      font-size: 10px;
-      color: #94A3B8;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 13px;
+      font-style: italic;
+      color: var(--slate);
       margin-top: 3px;
     }}
 
     .cert-id {{
+      font-family: 'DM Mono', monospace;
       font-size: 9px;
-      font-family: 'Courier New', monospace;
       color: #CBD5E1;
-      margin-top: 2px;
+      margin-top: 4px;
+      letter-spacing: 0.5px;
     }}
 
-    /* ── Divider ── */
-    .divider {{
+    .ornament-divider {{
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 0 0 40px;
+    }}
+
+    .ornament-rule {{
+      flex: 1;
       height: 1px;
-      background: #F1F5F9;
-      margin: 0 0 36px;
+      background: linear-gradient(90deg, transparent, var(--rule) 40%, var(--rule) 60%, transparent);
     }}
 
-    /* ── Core statement ── */
+    .ornament-diamond {{
+      width: 6px;
+      height: 6px;
+      background: var(--green-bright);
+      transform: rotate(45deg);
+      flex-shrink: 0;
+    }}
+
+    .ornament-dot {{
+      width: 3px;
+      height: 3px;
+      background: var(--green-light);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }}
+
     .certifies-line {{
-      font-size: 12px;
-      letter-spacing: 1.5px;
-      color: #94A3B8;
-      text-transform: uppercase;
-      text-align: center;
-      margin-bottom: 12px;
-    }}
-
-    .donor-name {{
-      font-size: 40px;
-      font-weight: 800;
-      color: #0F172A;
-      text-align: center;
-      letter-spacing: -0.5px;
-      line-height: 1.1;
-      margin-bottom: 16px;
-    }}
-
-    .made-line {{
-      font-size: 13px;
-      color: #64748B;
-      text-align: center;
-      margin-bottom: 24px;
-      line-height: 1.6;
-    }}
-
-    /* ── Amount block ── */
-    .amount-block {{
-      background: #F0FDF9;
-      border: 1.5px solid #A7F3D0;
-      border-radius: 12px;
-      padding: 20px 32px;
-      text-align: center;
-      margin: 0 auto 32px;
-      max-width: 340px;
-    }}
-
-    .amount-label {{
-      font-size: 10px;
-      letter-spacing: 2px;
-      color: #10B891;
-      text-transform: uppercase;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }}
-
-    .amount-value {{
-      font-size: 52px;
-      font-weight: 800;
-      color: #065F46;
-      line-height: 1;
-      letter-spacing: -1px;
-    }}
-
-    /* ── Beneficiary ── */
-    .for-line {{
-      font-size: 12px;
-      letter-spacing: 1.5px;
-      color: #94A3B8;
-      text-transform: uppercase;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 14px;
+      font-style: italic;
+      letter-spacing: 1px;
+      color: var(--muted);
       text-align: center;
       margin-bottom: 10px;
     }}
 
-    .beneficiary {{
-      font-size: 22px;
+    .donor-name {{
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 52px;
+      font-weight: 600;
+      color: var(--ink);
+      text-align: center;
+      letter-spacing: -0.5px;
+      line-height: 1.05;
+      margin-bottom: 16px;
+    }}
+
+    .made-line {{
+      font-size: 12.5px;
+      color: var(--slate);
+      text-align: center;
+      margin-bottom: 28px;
+      line-height: 1.7;
+      font-weight: 400;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+    }}
+
+    .amount-block {{
+      background: linear-gradient(135deg, var(--green-pale) 0%, #fff 100%);
+      border: 1.5px solid var(--green-light);
+      border-radius: 14px;
+      padding: 22px 36px;
+      text-align: center;
+      margin: 0 auto 36px;
+      max-width: 320px;
+      position: relative;
+      overflow: hidden;
+    }}
+
+    .amount-block::before {{
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--green-mid), var(--green-bright));
+    }}
+
+    .amount-label {{
+      font-size: 9px;
+      letter-spacing: 2.5px;
+      color: var(--green-mid);
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }}
+
+    .amount-value {{
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 58px;
       font-weight: 700;
-      color: #0F172A;
+      color: var(--green-deep);
+      line-height: 1;
+      letter-spacing: -1px;
+    }}
+
+    .for-line {{
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 13px;
+      font-style: italic;
+      letter-spacing: 0.5px;
+      color: var(--muted);
       text-align: center;
       margin-bottom: 8px;
     }}
 
-    /* ── Milestone badge ── */
+    .beneficiary {{
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--ink);
+      text-align: center;
+      margin-bottom: 12px;
+    }}
+
     .milestone-wrapper {{
       text-align: center;
-      margin-bottom: 36px;
+      margin-bottom: 40px;
     }}
 
     .milestone-badge {{
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      background: #EFF6FF;
-      border: 1px solid #BFDBFE;
+      gap: 7px;
+      background: var(--gold-pale);
+      border: 1px solid #FDE68A;
       border-radius: 20px;
-      padding: 5px 14px;
+      padding: 6px 16px;
       font-size: 11px;
-      color: #1D4ED8;
+      color: var(--gold);
       font-weight: 500;
+      letter-spacing: 0.3px;
     }}
 
     .milestone-dot {{
-      width: 6px;
-      height: 6px;
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
-      background: #3B82F6;
+      background: var(--gold);
       flex-shrink: 0;
     }}
 
-    /* ── Metrics row ── */
     .metrics-row {{
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 16px;
+      gap: 14px;
       margin-bottom: 36px;
     }}
 
     .metric-card {{
       background: #F8FAFC;
-      border: 1px solid #E2E8F0;
-      border-radius: 10px;
-      padding: 16px;
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      padding: 18px 14px;
       text-align: center;
+      transition: border-color 0.2s;
+    }}
+
+    .metric-card:hover {{
+      border-color: var(--green-light);
     }}
 
     .metric-icon {{
-      color: #10B891;
-      margin-bottom: 6px;
+      color: var(--green-bright);
+      margin-bottom: 8px;
       display: flex;
       justify-content: center;
     }}
 
     .metric-label {{
-      font-size: 10px;
-      letter-spacing: 1px;
-      color: #94A3B8;
+      font-size: 9.5px;
+      letter-spacing: 1.5px;
+      color: var(--muted);
       text-transform: uppercase;
       font-weight: 600;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
     }}
 
     .metric-value {{
-      font-size: 22px;
-      font-weight: 800;
-      color: #0F172A;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1;
     }}
 
     .metric-value.small {{
-      font-size: 14px;
+      font-size: 15px;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 600;
       padding-top: 4px;
+      letter-spacing: -0.2px;
     }}
 
-    /* ── Blockchain section ── */
     .blockchain-section {{
-      background: #0F172A;
-      border-radius: 12px;
-      padding: 24px 28px;
-      margin-bottom: 32px;
+      background: var(--ink);
+      border-radius: 14px;
+      padding: 26px 30px;
+      margin-bottom: 36px;
     }}
 
     .bc-header {{
       display: flex;
       align-items: center;
       gap: 8px;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
     }}
 
     .bc-dot {{
-      width: 8px;
-      height: 8px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      background: #10B891;
+      background: var(--green-bright);
       flex-shrink: 0;
+      box-shadow: 0 0 6px var(--green-bright);
     }}
 
     .bc-title {{
-      font-size: 10px;
-      letter-spacing: 2px;
-      color: #10B891;
+      font-size: 9.5px;
+      letter-spacing: 2.5px;
+      color: var(--green-bright);
       text-transform: uppercase;
-      font-weight: 700;
+      font-weight: 600;
     }}
 
     .bc-live {{
       margin-left: auto;
-      font-size: 9px;
-      color: #10B891;
-      letter-spacing: 1px;
-      background: rgba(16, 184, 145, 0.12);
-      border: 1px solid rgba(16, 184, 145, 0.25);
+      font-size: 8.5px;
+      color: var(--green-bright);
+      letter-spacing: 1.5px;
+      background: rgba(16, 185, 129, 0.10);
+      border: 1px solid rgba(16, 185, 129, 0.25);
       border-radius: 10px;
-      padding: 2px 8px;
+      padding: 3px 10px;
+      font-weight: 600;
+    }}
+
+    .bc-divider {{
+      height: 1px;
+      background: rgba(255,255,255,0.06);
+      margin-bottom: 18px;
     }}
 
     .bc-grid {{
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 14px;
+      gap: 18px 24px;
     }}
 
     .bc-field-label {{
-      font-size: 9px;
+      font-size: 8.5px;
       letter-spacing: 1.5px;
       color: #475569;
       text-transform: uppercase;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
+      font-weight: 600;
     }}
 
     .bc-field-value {{
+      font-family: 'DM Mono', monospace;
       font-size: 10px;
-      font-family: 'Courier New', monospace;
       color: #94A3B8;
       word-break: break-all;
-      line-height: 1.5;
+      line-height: 1.6;
     }}
 
     .bc-field-value.highlight {{
-      color: #10B891;
+      color: var(--green-bright);
     }}
 
-    /* ── Seal + statements + signature ── */
     .seal-row {{
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 24px;
+      gap: 28px;
+      padding-top: 4px;
     }}
 
     .seal {{
-      width: 80px;
-      height: 80px;
+      width: 88px;
+      height: 88px;
       flex-shrink: 0;
     }}
 
@@ -426,65 +508,68 @@ def generate_html_certificate(
     .statement-line {{
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 9px;
       font-size: 11px;
-      color: #64748B;
-      margin-bottom: 6px;
+      color: var(--slate);
+      margin-bottom: 8px;
+      line-height: 1.4;
     }}
 
     .statement-check {{
-      width: 14px;
-      height: 14px;
+      width: 15px;
+      height: 15px;
       border-radius: 50%;
-      background: #DCFCE7;
+      background: var(--green-pale);
+      border: 1px solid var(--green-light);
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }}
 
-    /* ── Signature ── */
     .sigline {{
       text-align: right;
       min-width: 160px;
     }}
 
     .sig-img {{
-      font-size: 28px;
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 34px;
       font-style: italic;
-      font-family: Georgia, 'Times New Roman', serif;
-      color: #0F172A;
+      font-weight: 400;
+      color: var(--ink);
       line-height: 1;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
     }}
 
     .sig-rule {{
       width: 120px;
       height: 1px;
-      background: #CBD5E1;
+      background: var(--rule);
       margin-left: auto;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
     }}
 
     .sig-name {{
-      font-size: 10px;
+      font-size: 10.5px;
       font-weight: 700;
-      color: #0F172A;
+      color: var(--ink);
+      letter-spacing: 0.2px;
     }}
 
     .sig-role {{
       font-size: 9px;
-      color: #94A3B8;
+      color: var(--muted);
+      margin-top: 1px;
     }}
 
-    /* ── Footer strip ── */
     .footer-strip {{
       background: #F8FAFC;
-      padding: 10px 56px;
+      padding: 12px 64px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-top: 1px solid #F1F5F9;
+      border-top: 1px solid var(--rule);
     }}
 
     .footer-text {{
@@ -497,47 +582,49 @@ def generate_html_certificate(
       font-size: 9px;
       color: #CBD5E1;
       font-weight: 700;
-      letter-spacing: 2px;
+      letter-spacing: 3px;
     }}
 
-    /* ── Print styles ── */
+    .bottom-band {{
+      height: 8px;
+      background: linear-gradient(90deg, var(--green-deep) 0%, var(--green-bright) 50%, var(--green-deep) 100%);
+    }}
+
     @media print {{
       body {{ background: white; padding: 0; }}
       .cert-wrap {{ box-shadow: none; max-width: 100%; }}
     }}
 
-    /* ── Responsive ── */
     @media (max-width: 600px) {{
-      .cert-inner {{ padding: 32px 24px 28px; }}
-      .donor-name {{ font-size: 28px; }}
-      .amount-value {{ font-size: 40px; }}
+      .cert-inner {{ padding: 36px 28px 32px; }}
+      .donor-name {{ font-size: 36px; }}
+      .amount-value {{ font-size: 44px; }}
       .metrics-row {{ grid-template-columns: 1fr; }}
       .bc-grid {{ grid-template-columns: 1fr; }}
       .seal-row {{ flex-direction: column; align-items: flex-start; }}
       .sigline {{ text-align: left; min-width: unset; }}
       .sig-rule {{ margin-left: 0; }}
-      .header-row {{ flex-direction: column; gap: 12px; }}
+      .header-row {{ flex-direction: column; gap: 14px; }}
       .cert-label {{ text-align: left; }}
-      .footer-strip {{ padding: 10px 24px; }}
+      .footer-strip {{ padding: 12px 28px; }}
     }}
   </style>
 </head>
 <body>
 <div class="cert-wrap">
+  <div class="cert-bg"></div>
 
   <div class="top-band"></div>
 
   <div class="cert-inner">
 
-    <!-- ── Header ── -->
     <div class="header-row">
       <div class="brand">
         <div class="brand-mark">
-          <!-- L monogram -->
-          <svg width="26" height="26" viewBox="0 0 26 26" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <text x="13" y="20" text-anchor="middle"
-              font-size="18" font-weight="900"
-              font-family="Helvetica Neue,Helvetica,Arial,sans-serif"
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <text x="14" y="21" text-anchor="middle"
+              font-size="20" font-weight="800"
+              font-family="DM Sans,Helvetica,Arial,sans-serif"
               fill="white">L</text>
           </svg>
         </div>
@@ -556,23 +643,26 @@ def generate_html_certificate(
       </div>
     </div>
 
-    <div class="divider"></div>
+    <div class="ornament-divider">
+      <div class="ornament-rule"></div>
+      <div class="ornament-dot"></div>
+      <div class="ornament-diamond"></div>
+      <div class="ornament-dot"></div>
+      <div class="ornament-rule"></div>
+    </div>
 
-    <!-- ── Core statement ── -->
     <div class="certifies-line">This certifies that</div>
     <div class="donor-name">{donor_name}</div>
     <div class="made-line">
       has made a verified, blockchain-recorded donation in support of a humanitarian cause
     </div>
 
-    <!-- ── Amount ── -->
     <div class="amount-block">
       <div class="amount-label">Verified Donation</div>
       <div class="amount-value">&#8369;{amount:,.2f}</div>
     </div>
 
-    <!-- ── Beneficiary ── -->
-    <div class="for-line">Benefiting the campaign of</div>
+    <div class="for-line">in benefit of the campaign of</div>
     <div class="beneficiary">{beneficiary_name}</div>
     <div class="milestone-wrapper">
       <span class="milestone-badge">
@@ -581,13 +671,12 @@ def generate_html_certificate(
       </span>
     </div>
 
-    <!-- ── Metrics ── -->
     <div class="metrics-row">
 
       <div class="metric-card">
         <div class="metric-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="1.8"
+            stroke="currentColor" stroke-width="1.6"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
@@ -602,7 +691,7 @@ def generate_html_certificate(
       <div class="metric-card">
         <div class="metric-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="1.8"
+            stroke="currentColor" stroke-width="1.6"
             stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="1" x2="12" y2="23"/>
             <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
@@ -615,7 +704,7 @@ def generate_html_certificate(
       <div class="metric-card">
         <div class="metric-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="1.8"
+            stroke="currentColor" stroke-width="1.6"
             stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
             <line x1="16" y1="2" x2="16" y2="6"/>
@@ -629,13 +718,13 @@ def generate_html_certificate(
 
     </div>
 
-    <!-- ── Blockchain verification ── -->
     <div class="blockchain-section">
       <div class="bc-header">
         <div class="bc-dot"></div>
         <div class="bc-title">Stellar Blockchain Verification</div>
-        <div class="bc-live">&#9679; VERIFIED</div>
+        <div class="bc-live">&#9679;&nbsp;VERIFIED</div>
       </div>
+      <div class="bc-divider"></div>
       <div class="bc-grid">
         <div class="bc-field">
           <div class="bc-field-label">Transaction Hash</div>
@@ -656,54 +745,51 @@ def generate_html_certificate(
       </div>
     </div>
 
-    <!-- ── Seal + statements + signature ── -->
     <div class="seal-row">
 
-      <!-- Circular seal SVG -->
       <div class="seal">
-        <svg width="80" height="80" viewBox="0 0 80 80"
+        <svg width="88" height="88" viewBox="0 0 88 88"
           xmlns="http://www.w3.org/2000/svg"
           aria-label="LINGAP Verified Impact Seal">
           <defs>
             <path id="seal-circle"
-              d="M 40,40 m -28,0 a 28,28 0 1,1 56,0 a 28,28 0 1,1 -56,0"/>
+              d="M 44,44 m -31,0 a 31,31 0 1,1 62,0 a 31,31 0 1,1 -62,0"/>
+            <radialGradient id="sealGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#ECFDF5"/>
+              <stop offset="100%" stop-color="#fff"/>
+            </radialGradient>
           </defs>
-          <!-- Outer star burst -->
+          <circle cx="44" cy="44" r="42" fill="url(#sealGrad)" stroke="#D1FAE5" stroke-width="1"/>
+          <circle cx="44" cy="44" r="38"
+            fill="none" stroke="#10B981" stroke-width="0.8"
+            stroke-dasharray="3 4" opacity="0.5"/>
           <polygon
-            points="40,5 47,27 70,27 52,41 59,63 40,50 21,63 28,41 10,27 33,27"
-            fill="none" stroke="#10B891" stroke-width="1.5" opacity="0.3"/>
-          <!-- Inner star -->
-          <polygon
-            points="40,10 46,29 66,29 51,41 57,60 40,49 23,60 29,41 14,29 34,29"
-            fill="none" stroke="#10B891" stroke-width="0.8" opacity="0.5"/>
-          <!-- Circle ring -->
-          <circle cx="40" cy="40" r="20"
-            fill="none" stroke="#10B891" stroke-width="1" opacity="0.6"/>
-          <!-- Circular text -->
+            points="44,6 52,30 77,30 57,46 65,70 44,55 23,70 31,46 11,30 36,30"
+            fill="none" stroke="#10B981" stroke-width="1.2" opacity="0.2"/>
+          <circle cx="44" cy="44" r="23"
+            fill="none" stroke="#10B981" stroke-width="0.8" opacity="0.4"/>
           <text font-size="6.5"
-            font-family="Helvetica Neue,Helvetica,Arial,sans-serif"
-            font-weight="700" letter-spacing="2.5" fill="#10B891">
+            font-family="DM Sans,Helvetica,Arial,sans-serif"
+            font-weight="700" letter-spacing="2.8" fill="#059669">
             <textPath href="#seal-circle" startOffset="50%" text-anchor="middle">
-              LINGAP · VERIFIED · IMPACT ·
+              LINGAP &middot; VERIFIED &middot; IMPACT &middot;
             </textPath>
           </text>
-          <!-- Center text -->
-          <text x="40" y="37" text-anchor="middle"
-            font-size="9" font-weight="800" fill="#10B891"
-            font-family="Helvetica Neue,Helvetica,Arial,sans-serif"
-            letter-spacing="1">CERTIFIED</text>
-          <text x="40" y="47" text-anchor="middle"
-            font-size="7" fill="#10B891"
-            font-family="Helvetica Neue,Helvetica,Arial,sans-serif">DONOR</text>
+          <text x="44" y="41" text-anchor="middle"
+            font-size="9" font-weight="700" fill="#064E3B"
+            font-family="DM Sans,Helvetica,Arial,sans-serif"
+            letter-spacing="1.5">CERTIFIED</text>
+          <text x="44" y="52" text-anchor="middle"
+            font-size="7.5" fill="#059669"
+            font-family="DM Sans,Helvetica,Arial,sans-serif"
+            letter-spacing="1">DONOR</text>
         </svg>
       </div>
 
-      <!-- Verification statements -->
       <div class="cert-statements">
         {statements_html}
       </div>
 
-      <!-- Signature -->
       <div class="sigline">
         <div class="sig-img">Lingap</div>
         <div class="sig-rule"></div>
@@ -713,19 +799,18 @@ def generate_html_certificate(
 
     </div>
 
-  </div><!-- /.cert-inner -->
+  </div>
 
-  <!-- Footer strip -->
   <div class="footer-strip">
     <div class="footer-text">
-      Immutable Record &nbsp;·&nbsp; Publicly Verifiable &nbsp;·&nbsp; Blockchain-Backed
+      Immutable Record &nbsp;&middot;&nbsp; Publicly Verifiable &nbsp;&middot;&nbsp; Blockchain-Backed
     </div>
     <div class="footer-watermark">LINGAP</div>
   </div>
 
   <div class="bottom-band"></div>
 
-</div><!-- /.cert-wrap -->
+</div>
 </body>
 </html>"""
 
@@ -736,10 +821,6 @@ def get_certificate_hash(html_content: str) -> str:
     """Compute SHA-256 hash of the certificate HTML for integrity verification."""
     return hashlib.sha256(html_content.encode("utf-8")).hexdigest()
 
-
-# ---------------------------------------------------------------------------
-# Backwards-compatible SVG wrapper (kept for reference; use HTML version above)
-# ---------------------------------------------------------------------------
 
 def generate_svg_certificate(
     donor_name: str,
@@ -753,12 +834,7 @@ def generate_svg_certificate(
     merkle_proof: str | None = None,
     onchain_hash: str | None = None,
 ) -> str:
-    """Legacy SVG certificate generator (thin wrapper around the HTML version).
-
-    Embeds the full HTML certificate inside an SVG foreignObject so it can be
-    used anywhere an SVG is expected (e.g. stored as .svg, embedded in <img>).
-    For most use-cases, prefer generate_html_certificate() directly.
-    """
+    """Legacy SVG certificate generator wrapper around HTML template."""
     html = generate_html_certificate(
         donor_name=donor_name,
         amount=amount,
@@ -771,7 +847,8 @@ def generate_svg_certificate(
         merkle_proof=merkle_proof,
         onchain_hash=onchain_hash,
     )
-    svg = f"""<?xml version="1.0" encoding="UTF-8"?>
+
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
 <svg viewBox="0 0 800 1100" xmlns="http://www.w3.org/2000/svg"
      xmlns:xlink="http://www.w3.org/1999/xlink"
      preserveAspectRatio="xMidYMid meet">
@@ -781,19 +858,14 @@ def generate_svg_certificate(
     </div>
   </foreignObject>
 </svg>"""
-    return svg
 
-
-# ---------------------------------------------------------------------------
-# Example usage / smoke test
-# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     sample = generate_html_certificate(
         donor_name="Cameron Graham",
         amount=7_498.00,
-        beneficiary_name="Gino Reyes — Home Repair, Manila",
-        milestone_description="Milestone 1: Materials Procurement — 50% Funded",
+        beneficiary_name="Gino Reyes - Home Repair, Manila",
+        milestone_description="Milestone 1: Materials Procurement - 50% Funded",
         lives_touched=6,
         total_donated=7_498.00,
         donation_date=datetime(2026, 5, 17),
@@ -811,3 +883,4 @@ if __name__ == "__main__":
     cert_hash = get_certificate_hash(sample)
     print(f"Certificate written to: {output_path}")
     print(f"SHA-256 integrity hash:  {cert_hash}")
+

@@ -20,6 +20,7 @@ from app.schemas.donation_certificate import (
     DonationCertificateUpdate,
 )
 from app.certificates.generator import generate_certificate_pdf
+from app.certificates.svg_generator import generate_html_certificate
 
 router = APIRouter(prefix="/certificates", tags=["certificates"])
 
@@ -90,24 +91,22 @@ async def get_public_certificate_page(
     donor = (await db.execute(select(User).where(User.id == donation.donor_id))).scalar_one_or_none()
     donor_name = cert.donor_name or (donor.stellar_public_key if donor else None) or "Anonymous Donor"
     tx_hash = cert.stellar_tx_hash or donation.stellar_tx_hash or "N/A"
-    html = f"""
-    <!doctype html>
-    <html>
-    <head><meta charset="utf-8"><title>LINGAP Certificate {cert.id}</title></head>
-    <body style="font-family:Arial,sans-serif;background:#f5f7f5;padding:24px;color:#17231D;">
-      <div style="max-width:760px;margin:0 auto;background:#fff;border:1px solid #d7e1d9;border-radius:12px;padding:28px;">
-        <h1 style="margin:0 0 10px;">LINGAP On-Chain Donation Proof</h1>
-        <p style="margin:0 0 22px;color:#4A5C52;">Public Impact Certificate</p>
-        <p><strong>User Name:</strong> {donor_name}</p>
-        <p><strong>Campaign Name:</strong> {campaign_name}</p>
-        <p><strong>Milestone:</strong> {cert.milestone_description}</p>
-        <p><strong>Donation Amount:</strong> {float(cert.amount):,.2f} XLM</p>
-        <p><strong>Transaction Hash:</strong> {tx_hash}</p>
-        <p><strong>Verification:</strong> {"Verified" if cert.verified else "Pending"}</p>
-      </div>
-    </body>
-    </html>
-    """
+    html = generate_html_certificate(
+        donor_name=donor_name,
+        amount=float(cert.amount),
+        beneficiary_name=campaign_name,
+        milestone_description=cert.milestone_description or "Campaign milestone completed",
+        lives_touched=int(cert.lives_touched or 0),
+        total_donated=float(cert.total_donated or cert.amount),
+        donation_date=donation.created_at,
+        stellar_tx_hash=tx_hash,
+        merkle_proof=cert.merkle_proof,
+        onchain_hash=cert.onchain_hash,
+        certificate_id=str(cert.id),
+        block_number=None,
+        network="Stellar Mainnet" if cert.verified else "Pending Verification",
+        certifying_officer="LINGAP Foundation",
+    )
     return HTMLResponse(content=html)
 
 
@@ -264,6 +263,7 @@ async def list_certificates(
                 "donation_id": str(cert.donation_id),
                 "donor_name": cert.donor_name,
                 "amount": float(cert.amount),
+                "asset": donation.asset,
                 "beneficiary_name": cert.beneficiary_name,
                 "campaign_name": campaign_name,
                 "milestone_description": cert.milestone_description,
