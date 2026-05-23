@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_current_user_optional
 from app.models.user import User
 from app.models.donation_certificate import DonationCertificate
 from app.models.donation import Donation
@@ -48,7 +48,7 @@ async def _get_donation(db: AsyncSession, donation_id: uuid.UUID) -> Donation | 
 async def get_certificate(
     cert_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User | None = Depends(get_current_user_optional),
 ):
     """Get certificate details. Public certificates visible to all, private only to owner."""
     cert = (
@@ -172,7 +172,7 @@ async def update_certificate_visibility(
 async def download_certificate(
     cert_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User | None = Depends(get_current_user_optional),
 ):
     """Render certificate PDF on demand and stream it."""
     cert = (
@@ -220,7 +220,7 @@ async def download_certificate(
 async def list_donor_certificates(
     donor_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User | None = Depends(get_current_user_optional),
 ):
     """List all certificates for a donor. Public certs visible to all, private only to owner."""
     if not user or (user.id != donor_id and user.role.value != "admin"):
@@ -243,7 +243,7 @@ async def list_donor_certificates(
 async def list_certificates(
     donor_id: uuid.UUID | None = None,
     db: AsyncSession = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User | None = Depends(get_current_user_optional),
 ):
     query = select(DonationCertificate).order_by(DonationCertificate.created_at.desc())
     if donor_id:
@@ -252,14 +252,10 @@ async def list_certificates(
     certs = (await db.execute(query)).scalars().all()
     items = []
     for cert in certs:
-        if not cert.is_public and (not user or user.id != cert.donation.donor_id):
-            donation = await _get_donation(db, cert.donation_id)
-            if not donation:
-                continue
-            if not user or user.id != donation.donor_id:
-                continue
         donation = await _get_donation(db, cert.donation_id)
         if not donation:
+            continue
+        if not cert.is_public and (not user or user.id != donation.donor_id):
             continue
         campaign_name = await _campaign_title_for_donation(db, donation)
         items.append(
