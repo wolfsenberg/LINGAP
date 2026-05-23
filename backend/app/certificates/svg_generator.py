@@ -847,12 +847,7 @@ def generate_svg_certificate(
         merkle_proof=merkle_proof,
         onchain_hash=onchain_hash,
     )
-<<<<<<< HEAD
-
     return f"""<?xml version="1.0" encoding="UTF-8"?>
-=======
-    svg = f"""<?xml version="1.0" encoding="UTF-8"?>
->>>>>>> caef5d7d3180e59bb68f4adaba5821d3545663e9
 <svg viewBox="0 0 800 1100" xmlns="http://www.w3.org/2000/svg"
      xmlns:xlink="http://www.w3.org/1999/xlink"
      preserveAspectRatio="xMidYMid meet">
@@ -887,7 +882,3 @@ if __name__ == "__main__":
     cert_hash = get_certificate_hash(sample)
     print(f"Certificate written to: {output_path}")
     print(f"SHA-256 integrity hash:  {cert_hash}")
-<<<<<<< HEAD
-
-=======
->>>>>>> caef5d7d3180e59bb68f4adaba5821d3545663e9
