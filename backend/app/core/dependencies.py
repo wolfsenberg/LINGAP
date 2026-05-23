@@ -9,6 +9,7 @@ from sqlalchemy import select
 import uuid
 
 bearer = HTTPBearer()
+optional_bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -25,6 +26,20 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+async def get_current_user_optional(
+    credentials: HTTPAuthorizationCredentials | None = Depends(optional_bearer),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    if credentials is None:
+        return None
+    try:
+        user_id = decode_token(credentials.credentials)
+        result = await db.execute(select(User).where(User.id == uuid.UUID(user_id)))
+        return result.scalar_one_or_none()
+    except Exception:
+        return None
 
 
 async def require_admin(user: User = Depends(get_current_user)) -> User:

@@ -7,11 +7,6 @@ from app.certificates.svg_generator import (
     generate_svg_certificate,
     get_certificate_hash,
 )
-from app.storage.svg_s3 import (
-    upload_svg_certificate,
-    upload_certificate_html_wrapper,
-    StoredSVGCertificate,
-)
 
 
 class OnChainCertificateService:
@@ -86,11 +81,9 @@ class OnChainCertificateService:
 
         svg_hash = get_certificate_hash(svg_content)
 
-        # Step 3: Generate HTML wrapper with embedded SVG for social previews
-        # Step 3 and 4: Upload to public S3 bucket (async)
-        # We no longer need the PNG fallback wrapper since the new generator handles HTML
-        svg_stored = await upload_svg_certificate(svg_content, donation_id)
-        html_s3_url = await upload_certificate_html_wrapper(svg_content, donation_id)
+        # Step 3: Persist only metadata in DB; no external object storage required.
+        svg_public_url = ""
+        html_public_url = ""
 
         # Step 5: Compute certificate integrity hash (for future merkle proofs)
         cert_integrity_hash = hashlib.sha256(
@@ -98,8 +91,8 @@ class OnChainCertificateService:
         ).hexdigest()
 
         return {
-            "svg_s3_url": svg_stored.s3_url,
-            "html_s3_url": html_s3_url,
+            "svg_s3_url": svg_public_url,
+            "html_s3_url": html_public_url,
             "svg_hash": svg_hash,
             "verified": True,
             "tx_verified": tx_verified,

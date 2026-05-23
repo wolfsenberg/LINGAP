@@ -220,52 +220,48 @@ async def simulate_top_up(
 
     amount_xlm = round(float(amount_xlm), 7)
 
-    if method == BalancePaymentMethod.stellar_wallet:
-        if not settings.LINGAP_RECEIVER_PUBLIC_KEY:
-            raise HTTPException(status_code=400, detail="LINGAP receiving wallet is not configured.")
-        if not body.sender_wallet or not body.stellar_tx_hash:
-            raise HTTPException(status_code=422, detail="Stellar Wallet top-up requires sender wallet and transaction hash.")
-        verification = await verify_native_payment(
-            body.stellar_tx_hash,
-            source_public_key=body.sender_wallet,
-            destination_public_key=settings.LINGAP_RECEIVER_PUBLIC_KEY,
-            expected_amount=amount_xlm,
+    # All methods now require a real Stellar tx signed via Freighter.
+    # Verify the payment landed on-chain before crediting the balance.
+    if not settings.LINGAP_RECEIVER_PUBLIC_KEY:
+        raise HTTPException(status_code=400, detail="LINGAP receiving wallet is not configured.")
+    if not body.sender_wallet or not body.stellar_tx_hash:
+        raise HTTPException(
+            status_code=422,
+            detail="A Stellar transaction hash and sender wallet are required. All top-ups must be signed via Freighter.",
         )
-        if not verification.get("confirmed"):
-            raise HTTPException(status_code=400, detail=verification.get("reason") or "Stellar payment could not be verified.")
-        tx = BalanceTransaction(
-            user_id=user.id,
-            kind=BalanceTransactionKind.top_up,
-            amount_xlm=amount_xlm,
-            amount_php=xlm_to_php(amount_xlm, rate),
-            payment_method=method,
-            payment_reference=body.stellar_tx_hash,
-            payment_status=BalancePaymentStatus.confirmed,
-            stellar_tx_hash=body.stellar_tx_hash,
-            note=f"Direct Stellar Wallet top-up from {body.sender_wallet}.",
+
+    verification = await verify_native_payment(
+        body.stellar_tx_hash,
+        source_public_key=body.sender_wallet,
+        destination_public_key=settings.LINGAP_RECEIVER_PUBLIC_KEY,
+        expected_amount=amount_xlm,
+    )
+    if not verification.get("confirmed"):
+        raise HTTPException(
+            status_code=400,
+            detail=verification.get("reason") or "Stellar payment could not be verified on-chain.",
         )
-        db.add(tx)
-        await db.commit()
-        await db.refresh(tx)
-        await record_top_up(tx)
-    else:
-        if method not in SIMULATED_TOPUP_METHODS:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Payment method is not available for this top-up flow.",
-            )
-        if method in {BalancePaymentMethod.gcash, BalancePaymentMethod.maya} and not body.sender_reference:
-            raise HTTPException(status_code=422, detail=f"{METHOD_LABELS[method]} number is required.")
-        if method == BalancePaymentMethod.pdax and not (body.sender_reference or body.sender_name):
-            raise HTTPException(status_code=422, detail="PDAX account email or account name is required.")
-        tx = await create_confirmed_top_up(db, user, method, amount_xlm, rate)
-        if body.sender_reference or body.sender_name:
-            tx.note = (
-                f"{METHOD_LABELS[method]} confirmation credited to LINGAP balance ledger. "
-                f"Sender: {body.sender_reference or body.sender_name}."
-            )
-            await db.commit()
-            await db.refresh(tx)
+
+    method_label = METHOD_LABELS.get(method, method.value)
+    sender_info = body.sender_reference or body.sender_name or body.sender_wallet
+    tx = BalanceTransaction(
+        user_id=user.id,
+        kind=BalanceTransactionKind.top_up,
+        amount_xlm=amount_xlm,
+        amount_php=xlm_to_php(amount_xlm, rate),
+        payment_method=method,
+        payment_reference=body.stellar_tx_hash,
+        payment_status=BalancePaymentStatus.confirmed,
+        stellar_tx_hash=body.stellar_tx_hash,
+        note=(
+            f"{method_label} top-up confirmed on Stellar. "
+            f"Sender: {sender_info}."
+        ),
+    )
+    db.add(tx)
+    await db.commit()
+    await db.refresh(tx)
+    await record_top_up(tx)
 
     balance = await get_user_xlm_balance(db, user.id)
     return {

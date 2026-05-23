@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
 import { balanceApi, campaignsApi, donationsApi, type BalanceApi } from "@/lib/api";
-import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash, buildPaymentTransaction, submitSignedTransactionXdr, STELLAR_CONFIG } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
@@ -95,7 +95,7 @@ export default function DetailPage() {
 
   const campaign = CAMPAIGNS.find((c) => c.slug === slug);
   const user = useAuthStore((state) => state.user);
-  const { connected, publicKey, connect } = useFreighter();
+  const { connected, publicKey, connect, sign } = useFreighter();
   const [selectedAmount, setSelectedAmount] = useState(500);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
@@ -252,39 +252,76 @@ export default function DetailPage() {
       toast.error("Enter a valid amount.");
       return;
     }
-    if (balance.xlm_balance < effectiveAmount) {
-      toast.error("You do not have enough XLM balance to complete this donation. Please top up first.");
+
+    const receivingWallet = process.env.NEXT_PUBLIC_LINGAP_RECEIVER_PUBLIC_KEY;
+    if (!receivingWallet) {
+      toast.error("LINGAP receiving wallet is not configured.");
       return;
     }
+
     setDonating(true);
+    const campaignId = activeCampaign.slug || activeCampaign.id;
+    const donationPurpose = `campaign:${campaignId}`;
+    // Stellar text memo max 28 chars
+    const memo = `LNGP-DON-${campaignId}`.slice(0, 28);
+
     try {
-      const donationPurpose = `campaign:${activeCampaign.slug || activeCampaign.id}`;
-      const donationRes = await donationsApi.create({
-        amount: Number(effectiveAmount.toFixed(2)),
+      // 1. Build unsigned XLM payment to LINGAP receiver
+      const tx = await buildPaymentTransaction(
+        publicKey,
+        receivingWallet,
+        effectiveAmount.toFixed(7),
+        undefined,
+        memo,
+      );
+
+      // 2. Freighter signs → popup appears here
+      toast("Check your Freighter wallet to sign the donation.", { icon: "🔐", duration: 8000 });
+      let signedXdr: string;
+      try {
+        signedXdr = await sign(tx.toXDR(), STELLAR_CONFIG.network);
+      } catch (signErr: unknown) {
+        const msg = signErr instanceof Error ? signErr.message : String(signErr);
+        if (msg.toLowerCase().includes("user declined") || msg.toLowerCase().includes("rejected")) {
+          toast.error("Donation cancelled in Freighter.");
+        } else {
+          toast.error(`Freighter error: ${msg}`);
+        }
+        return;
+      }
+
+      // 3. Submit to Stellar Horizon — real on-chain tx
+      toast("Submitting to Stellar network...", { icon: "🚀", duration: 6000 });
+      const submitResult = await submitSignedTransactionXdr(signedXdr);
+      const realTxHash = submitResult.hash;
+
+      // 4. Record in LINGAP DB with the real Stellar tx hash + deduct balance
+      await donationsApi.create({
+        amount: Number(effectiveAmount.toFixed(7)),
         asset: "XLM",
         purpose: donationPurpose,
-        fundingSource: "lingap_balance",
-        spendBalance: true,
+        stellarTxHash: realTxHash,
+        fundingSource: "stellar_wallet",
+        spendBalance: true,   // deducts from LINGAP balance AND records real tx hash
         walletAddress: publicKey,
       });
-      const txHash = donationRes.data.data.stellarTxHash;
-      setConfirmedDonationXlm((current) => current + effectiveAmount);
-      setLastTxHash(txHash);
-      setBalance((current) => ({
-        ...current,
-        xlm_balance: Math.max(current.xlm_balance - effectiveAmount, 0),
-        php_equivalent: Math.max((current.xlm_balance - effectiveAmount) * conversionRate, 0),
-      }));
-      setConfirmedDonationXlm(0);
+
+      setConfirmedDonationXlm((c) => c + effectiveAmount);
+      setLastTxHash(realTxHash);
+      toast.success(`Donation confirmed on Stellar! TX: ${realTxHash.slice(0, 10)}...`);
+
+      // 5. Refresh live totals
       try {
-        const latest = await campaignsApi.publicOne(activeCampaign.slug || activeCampaign.id);
+        const [latest, nextBalance] = await Promise.all([
+          campaignsApi.publicOne(campaignId),
+          balanceApi.mine(),
+        ]);
         if (latest.data.data) setLiveSummary(latest.data.data);
-        const nextBalance = await balanceApi.mine();
         setBalance(nextBalance.data.data);
       } catch {
-        // Donation is already recorded; the polling loop will pick up fresh totals.
+        // Non-critical — polling loop will catch up
       }
-      toast.success(`Donation confirmed! Ref: ${txHash.slice(0, 12)}...`);
+
     } catch (e: unknown) {
       toast.error(getDonationErrorMessage(e));
     } finally {
@@ -495,9 +532,9 @@ export default function DetailPage() {
               style={{ width: "100%", justifyContent: "center", marginBottom: 12, opacity: donating ? 0.7 : 1 }}
             >
               {donating
-                ? "Submitting to LINGAP..."
+                ? "Submitting to Stellar..."
                 : connected
-                  ? `Donate ${formatXlmAmount(effectiveAmount)} XLM`
+                  ? `Donate ${formatXlmAmount(effectiveAmount)} XLM via Stellar`
                   : "Connect Wallet to Donate"}
             </button>
             {lastTxHash && (
