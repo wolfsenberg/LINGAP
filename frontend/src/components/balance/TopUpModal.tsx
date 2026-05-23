@@ -7,6 +7,7 @@ import { balanceApi, type BalanceApi, type BalanceTransactionApi } from "@/lib/a
 import { useFreighter } from "@/hooks/useFreighter";
 import {
   buildPaymentTransaction,
+  buildSignAndSubmit,
   getStellarExpertContractUrl,
   getStellarExpertTxUrl,
   submitSignedTransactionXdr,
@@ -116,8 +117,6 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
     setConfirmedTxHash("");
 
     try {
-      let stellarTxHash: string | undefined;
-
       // ── ALL methods: send a real Stellar payment through Freighter ──────────
       // This makes every top-up visible on stellar.expert regardless of
       // payment method. The memo identifies the source channel.
@@ -139,30 +138,25 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
 
       toast("Check your Freighter wallet to sign the top-up.", { icon: "🔐", duration: 8000 });
 
-      const tx = await buildPaymentTransaction(
-        publicKey,
-        receivingWallet,
-        amountXlm.toFixed(7),
-        undefined,
-        memoLabel,
-      );
-
-      let signedXdr: string;
+      let stellarTxHash: string;
       try {
-        signedXdr = await sign(tx.toXDR(), NETWORK_PASSPHRASE);
+        const result = await buildSignAndSubmit(
+          publicKey,
+          receivingWallet,
+          amountXlm.toFixed(7),
+          memoLabel,
+          sign,
+        );
+        stellarTxHash = result.hash;
       } catch (signErr: unknown) {
         const msg = signErr instanceof Error ? signErr.message : String(signErr);
         if (msg.toLowerCase().includes("user declined") || msg.toLowerCase().includes("rejected")) {
           toast.error("Transaction cancelled in Freighter.");
         } else {
-          toast.error(`Freighter error: ${msg}`);
+          toast.error(msg);
         }
         return;
       }
-
-      toast("Submitting to Stellar network...", { icon: "🚀", duration: 6000 });
-      const submitResult = await submitSignedTransactionXdr(signedXdr);
-      stellarTxHash = submitResult.hash;
 
       // ── Record in LINGAP backend ─────────────────────────────────────────
       const res = await balanceApi.simulateTopUp({
@@ -171,7 +165,7 @@ export default function TopUpModal({ open, onClose, rate, onConfirmed }: TopUpMo
         senderReference: senderReference.trim() || undefined,
         senderName: senderName.trim() || undefined,
         senderWallet: publicKey,
-        stellarTxHash,
+        stellarTxHash: stellarTxHash,
       });
 
       const topUpTx = res.data.data.top_up;

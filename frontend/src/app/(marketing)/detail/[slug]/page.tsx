@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { useFreighter } from "@/hooks/useFreighter";
 import { balanceApi, campaignsApi, donationsApi, type BalanceApi } from "@/lib/api";
-import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash, buildPaymentTransaction, submitSignedTransactionXdr, STELLAR_CONFIG } from "@/lib/stellar";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash, buildSignAndSubmit, STELLAR_CONFIG } from "@/lib/stellar";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
 import SafeImageFrame from "@/components/campaign/SafeImageFrame";
@@ -266,43 +266,37 @@ export default function DetailPage() {
     const memo = `LNGP-DON-${campaignId}`.slice(0, 28);
 
     try {
-      // 1. Build unsigned XLM payment to LINGAP receiver
-      const tx = await buildPaymentTransaction(
-        publicKey,
-        receivingWallet,
-        effectiveAmount.toFixed(7),
-        undefined,
-        memo,
-      );
-
-      // 2. Freighter signs → popup appears here
+      // buildSignAndSubmit: builds tx with fresh sequence, Freighter signs,
+      // submits raw XDR, auto-retries once on tx_bad_seq
       toast("Check your Freighter wallet to sign the donation.", { icon: "🔐", duration: 8000 });
-      let signedXdr: string;
+      let realTxHash: string;
       try {
-        signedXdr = await sign(tx.toXDR(), STELLAR_CONFIG.network);
+        const result = await buildSignAndSubmit(
+          publicKey,
+          receivingWallet,
+          effectiveAmount.toFixed(7),
+          memo,
+          sign,
+        );
+        realTxHash = result.hash;
       } catch (signErr: unknown) {
         const msg = signErr instanceof Error ? signErr.message : String(signErr);
         if (msg.toLowerCase().includes("user declined") || msg.toLowerCase().includes("rejected")) {
           toast.error("Donation cancelled in Freighter.");
         } else {
-          toast.error(`Freighter error: ${msg}`);
+          toast.error(msg);
         }
         return;
       }
 
-      // 3. Submit to Stellar Horizon — real on-chain tx
-      toast("Submitting to Stellar network...", { icon: "🚀", duration: 6000 });
-      const submitResult = await submitSignedTransactionXdr(signedXdr);
-      const realTxHash = submitResult.hash;
-
-      // 4. Record in LINGAP DB with the real Stellar tx hash + deduct balance
+      // Record in LINGAP DB with the real Stellar tx hash + deduct balance
       await donationsApi.create({
         amount: Number(effectiveAmount.toFixed(7)),
         asset: "XLM",
         purpose: donationPurpose,
         stellarTxHash: realTxHash,
         fundingSource: "stellar_wallet",
-        spendBalance: true,   // deducts from LINGAP balance AND records real tx hash
+        spendBalance: true,
         walletAddress: publicKey,
       });
 
@@ -310,7 +304,7 @@ export default function DetailPage() {
       setLastTxHash(realTxHash);
       toast.success(`Donation confirmed on Stellar! TX: ${realTxHash.slice(0, 10)}...`);
 
-      // 5. Refresh live totals
+      // Refresh live totals
       try {
         const [latest, nextBalance] = await Promise.all([
           campaignsApi.publicOne(campaignId),
