@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { ArrowLeft, Building2, FileText, ImagePlus, Landmark, MapPin, Save, ShieldCheck, Trash2 } from "lucide-react";
+import { ArrowLeft, Building2, FileText, ImagePlus, Landmark, MapPin, Save, ShieldCheck, Trash2, Banknote } from "lucide-react";
 import { campaignsApi, type CampaignDriveApi } from "@/lib/api";
 
 const categories = ["Medical", "Relief", "Education", "Community", "Animal Rescue", "Disaster Relief"];
@@ -16,6 +16,9 @@ export default function EditCampaignPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [requestingDelete, setRequestingDelete] = useState(false);
+  const [requestingRelease, setRequestingRelease] = useState(false);
+  const [releaseRecipient, setReleaseRecipient] = useState("");
+  const [releaseNote, setReleaseNote] = useState("");
   const [category, setCategory] = useState("Medical");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -113,6 +116,33 @@ export default function EditCampaignPage() {
       toast.error(error instanceof Error ? error.message : "Unable to request campaign deletion.");
     } finally {
       setRequestingDelete(false);
+    }
+  }
+
+  async function handleReleaseRequest() {
+    if (!campaign) return;
+    if (!releaseRecipient.trim()) {
+      toast.error("Please enter the recipient name.");
+      return;
+    }
+    const confirmed = window.confirm(
+      `Request fund release for "${campaign.title}" to "${releaseRecipient}"?\n\nAdmin will review and approve. Once approved, you must upload handoff proof (photo/receipt) so admin can verify the funds were delivered.`
+    );
+    if (!confirmed) return;
+    setRequestingRelease(true);
+    try {
+      await campaignsApi.requestRelease(campaign.id, {
+        recipient_name: releaseRecipient.trim(),
+        recipient_type: campaign.institution || "Verified recipient",
+        note: releaseNote.trim() || undefined,
+      });
+      toast.success("Fund release request sent to admin for review.");
+      setReleaseRecipient("");
+      setReleaseNote("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to send release request.");
+    } finally {
+      setRequestingRelease(false);
     }
   }
 
@@ -232,6 +262,45 @@ export default function EditCampaignPage() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                 <span className="badge badge-navy">{campaign.category}</span>
                 <span className="badge badge-emerald">{campaign.status}</span>
+              </div>
+            </section>
+
+            <section className="card" style={{ borderColor: "rgba(74,155,106,.22)", background: "rgba(74,155,106,.025)" }}>
+              <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--forest)", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
+                <Banknote size={18} color="var(--canopy)" /> Request Fund Release
+              </h2>
+              <p style={{ fontSize: 13, color: "var(--text2)", lineHeight: 1.6, marginBottom: 12 }}>
+                Once your campaign has collected enough funds, request admin approval to hand down the money to the recipient. After approval, you must upload proof (photo/receipt) that the funds were delivered.
+              </p>
+              <div style={{ display: "grid", gap: 10 }}>
+                <label style={{ display: "grid", gap: 5 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "var(--text2)", textTransform: "uppercase", letterSpacing: ".08em" }}>Recipient name</span>
+                  <input
+                    className="form-input"
+                    placeholder={campaign?.institution || "e.g. Juan dela Cruz / Ospital ng Maynila"}
+                    value={releaseRecipient}
+                    onChange={(e) => setReleaseRecipient(e.target.value)}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: 5 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "var(--text2)", textTransform: "uppercase", letterSpacing: ".08em" }}>Note (optional)</span>
+                  <textarea
+                    className="form-input"
+                    rows={2}
+                    placeholder="Any context for admin review..."
+                    value={releaseNote}
+                    onChange={(e) => setReleaseNote(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={handleReleaseRequest}
+                  disabled={requestingRelease || !releaseRecipient.trim()}
+                  className="btn btn-emerald"
+                  style={{ justifyContent: "center", opacity: requestingRelease || !releaseRecipient.trim() ? 0.6 : 1 }}
+                >
+                  <Banknote size={14} /> {requestingRelease ? "Sending..." : "Request Fund Release"}
+                </button>
               </div>
             </section>
 

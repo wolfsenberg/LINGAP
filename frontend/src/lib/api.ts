@@ -102,6 +102,14 @@ export type PublicCampaignApi = CampaignDriveApi & {
   organizer_name?: string | null;
 };
 
+export type CampaignReleaseRequestCreate = {
+  recipient_name: string;
+  recipient_type?: string;
+  recipient_reference?: string | null;
+  amount_xlm?: number | null;
+  note?: string | null;
+};
+
 export type CampaignChangeLogApi = {
   id: string;
   campaign_id: string;
@@ -608,6 +616,18 @@ export const campaignsApi = {
     api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/delete-requests/${requestId}/approve`),
   rejectDeleteRequest: (requestId: string) =>
     api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/delete-requests/${requestId}/reject`),
+  requestRelease: (campaignId: string, data: CampaignReleaseRequestCreate) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/${campaignId}/release-request`, data),
+  releaseRequests: (limit = 25) =>
+    api.get<ApiResponse<CampaignChangeLogApi[]>>("/api/v1/campaigns/admin/release-requests", {
+      params: { limit },
+    }),
+  approveReleaseRequest: (requestId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/release-requests/${requestId}/approve`),
+  rejectReleaseRequest: (requestId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/release-requests/${requestId}/reject`),
+  verifyReleaseProof: (requestId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/release-requests/${requestId}/verify-proof`),
 };
 
 export const donorsApi = {

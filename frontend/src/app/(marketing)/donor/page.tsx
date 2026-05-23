@@ -349,8 +349,8 @@ export default function DonorPage() {
                       <span><Landmark size={12} /> {formatLedgerReference(tx.payment_reference)}</span>
                       <span><CheckCircle2 size={12} /> {tx.payment_status}</span>
                       {stellarTransactionUrl(tx) && (
-                        <a href={stellarTransactionUrl(tx) ?? undefined} target="_blank" rel="noreferrer" style={{ color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
-                          <Network size={12} /> {isStellarTxHash(tx.stellar_tx_hash) ? "Stellar transaction" : "Vault reference"}
+                        <a href={stellarTransactionUrl(tx) ?? undefined} target="_blank" rel="noreferrer" className="donation-proof-link">
+                          <Network size={12} /> {isStellarTxHash(tx.stellar_tx_hash) ? "Stellar tx" : "Vault ref"}
                         </a>
                       )}
                     </div>
@@ -405,8 +405,7 @@ export default function DonorPage() {
                         <span><Landmark size={12} /> {item.escrow}</span>
                         <span><Network size={12} /> {item.stellar}</span>
                         <span><Wallet size={12} /> {item.funding}</span>
-                      </div>
-                    </div>
+                      </div>                    </div>
                     <span className={`badge ${item.badge}`}>{item.badgeText}</span>
                   </div>
                 ))}
