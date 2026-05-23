@@ -221,7 +221,7 @@ export default function PublicProfilePage() {
                           <span><Network size={12} /> {shortHash(item.stellar_tx_hash)}</span>
                           {item.wallet_address ? <span>Wallet: {shortHash(item.wallet_address)}</span> : null}
                           {item.certificate_id ? (
-                            <Link href={`/certificate?cert=${item.certificate_id}`} className="badge badge-emerald">Certificate</Link>
+                            <Link href={`/certificate?user=${profile.user.id}&cert=${item.certificate_id}`} className="badge badge-emerald">Certificate</Link>
                           ) : null}
                         </div>
                       </div>
@@ -278,7 +278,7 @@ export default function PublicProfilePage() {
                       <strong>{cert.beneficiary_name}</strong>
                       <span>{formatXlm(cert.amount)} · {cert.lives_touched} lives touched</span>
                       <div className="donation-proof-row">
-                        <Link href={`/certificate?cert=${cert.id}`} className="badge badge-emerald">View</Link>
+                        <Link href={`/certificate?user=${profile.user.id}&cert=${cert.id}`} className="badge badge-emerald">View</Link>
                         <a href={`/api/v1/certificates/${cert.id}/download`} className="badge badge-gray">PDF</a>
                       </div>
                     </div>

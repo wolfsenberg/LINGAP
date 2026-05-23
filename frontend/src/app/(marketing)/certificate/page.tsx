@@ -53,13 +53,15 @@ export default function CertificatePage() {
   const [selected, setSelected] = useState<Certificate | null>(null);
   const [userCertificates, setUserCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
+  const targetUserId = searchParams.get("user");
+  const isOwnView = !targetUserId || targetUserId === user?.id;
 
   useEffect(() => {
-    if (!user?.id) {
+    const donorId = targetUserId || user?.id;
+    if (!donorId) {
       setLoading(false);
       return;
     }
-    const donorId = user.id;
     const preselectCertId = searchParams.get("cert");
 
     certificatesApi.listByDonor(donorId)
@@ -86,12 +88,12 @@ export default function CertificatePage() {
       })
       .catch((err) => {
         console.error(err);
-        toast.error("Failed to load your certificates.");
+        toast.error("Failed to load certificates.");
       })
       .finally(() => {
         setLoading(false);
       });
-  }, [user, searchParams]);
+  }, [user?.id, targetUserId, searchParams]);
 
   const hasCertificates = userCertificates.length > 0;
   const selectedShareUrl = useMemo(() => selected?.stellarUrl ?? "", [selected]);
@@ -170,8 +172,12 @@ export default function CertificatePage() {
           <Link href="/donor#impact-certificates" className="btn btn-outline btn-sm" style={{color:'#fff',borderColor:'rgba(255,255,255,.28)',background:'rgba(255,255,255,.08)',marginBottom:22}}>
             <ArrowLeft size={14}/> Back to My Impact
           </Link>
-          <div className="section-label" style={{color:'var(--canopy-light)'}}>MY IMPACT CERTIFICATES</div>
-          <h1 style={{fontSize:36,fontWeight:800,color:'#fff',marginBottom:12}}>Your verified giving gallery</h1>
+          <div className="section-label" style={{color:'var(--canopy-light)'}}>
+            {isOwnView ? "MY IMPACT CERTIFICATES" : "PUBLIC IMPACT CERTIFICATES"}
+          </div>
+          <h1 style={{fontSize:36,fontWeight:800,color:'#fff',marginBottom:12}}>
+            {isOwnView ? "Your verified giving gallery" : "Verified giving gallery"}
+          </h1>
           <p style={{color:'rgba(255,255,255,.68)',fontSize:16,maxWidth:620}}>Every completed milestone creates a blockchain-verifiable certificate you can print, save, or share.</p>
         </div>
       </div>
@@ -218,7 +224,9 @@ export default function CertificatePage() {
             <div style={{width:72,height:72,borderRadius:18,background:'rgba(74,155,106,.1)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 18px'}}>
               <Award size={34} color="var(--canopy)" strokeWidth={1.7}/>
             </div>
-            <h2 style={{fontSize:24,fontWeight:800,color:'var(--forest)',marginBottom:10}}>You don't have any impact certificates yet</h2>
+            <h2 style={{fontSize:24,fontWeight:800,color:'var(--forest)',marginBottom:10}}>
+              {isOwnView ? "You don't have any impact certificates yet" : "No public impact certificates yet"}
+            </h2>
             <p style={{fontSize:15,color:'var(--text2)',lineHeight:1.7,maxWidth:480,margin:'0 auto 24px'}}>Certificates appear here once your supported campaign reaches a verified milestone. Try donating to a campaign to start building your verified impact record.</p>
             <div className="flex gap-12" style={{justifyContent:'center',flexWrap:'wrap'}}>
               <Link href="/discover" className="btn btn-emerald">
