@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ChangeEvent, FormEvent, useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import {
   ArrowLeft,
@@ -15,20 +16,77 @@ import {
   ShieldCheck,
   Upload,
 } from "lucide-react";
+import { campaignsApi } from "@/lib/api";
 
 const categories = ["Medical", "Relief", "Education", "Community"];
 
 export default function StartCampaignPage() {
   const [category, setCategory] = useState("Medical");
+  const [saving, setSaving] = useState(false);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const router = useRouter();
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreview(null);
+      return;
+    }
+
+    const preview = URL.createObjectURL(coverFile);
+    setCoverPreview(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [coverFile]);
+
+  function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0] ?? null;
+    if (!file) {
+      setCoverFile(null);
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload a PNG, JPG, or WebP image.");
+      event.target.value = "";
+      setCoverFile(null);
+      return;
+    }
+
+    setCoverFile(file);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    toast.success("Campaign draft saved for verification.");
+    const form = new FormData(event.currentTarget);
+    setSaving(true);
+    try {
+      let imageSrc: string | null = null;
+      if (coverFile) {
+        const upload = await campaignsApi.uploadCover(coverFile);
+        imageSrc = upload.data.data.url;
+      }
+
+      await campaignsApi.create({
+        title: String(form.get("title") || ""),
+        description: String(form.get("description") || ""),
+        category,
+        institution: String(form.get("institution") || ""),
+        location: String(form.get("location") || ""),
+        goal_amount: Number(form.get("goal_amount") || 0),
+        image_src: imageSrc,
+      });
+      toast.success("Campaign draft saved for verification.");
+      router.push("/donor#organized-drives");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Campaign save failed.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <div>
-      <div style={{background:'var(--forest)',padding:'48px 40px'}}>
+      <div className="start-hero" style={{background:'var(--forest)',padding:'48px 40px'}}>
         <div className="container">
           <Link href="/donor#organized-drives" className="btn btn-outline btn-sm" style={{color:'#fff',borderColor:'rgba(255,255,255,.28)',background:'rgba(255,255,255,.08)',marginBottom:22}}>
             <ArrowLeft size={14}/> Back to My Impact
@@ -40,7 +98,7 @@ export default function StartCampaignPage() {
       </div>
 
       <div className="page-inner">
-        <form onSubmit={handleSubmit} className="grid-2" style={{alignItems:'start',gap:24}}>
+        <form onSubmit={handleSubmit} className="grid-2 start-campaign-form" style={{alignItems:'start',gap:24}}>
           <div style={{display:'flex',flexDirection:'column',gap:18}}>
             <section className="card">
               <h2 style={{fontSize:20,fontWeight:800,color:'var(--forest)',marginBottom:18,display:'flex',alignItems:'center',gap:8}}>
@@ -49,22 +107,31 @@ export default function StartCampaignPage() {
               <div style={{display:'grid',gap:14}}>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Campaign title</span>
-                  <input required placeholder="e.g. Maria Santos cancer treatment fund" className="form-input" />
+                  <input required name="title" placeholder="e.g. Maria Santos cancer treatment fund" className="form-input" />
                 </label>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Short story</span>
-                  <textarea required placeholder="Tell donors who needs help, why it matters, and what proof you can provide." className="form-input" rows={5}/>
+                  <textarea required name="description" placeholder="Tell donors who needs help, why it matters, and what proof you can provide." className="form-input" rows={5}/>
                 </label>
                 <div style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Campaign Photos</span>
-                  <div style={{padding:20,border:'1px dashed var(--border)',borderRadius:'var(--r-sm)',background:'rgba(255,255,255,.5)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',position:'relative',transition:'all .2s'}} className="hover-border-canopy">
-                    <input type="file" multiple accept="image/png, image/jpeg" style={{opacity:0,position:'absolute',top:0,left:0,width:'100%',height:'100%',cursor:'pointer'}} />
-                    <Upload size={22} color="var(--canopy)" strokeWidth={1.8}/>
-                    <div style={{fontSize:13,fontWeight:700,color:'var(--forest)',marginTop:8}}>Add cover & gallery photos</div>
-                    <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>Show donors who they are helping (PNG/JPG, max 4 photos)</div>
+                  <div style={{padding:coverPreview ? 0 : 20,border:'1px dashed var(--border)',borderRadius:'var(--r-sm)',background:'rgba(255,255,255,.5)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',cursor:'pointer',position:'relative',transition:'all .2s',minHeight:180,overflow:'hidden'}} className="hover-border-canopy">
+                    <input type="file" name="cover" accept="image/png, image/jpeg, image/webp" onChange={handleCoverChange} style={{opacity:0,position:'absolute',top:0,left:0,width:'100%',height:'100%',cursor:'pointer',zIndex:2}} />
+                    {coverPreview ? (
+                      <>
+                        <img src={coverPreview} alt="Campaign cover preview" style={{width:'100%',height:220,objectFit:'cover',display:'block'}} />
+                        <div style={{position:'absolute',left:14,bottom:14,zIndex:3,padding:'8px 12px',borderRadius:999,background:'rgba(255,253,248,.92)',fontSize:12,fontWeight:800,color:'var(--forest)',boxShadow:'0 10px 24px rgba(0,0,0,.12)'}}>Cover selected - click to change</div>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={22} color="var(--canopy)" strokeWidth={1.8}/>
+                        <div style={{fontSize:13,fontWeight:700,color:'var(--forest)',marginTop:8}}>Add campaign cover photo</div>
+                        <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>Show donors who they are helping (PNG/JPG/WebP)</div>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div className="form-two-col" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                   <label style={{display:'grid',gap:6}}>
                     <span className="small semi muted">Category</span>
                     <select value={category} onChange={(e)=>setCategory(e.target.value)} className="form-input">
@@ -73,7 +140,7 @@ export default function StartCampaignPage() {
                   </label>
                   <label style={{display:'grid',gap:6}}>
                     <span className="small semi muted">Target amount</span>
-                    <input required type="number" min="1" placeholder="250000" className="form-input" />
+                    <input required name="goal_amount" type="number" min="1" placeholder="250000" className="form-input" />
                   </label>
                 </div>
               </div>
@@ -86,17 +153,17 @@ export default function StartCampaignPage() {
               <div style={{display:'grid',gap:14}}>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Beneficiary / recipient name</span>
-                  <input required placeholder="Full name or community name" className="form-input" />
+                  <input required name="beneficiary_name" placeholder="Full name or community name" className="form-input" />
                 </label>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Verified institution receiving funds</span>
-                  <input required placeholder="Hospital, school, pharmacy, NGO, or relief partner" className="form-input" />
+                  <input required name="institution" placeholder="Hospital, school, pharmacy, NGO, or relief partner" className="form-input" />
                 </label>
                 <label style={{display:'grid',gap:6}}>
                   <span className="small semi muted">Location</span>
                   <div style={{position:'relative'}}>
                     <MapPin size={15} style={{position:'absolute',left:12,top:13,color:'var(--text3)'}}/>
-                    <input required placeholder="City, province" className="form-input" style={{paddingLeft:36}} />
+                    <input required name="location" placeholder="City, province" className="form-input" style={{paddingLeft:36}} />
                   </div>
                 </label>
               </div>
@@ -108,7 +175,7 @@ export default function StartCampaignPage() {
               </h2>
               <div style={{display:'grid',gap:12}}>
                 {["Initial verification", "Milestone 1 release", "Final proof and closeout"].map((m,i)=>(
-                  <div key={m} style={{display:'grid',gridTemplateColumns:'1.2fr .8fr',gap:12}}>
+                  <div key={m} className="milestone-row" style={{display:'grid',gridTemplateColumns:'1.2fr .8fr',gap:12}}>
                     <input defaultValue={m} className="form-input" aria-label={`Milestone ${i + 1} name`} />
                     <input placeholder="Amount" type="number" min="0" className="form-input" aria-label={`Milestone ${i + 1} amount`} />
                   </div>
@@ -118,7 +185,7 @@ export default function StartCampaignPage() {
             </section>
           </div>
 
-          <aside style={{display:'flex',flexDirection:'column',gap:18,position:'sticky',top:88}}>
+          <aside className="start-campaign-side" style={{display:'flex',flexDirection:'column',gap:18,position:'sticky',top:88}}>
             <section className="card">
               <h2 style={{fontSize:18,fontWeight:800,color:'var(--forest)',marginBottom:14,display:'flex',alignItems:'center',gap:8}}>
                 <Upload size={18} color="var(--canopy)"/> Required Proofs
@@ -161,8 +228,8 @@ export default function StartCampaignPage() {
               ))}
             </section>
 
-            <div className="flex gap-10" style={{flexDirection:'column'}}>
-              <button type="submit" className="btn btn-emerald btn-lg" style={{justifyContent:'center'}}><Save size={16}/> Save for Verification</button>
+            <div className="flex" style={{flexDirection:'column',gap:8}}>
+              <button type="submit" disabled={saving} className="btn btn-emerald btn-lg" style={{justifyContent:'center', opacity: saving ? .72 : 1}}><Save size={16}/> {saving ? "Saving..." : "Save for Verification"}</button>
               <Link href="/donor#organized-drives" className="btn btn-outline" style={{justifyContent:'center'}}>Cancel</Link>
             </div>
           </aside>

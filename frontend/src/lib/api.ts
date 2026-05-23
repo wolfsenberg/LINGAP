@@ -34,6 +34,206 @@ type DonationCreateRequest = {
   purpose?: string;
   stellarTxHash?: string;
   stellar_tx_hash?: string;
+  fundingSource?: string;
+  spendBalance?: boolean;
+  walletAddress?: string;
+};
+
+type ApiDonation = {
+  id: string;
+  donor_id: string;
+  donor_name: string;
+  amount: number;
+  asset: string;
+  purpose?: string | null;
+  stellar_tx_hash: string;
+  blockchain_confirmed: boolean;
+  disbursed: boolean;
+  disbursed_amount: number;
+  funding_source?: string | null;
+  amount_php?: number | null;
+  created_at: string;
+};
+
+export type BalanceTransactionApi = {
+  id: string;
+  kind: "top_up" | "donation" | string;
+  amount_xlm: number;
+  amount_php: number;
+  payment_method: "pdax" | "gcash" | "maya" | "stellar_wallet" | "lingap_balance" | string;
+  payment_reference: string;
+  payment_status: "pending" | "confirmed" | "failed" | string;
+  campaign_id?: string | null;
+  donation_id?: string | null;
+  stellar_tx_hash?: string | null;
+  note?: string | null;
+  created_at: string;
+};
+
+export type BalanceApi = {
+  xlm_balance: number;
+  php_equivalent: number;
+  xlm_to_php_rate: number;
+  transactions: BalanceTransactionApi[];
+};
+
+export type CampaignDriveApi = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  raised_amount: number;
+  goal_amount: number;
+  progress: number;
+  donors: number;
+  institution: string;
+  location: string;
+  image_src?: string | null;
+  updated_at: string;
+  source: string;
+};
+
+export type PublicCampaignApi = CampaignDriveApi & {
+  slug: string;
+  organizer_id?: string | null;
+  raised_label?: string;
+  goal_label?: string;
+  organizer_name?: string | null;
+};
+
+export type CampaignChangeLogApi = {
+  id: string;
+  campaign_id: string;
+  campaign_title: string;
+  actor_id: string;
+  actor_name: string;
+  actor_email: string;
+  changed_fields: string[];
+  changes: Record<string, any>;
+  summary: string;
+  created_at: string;
+};
+
+export type CampaignEscrowApi = {
+  campaign: PublicCampaignApi;
+  summary: {
+    total_escrowed_xlm: number;
+    total_escrowed_php: number;
+    released_php: number;
+    locked_php: number;
+    pending_verification_php: number;
+    confirmed_donation_count: number;
+  };
+  transactions: Array<{
+    id: string;
+    donor_id: string;
+    donor_name: string;
+    amount: number;
+    asset: string;
+    amount_php: number;
+    stellar_tx_hash: string;
+    blockchain_confirmed: boolean;
+    disbursed: boolean;
+    disbursed_amount: number;
+    created_at: string;
+  }>;
+};
+
+export type ProofCenterApi = {
+  stats: {
+    verified_documents: number;
+    confirmed_donations: number;
+    anchored_documents: number;
+    verified_amount_php: number;
+  };
+  risk_feed: Array<{
+    campaign_id: string;
+    campaign_title: string;
+    level: "LOW RISK" | "AWAITING PROOF" | string;
+    status: string;
+    confidence: number;
+    created_at: string;
+  }>;
+  documents: Array<{
+    id: string;
+    kind: string;
+    title: string;
+    filename?: string | null;
+    campaign_id?: string;
+    campaign_title: string;
+    donor_name?: string;
+    claimed_amount: number;
+    amount_xlm?: number;
+    sha256?: string | null;
+    stellar_tx_hash?: string | null;
+    created_at: string;
+    status: string;
+    source: "confirmed_donation" | "proof_artifact" | string;
+  }>;
+};
+
+export type LeaderboardDonorApi = {
+  rank: number;
+  user_id: string;
+  name: string;
+  total_donated: number;
+  donation_count: number;
+  last_donation_at?: string | null;
+};
+
+export type PublicProfileCampaignApi = PublicCampaignApi;
+
+export type PublicProfileApi = {
+  user: {
+    id: string;
+    display_name: string;
+    role: string;
+    kyc_verified: boolean;
+    joined_at: string;
+  };
+  impact: {
+    total_donated_xlm: number;
+    total_donated_php: number;
+    donation_count: number;
+    campaigns_organized: number;
+    active_campaigns: number;
+    completed_campaigns: number;
+    public_certificates: number;
+    community_rank?: number | null;
+    last_activity_at?: string | null;
+  };
+  campaigns: PublicProfileCampaignApi[];
+  certificates: Array<{
+    id: string;
+    beneficiary_name: string;
+    amount: number;
+    lives_touched: number;
+    stellar_tx_hash?: string | null;
+    verified: boolean;
+    created_at: string;
+  }>;
+  activity: Array<{
+    id: string;
+    campaign_id: string;
+    amount: number;
+    asset: string;
+    stellar_tx_hash: string;
+    blockchain_confirmed?: boolean;
+    created_at: string;
+  }>;
+  badges: Array<{
+    title: string;
+    description: string;
+    earned: boolean;
+  }>;
+};
+
+export type PublicProfileSearchResultApi = {
+  user: PublicProfileApi["user"];
+  impact: PublicProfileApi["impact"];
+  top_campaigns: PublicProfileCampaignApi[];
+  badges: PublicProfileApi["badges"];
 };
 
 const normalizeUser = (user: ApiUser): User => ({
@@ -46,8 +246,89 @@ const normalizeUser = (user: ApiUser): User => ({
   createdAt: user.created_at,
 });
 
+const normalizeDonation = (donation: ApiDonation): Donation => ({
+  id: donation.id,
+  donorId: donation.donor_id,
+  donorName: donation.donor_name,
+  amount: donation.amount,
+  asset: donation.asset,
+  purpose: donation.purpose ?? undefined,
+  stellarTxHash: donation.stellar_tx_hash,
+  blockchainConfirmed: donation.blockchain_confirmed,
+  disbursed: donation.disbursed,
+  disbursedAmount: donation.disbursed_amount,
+  fundingSource: donation.funding_source ?? undefined,
+  amountPhp: donation.amount_php ?? undefined,
+  createdAt: donation.created_at,
+});
+
+const normalizePaginatedDonations = (res: PaginatedResponse<ApiDonation>): PaginatedResponse<Donation> => ({
+  ...res,
+  items: res.items.map(normalizeDonation),
+});
+
+function getApiBaseUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_API_URL;
+  const productionUrl = "https://lingap.onrender.com";
+
+  if (typeof window === "undefined") {
+    return configuredUrl || productionUrl;
+  }
+
+  const isLocalFrontend =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1";
+  const isLocalApi =
+    !configuredUrl ||
+    configuredUrl.includes("localhost") ||
+    configuredUrl.includes("127.0.0.1");
+
+  if (!isLocalFrontend && isLocalApi) return productionUrl;
+  return configuredUrl || (isLocalFrontend ? "http://localhost:8000" : productionUrl);
+}
+
+function normalizeAssetUrl(url?: string | null) {
+  if (!url) return url;
+  if (url.startsWith("data:") || url.startsWith("blob:")) return url;
+  if (url.startsWith("http")) {
+    try {
+      const parsed = new URL(url);
+      const isLocalApi = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+      if (isLocalApi && parsed.pathname.startsWith("/api/")) {
+        return `${getApiBaseUrl()}${parsed.pathname}${parsed.search}`;
+      }
+    } catch {
+      return url;
+    }
+    return url;
+  }
+  if (url.startsWith("/api/")) return `${getApiBaseUrl()}${url}`;
+  return url;
+}
+
+function normalizeCampaignImage<T extends { image_src?: string | null }>(campaign: T): T {
+  return {
+    ...campaign,
+    image_src: normalizeAssetUrl(campaign.image_src),
+  };
+}
+
+function normalizePublicProfile(profile: PublicProfileApi): PublicProfileApi {
+  return {
+    ...profile,
+    campaigns: profile.campaigns.map(normalizeCampaignImage),
+  };
+}
+
+function normalizeProfileSearchResult(result: PublicProfileSearchResultApi): PublicProfileSearchResultApi {
+  return {
+    ...result,
+    top_campaigns: result.top_campaigns.map(normalizeCampaignImage),
+  };
+}
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: getApiBaseUrl(),
   headers: { "Content-Type": "application/json" },
 });
 
@@ -129,18 +410,59 @@ export const authApi = {
 };
 
 export const donationsApi = {
-  list: (page = 1, size = 20) =>
-    api.get<PaginatedResponse<Donation>>("/api/v1/donations", { params: { page, size } }),
-  get: (id: string) => api.get<ApiResponse<Donation>>(`/api/v1/donations/${id}`),
+  list: async (page = 1, size = 20) => {
+    const res = await api.get<PaginatedResponse<ApiDonation>>("/api/v1/donations", { params: { page, size } });
+    return { ...res, data: normalizePaginatedDonations(res.data) };
+  },
+  mine: async (page = 1, size = 20) => {
+    const res = await api.get<PaginatedResponse<ApiDonation>>("/api/v1/donations/me", { params: { page, size } });
+    return { ...res, data: normalizePaginatedDonations(res.data) };
+  },
+  get: async (id: string) => {
+    const res = await api.get<ApiResponse<ApiDonation>>(`/api/v1/donations/${id}`);
+    return { ...res, data: { ...res.data, data: normalizeDonation(res.data.data) } };
+  },
   create: (data: DonationCreateRequest) =>
-    api.post<ApiResponse<Donation>>("/api/v1/donations", {
+    api.post<ApiResponse<ApiDonation>>("/api/v1/donations", {
       amount: data.amount,
       asset: data.asset,
       purpose: data.purpose,
       stellar_tx_hash: data.stellar_tx_hash ?? data.stellarTxHash,
-    }),
+      funding_source: data.fundingSource,
+      spend_balance: data.spendBalance ?? false,
+      wallet_address: data.walletAddress,
+    }).then((res) => ({ ...res, data: { ...res.data, data: normalizeDonation(res.data.data) } })),
   getProvenance: (id: string) =>
     api.get<ApiResponse<ProvenanceRecord[]>>(`/api/v1/donations/${id}/provenance`),
+};
+
+export const balanceApi = {
+  rate: () =>
+    api.get<ApiResponse<{ xlm_to_php_rate: number; source: string }>>("/api/v1/rates/xlm-php"),
+  mine: () => api.get<ApiResponse<BalanceApi>>("/api/v1/me/balance"),
+  transactions: (limit = 25) =>
+    api.get<ApiResponse<BalanceTransactionApi[]>>("/api/v1/me/transactions", { params: { limit } }),
+  simulateTopUp: (data: {
+    paymentMethod: "pdax" | "gcash" | "maya" | "stellar_wallet";
+    amountXlm?: number;
+    amountPhp?: number;
+    senderReference?: string;
+    senderName?: string;
+    senderWallet?: string;
+    stellarTxHash?: string;
+  }) =>
+    api.post<ApiResponse<{ top_up: BalanceTransactionApi; balance: Omit<BalanceApi, "transactions"> }>>(
+      "/api/v1/topups/simulate",
+      {
+        payment_method: data.paymentMethod,
+        amount_xlm: data.amountXlm,
+        amount_php: data.amountPhp,
+        sender_reference: data.senderReference,
+        sender_name: data.senderName,
+        sender_wallet: data.senderWallet,
+        stellar_tx_hash: data.stellarTxHash,
+      }
+    ),
 };
 
 export const beneficiariesApi = {
@@ -171,6 +493,167 @@ export const aidRequestsApi = {
 
 export const dashboardApi = {
   stats: () => api.get<ApiResponse<DashboardStats>>("/api/v1/dashboard/stats"),
+};
+
+export const campaignsApi = {
+  publicList: async () => {
+    const res = await api.get<ApiResponse<PublicCampaignApi[]>>("/api/v1/campaigns/public");
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data.map(normalizeCampaignImage),
+      },
+    };
+  },
+  proofCenter: () => api.get<ApiResponse<ProofCenterApi>>("/api/v1/campaigns/proof-center"),
+  publicOne: async (campaignId: string) => {
+    const res = await api.get<ApiResponse<PublicCampaignApi | null>>(`/api/v1/campaigns/public/${campaignId}`);
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data ? normalizeCampaignImage(res.data.data) : null,
+      },
+    };
+  },
+  escrow: async (campaignId: string) => {
+    const res = await api.get<ApiResponse<CampaignEscrowApi | null>>(`/api/v1/campaigns/public/${campaignId}/escrow`);
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data
+          ? {
+              ...res.data.data,
+              campaign: normalizeCampaignImage(res.data.data.campaign),
+            }
+          : null,
+      },
+    };
+  },
+  mine: async () => {
+    const res = await api.get<ApiResponse<CampaignDriveApi[]>>("/api/v1/campaigns/mine");
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data.map(normalizeCampaignImage),
+      },
+    };
+  },
+  changeLog: (limit = 25) =>
+    api.get<ApiResponse<CampaignChangeLogApi[]>>("/api/v1/campaigns/admin/change-log", {
+      params: { limit },
+    }),
+  uploadCover: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await api.post<ApiResponse<{ url: string }>>("/api/v1/campaigns/uploads/cover", form, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    const url = res.data.data.url ?? "";
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: {
+          url,
+        },
+      },
+    };
+  },
+  create: (data: {
+    title: string;
+    description: string;
+    category: string;
+    institution: string;
+    location: string;
+    goal_amount: number;
+    image_src?: string | null;
+  }) =>
+    api.post<ApiResponse<CampaignDriveApi>>("/api/v1/campaigns", data).then((res) => ({
+      ...res,
+      data: {
+        ...res.data,
+        data: normalizeCampaignImage(res.data.data),
+      },
+    })),
+  update: (
+    campaignId: string,
+    data: Partial<{
+      title: string;
+      description: string;
+      category: string;
+      institution: string;
+      location: string;
+      goal_amount: number;
+      image_src: string | null;
+    }>
+  ) =>
+    api.patch<ApiResponse<CampaignDriveApi>>(`/api/v1/campaigns/${campaignId}`, data).then((res) => ({
+      ...res,
+      data: {
+        ...res.data,
+        data: normalizeCampaignImage(res.data.data),
+      },
+    })),
+  requestDelete: (campaignId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/${campaignId}/delete-request`),
+  deleteRequests: (limit = 25) =>
+    api.get<ApiResponse<CampaignChangeLogApi[]>>("/api/v1/campaigns/admin/delete-requests", {
+      params: { limit },
+    }),
+  approveDeleteRequest: (requestId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/delete-requests/${requestId}/approve`),
+  rejectDeleteRequest: (requestId: string) =>
+    api.post<ApiResponse<CampaignChangeLogApi>>(`/api/v1/campaigns/admin/delete-requests/${requestId}/reject`),
+};
+
+export const donorsApi = {
+  leaderboard: (limit = 10) =>
+    api.get<ApiResponse<LeaderboardDonorApi[]>>("/api/v1/donors/leaderboard", {
+      params: { limit },
+    }),
+  myImpact: () =>
+    api.get<ApiResponse<{ name: string; total_donated: number; campaigns_helped: number; lives_impacted: number }>>(
+      "/api/v1/donors/me/impact"
+    ),
+};
+
+export const profilesApi = {
+  search: async (q = "", limit = 8) => {
+    const res = await api.get<ApiResponse<PublicProfileSearchResultApi[]>>("/api/v1/profiles/search", {
+      params: { q, limit },
+    });
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data.map(normalizeProfileSearchResult),
+      },
+    };
+  },
+  me: async () => {
+    const res = await api.get<ApiResponse<PublicProfileApi>>("/api/v1/profiles/me");
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: normalizePublicProfile(res.data.data),
+      },
+    };
+  },
+  get: async (userId: string) => {
+    const res = await api.get<ApiResponse<PublicProfileApi | null>>(`/api/v1/profiles/${userId}`);
+    return {
+      ...res,
+      data: {
+        ...res.data,
+        data: res.data.data ? normalizePublicProfile(res.data.data) : null,
+      },
+    };
+  },
 };
 
 export const stellarApi = {

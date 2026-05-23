@@ -63,6 +63,25 @@ export function getStellarExpertTxUrl(txHash: string) {
   return `https://stellar.expert/explorer/${explorerNetwork}/tx/${txHash}`;
 }
 
+export function isStellarTxHash(value?: string | null) {
+  return /^[a-f0-9]{64}$/i.test(value || "");
+}
+
+export function formatLedgerReference(value?: string | null) {
+  if (!value) return "LNGP-PENDING";
+  if (value.startsWith("LINGAP-DEMO-DON-")) {
+    return value.replace("LINGAP-DEMO-DON-", "LNGP-DON-").toUpperCase();
+  }
+  return value.toUpperCase();
+}
+
+export function getStellarExpertContractUrl(contractId?: string | null) {
+  const id = contractId || process.env.NEXT_PUBLIC_CONTRACT_DONATION_VAULT;
+  if (!id) return null;
+  const explorerNetwork = NETWORK === "mainnet" ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${explorerNetwork}/contract/${id}`;
+}
+
 export async function getTransactionDetails(txHash: string) {
   return horizonServer.transactions().transaction(txHash).call();
 }

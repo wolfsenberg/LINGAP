@@ -1,20 +1,20 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Vote, ShieldAlert } from "lucide-react";
 import { escrowApi } from "@/lib/api";
 import { useFreighter } from "@/hooks/useFreighter";
-import { Vote, ShieldAlert } from "lucide-react";
+import { useAuthStore } from "@/store/authStore";
 
 const NETWORK_PASSPHRASE =
   process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet"
     ? "Public Global Stellar Network ; September 2015"
     : "Test SDF Network ; September 2015";
 
-// 60% threshold mirrors the contract constant.
 const PAUSE_THRESHOLD_PCT = 60;
 
 interface VotingPanelProps {
-  campaignId: number;
+  campaignId: number | string;
   campaignName?: string;
 }
 
@@ -25,8 +25,17 @@ interface VoteState {
   error: string | null;
 }
 
+function getNumericCampaignId(campaignId: number | string) {
+  if (typeof campaignId === "number" && Number.isInteger(campaignId)) return campaignId;
+  if (typeof campaignId === "string" && /^\d+$/.test(campaignId)) return Number(campaignId);
+  return null;
+}
+
 export default function VotingPanel({ campaignId, campaignName }: VotingPanelProps) {
   const { connected, publicKey, connect, sign } = useFreighter();
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === "admin";
+  const numericCampaignId = getNumericCampaignId(campaignId);
   const [vote, setVote] = useState<VoteState>({
     hasVoted: null,
     voteWeightXdr: null,
@@ -40,9 +49,19 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
   const [clawbackHash, setClawbackHash] = useState<string | null>(null);
 
   const fetchStatus = useCallback(async () => {
-    setVote((s) => ({ ...s, loading: true, error: null }));
+    if (numericCampaignId === null) {
+      setVote({
+        hasVoted: null,
+        voteWeightXdr: null,
+        loading: false,
+        error: "On-chain voting is not active for this campaign yet.",
+      });
+      return;
+    }
+
+    setVote((state) => ({ ...state, loading: true, error: null }));
     try {
-      const res = await escrowApi.getVoteStatus(campaignId, publicKey ?? undefined);
+      const res = await escrowApi.getVoteStatus(numericCampaignId, publicKey ?? undefined);
       setVote({
         hasVoted: res.data.data.donor_has_voted,
         voteWeightXdr: res.data.data.campaign_xdr,
@@ -50,46 +69,47 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
         error: null,
       });
     } catch {
-      setVote((s) => ({ ...s, loading: false, error: "Failed to load vote status" }));
+      setVote((state) => ({ ...state, loading: false, error: "Failed to load vote status" }));
     }
-  }, [campaignId, publicKey]);
+  }, [numericCampaignId, publicKey]);
 
   useEffect(() => {
     fetchStatus();
   }, [fetchStatus]);
 
   async function handleVote(action: "vote" | "revoke") {
-    if (!publicKey) return;
+    if (!publicKey || numericCampaignId === null) return;
     setTxLoading(true);
     setTxError(null);
     setTxHash(null);
     try {
       const xdrRes =
         action === "vote"
-          ? await escrowApi.getVoteXdr(campaignId, publicKey)
-          : await escrowApi.getRevokeVoteXdr(campaignId, publicKey);
+          ? await escrowApi.getVoteXdr(numericCampaignId, publicKey)
+          : await escrowApi.getRevokeVoteXdr(numericCampaignId, publicKey);
 
       const xdr = xdrRes.data.data.xdr;
       const signedXdr = await sign(xdr, NETWORK_PASSPHRASE);
       const submitRes = await escrowApi.submitSignedXdr(signedXdr);
       setTxHash(submitRes.data.data.tx_hash);
       await fetchStatus();
-    } catch (e: unknown) {
-      setTxError(e instanceof Error ? e.message : "Transaction failed");
+    } catch (error: unknown) {
+      setTxError(error instanceof Error ? error.message : "Transaction failed");
     } finally {
       setTxLoading(false);
     }
   }
 
   async function handleClawback() {
+    if (numericCampaignId === null || !isAdmin) return;
     setClawbackLoading(true);
     setTxError(null);
     try {
-      const res = await escrowApi.executeClawback(campaignId);
+      const res = await escrowApi.executeClawback(numericCampaignId);
       setClawbackHash(res.data.data.tx_hash);
       await fetchStatus();
-    } catch (e: unknown) {
-      setTxError(e instanceof Error ? e.message : "Clawback failed");
+    } catch (error: unknown) {
+      setTxError(error instanceof Error ? error.message : "Clawback failed");
     } finally {
       setClawbackLoading(false);
     }
@@ -99,6 +119,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
 
   return (
     <div
+      className="voting-panel"
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border)",
@@ -106,20 +127,16 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
         padding: 24,
       }}
     >
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+      <div className="voting-panel-head" style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <div style={{ width: 36, height: 36, background: "rgba(74,155,106,.1)", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <Vote size={18} color="var(--canopy)" strokeWidth={1.8} />
         </div>
         <div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--forest)" }}>
-            Donor Voting
-          </div>
-          {campaignName && (
-            <div style={{ fontSize: 12, color: "var(--text3)" }}>{campaignName}</div>
-          )}
+          <div style={{ fontWeight: 700, fontSize: 16, color: "var(--forest)" }}>Donor Voting</div>
+          {campaignName && <div style={{ fontSize: 12, color: "var(--text3)" }}>{campaignName}</div>}
         </div>
         <span
+          className="voting-panel-badge"
           style={{
             marginLeft: "auto",
             background: "rgba(220,38,38,.1)",
@@ -141,16 +158,32 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
       <p style={{ fontSize: 13, color: "var(--text2)", marginBottom: 20, lineHeight: 1.6 }}>
         If you believe this campaign is fraudulent or stalled, vote to pause it. When{" "}
         <strong>{PAUSE_THRESHOLD_PCT}%</strong> of deposited funds vote to pause, the campaign is
-        automatically frozen and unspent funds can be refunded proportionally to all donors.
+        frozen and eligible unspent funds can be refunded proportionally to donors.
       </p>
 
-      {/* Vote status */}
-      {vote.loading ? (
-        <div style={{ color: "var(--text3)", fontSize: 13, marginBottom: 16 }}>
-          Loading vote status…
+      {numericCampaignId === null && (
+        <div
+          style={{
+            background: "rgba(200,134,10,.08)",
+            border: "1px solid rgba(200,134,10,.24)",
+            borderRadius: 10,
+            padding: "12px 14px",
+            marginBottom: 18,
+            fontSize: 13,
+            color: "var(--text2)",
+            lineHeight: 1.55,
+          }}
+        >
+          This campaign is tracked in LINGAP records, but it does not have a numeric Soroban escrow campaign id yet. Donor voting and clawback controls activate once its escrow contract campaign is registered.
         </div>
+      )}
+
+      {vote.loading ? (
+        <div style={{ color: "var(--text3)", fontSize: 13, marginBottom: 16 }}>Loading vote status...</div>
       ) : vote.error ? (
-        <div style={{ color: "#DC2626", fontSize: 13, marginBottom: 16 }}>{vote.error}</div>
+        <div style={{ color: numericCampaignId === null ? "var(--amber)" : "#DC2626", fontSize: 13, marginBottom: 16 }}>
+          {vote.error}
+        </div>
       ) : (
         <div
           style={{
@@ -161,9 +194,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
             border: "1px solid var(--border)",
           }}
         >
-          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>
-            YOUR VOTE STATUS
-          </div>
+          <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 6 }}>YOUR VOTE STATUS</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span
               style={{
@@ -175,17 +206,12 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
               }}
             />
             <span style={{ fontSize: 14, fontWeight: 600, color: "var(--forest)" }}>
-              {vote.hasVoted === null
-                ? "Connect wallet to check"
-                : hasVoted
-                ? "You have voted to pause"
-                : "You have not voted"}
+              {vote.hasVoted === null ? "Connect wallet to check" : hasVoted ? "You have voted to pause" : "You have not voted"}
             </span>
           </div>
         </div>
       )}
 
-      {/* Threshold info */}
       <div
         style={{
           background: "rgba(220,38,38,.05)",
@@ -198,27 +224,29 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
         }}
       >
         <strong style={{ color: "#DC2626" }}>{PAUSE_THRESHOLD_PCT}% quorum</strong> of deposited
-        XLM weight required to trigger an auto-pause and unlock clawback.
+        XLM weight is required before admin clawback can execute.
       </div>
 
-      {/* Actions */}
-      {!connected ? (
-        <button
-          onClick={connect}
-          style={{
-            width: "100%",
-            padding: "10px 0",
-            background: "var(--forest)",
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            fontWeight: 600,
-            fontSize: 14,
-            cursor: "pointer",
-          }}
-        >
-          Connect Freighter Wallet
-        </button>
+      {numericCampaignId !== null && (!connected ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <button
+            onClick={connect}
+            style={{
+              width: "100%",
+              padding: "10px 0",
+              background: "var(--forest)",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontWeight: 600,
+              fontSize: 14,
+              cursor: "pointer",
+            }}
+          >
+            Connect Freighter Wallet
+          </button>
+          {isAdmin && <AdminClawbackButton loading={clawbackLoading} onClick={handleClawback} />}
+        </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {!hasVoted ? (
@@ -237,7 +265,7 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
                 width: "100%",
               }}
             >
-              {txLoading ? "Waiting for signature…" : "Vote to Pause Campaign"}
+              {txLoading ? "Waiting for signature..." : "Vote to Pause Campaign"}
             </button>
           ) : (
             <button
@@ -255,79 +283,51 @@ export default function VotingPanel({ campaignId, campaignName }: VotingPanelPro
                 width: "100%",
               }}
             >
-              {txLoading ? "Waiting for signature…" : "Revoke My Vote"}
+              {txLoading ? "Waiting for signature..." : "Revoke My Vote"}
             </button>
           )}
 
-          {/* Clawback — only shown after quorum */}
-          <button
-            onClick={handleClawback}
-            disabled={clawbackLoading}
-            style={{
-              padding: "10px 0",
-              background: clawbackLoading ? "var(--text3)" : "rgba(220,38,38,.1)",
-              color: clawbackLoading ? "#fff" : "#DC2626",
-              border: "1px solid rgba(220,38,38,.25)",
-              borderRadius: 8,
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: clawbackLoading ? "not-allowed" : "pointer",
-              width: "100%",
-            }}
-          >
-            {clawbackLoading ? "Processing clawback…" : "Execute Clawback (Admin)"}
-          </button>
+          {isAdmin && <AdminClawbackButton loading={clawbackLoading} onClick={handleClawback} />}
         </div>
-      )}
+      ))}
 
-      {/* Tx feedback */}
       {txHash && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: "10px 14px",
-            background: "rgba(74,155,106,.08)",
-            border: "1px solid rgba(74,155,106,.25)",
-            borderRadius: 8,
-            fontSize: 12,
-            color: "var(--canopy)",
-          }}
-        >
-          Transaction confirmed:{" "}
-          <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{txHash}</span>
+        <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(74,155,106,.08)", border: "1px solid rgba(74,155,106,.25)", borderRadius: 8, fontSize: 12, color: "var(--canopy)" }}>
+          Transaction confirmed: <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{txHash}</span>
         </div>
       )}
       {clawbackHash && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: "10px 14px",
-            background: "rgba(74,155,106,.08)",
-            border: "1px solid rgba(74,155,106,.25)",
-            borderRadius: 8,
-            fontSize: 12,
-            color: "var(--canopy)",
-          }}
-        >
-          Clawback executed:{" "}
-          <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{clawbackHash}</span>
+        <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(74,155,106,.08)", border: "1px solid rgba(74,155,106,.25)", borderRadius: 8, fontSize: 12, color: "var(--canopy)" }}>
+          Clawback executed: <span style={{ fontFamily: "monospace", wordBreak: "break-all" }}>{clawbackHash}</span>
         </div>
       )}
       {txError && (
-        <div
-          style={{
-            marginTop: 14,
-            padding: "10px 14px",
-            background: "rgba(220,38,38,.08)",
-            border: "1px solid rgba(220,38,38,.25)",
-            borderRadius: 8,
-            fontSize: 12,
-            color: "#DC2626",
-          }}
-        >
+        <div style={{ marginTop: 14, padding: "10px 14px", background: "rgba(220,38,38,.08)", border: "1px solid rgba(220,38,38,.25)", borderRadius: 8, fontSize: 12, color: "#DC2626" }}>
           {txError}
         </div>
       )}
     </div>
+  );
+}
+
+function AdminClawbackButton({ loading, onClick }: { loading: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={loading}
+      style={{
+        padding: "10px 0",
+        background: loading ? "var(--text3)" : "rgba(220,38,38,.1)",
+        color: loading ? "#fff" : "#DC2626",
+        border: "1px solid rgba(220,38,38,.25)",
+        borderRadius: 8,
+        fontWeight: 600,
+        fontSize: 13,
+        cursor: loading ? "not-allowed" : "pointer",
+        width: "100%",
+      }}
+    >
+      {loading ? "Processing clawback..." : "Execute Clawback"}
+    </button>
   );
 }

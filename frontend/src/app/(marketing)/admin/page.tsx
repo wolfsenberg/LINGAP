@@ -1,13 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import toast from "react-hot-toast";
 import {
-  AlertCircle, ArrowLeft, CheckCircle2, AlertTriangle, Eye, EyeOff, Lock, Network, ShieldCheck, Search, Link2, XCircle
+  AlertCircle, ArrowLeft, CheckCircle2, AlertTriangle, Eye, EyeOff, Lock, Network, ShieldCheck, Search, Link2, XCircle, History
 } from "lucide-react";
 import { CAMPAIGNS } from "@/lib/campaigns";
-import { authApi } from "@/lib/api";
+import { authApi, campaignsApi, type CampaignChangeLogApi } from "@/lib/api";
 import { useAuthStore } from "@/store/authStore";
 
 export default function AdminPage() {
@@ -16,7 +16,22 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [campaignChanges, setCampaignChanges] = useState<CampaignChangeLogApi[]>([]);
+  const [deleteRequests, setDeleteRequests] = useState<CampaignChangeLogApi[]>([]);
   const isAdmin = isAuthenticated && user?.role === "admin";
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let active = true;
+    Promise.allSettled([campaignsApi.changeLog(8), campaignsApi.deleteRequests(8)]).then(([changes, deletes]) => {
+      if (!active) return;
+      setCampaignChanges(changes.status === "fulfilled" ? changes.value.data.data : []);
+      setDeleteRequests(deletes.status === "fulfilled" ? deletes.value.data.data : []);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isAdmin]);
 
   async function handleAdminLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,6 +45,19 @@ export default function AdminPage() {
       toast.error("Invalid admin credentials.");
     } finally {
       setIsSubmitting(false);
+    }
+  }
+
+  async function reviewDeleteRequest(requestId: string, action: "approve" | "reject") {
+    try {
+      const res =
+        action === "approve"
+          ? await campaignsApi.approveDeleteRequest(requestId)
+          : await campaignsApi.rejectDeleteRequest(requestId);
+      setDeleteRequests((items) => items.map((item) => (item.id === requestId ? res.data.data : item)));
+      toast.success(action === "approve" ? "Campaign deletion approved." : "Campaign deletion rejected.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to review delete request.");
     }
   }
 
@@ -156,6 +184,95 @@ export default function AdminPage() {
             <div style={{fontFamily:'Sora,sans-serif',fontSize:30,fontWeight:800,color:'#DC2626'}}>₱3.1M</div>
             <div style={{fontSize:12,color:'var(--text3)'}}>14 suspicious campaigns blocked</div>
           </div>
+        </div>
+
+        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24,marginBottom:24}}>
+          <div className="flex flex-center flex-between mb-20" style={{gap:16,flexWrap:'wrap'}}>
+            <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',display:'flex',alignItems:'center',gap:8}}>
+              <History size={18} color="var(--canopy)" strokeWidth={1.8}/> Campaign Edit Review
+            </h3>
+            <span className="badge badge-emerald">{campaignChanges.length} recent changes</span>
+          </div>
+
+          {campaignChanges.length > 0 ? (
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                <thead>
+                  <tr style={{borderBottom:'2px solid var(--border)'}}>
+                    {['TIME','ORGANIZER','CAMPAIGN','FIELDS CHANGED','SUMMARY'].map((h)=>(
+                      <th key={h} style={{textAlign:'left',padding:'10px 12px',color:'var(--text3)',fontWeight:600,fontSize:12}}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaignChanges.map((change)=>(
+                    <tr key={change.id} style={{borderBottom:'1px solid var(--border)'}}>
+                      <td style={{padding:'10px 12px',color:'var(--text2)',fontFamily:'Space Mono,monospace',fontSize:12}}>
+                        {new Date(change.created_at).toLocaleString('en-PH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}
+                      </td>
+                      <td style={{padding:'10px 12px'}}>
+                        <div style={{fontWeight:700,color:'var(--forest)'}}>{change.actor_name}</div>
+                        <div style={{fontSize:11,color:'var(--text3)'}}>{change.actor_email}</div>
+                      </td>
+                      <td style={{padding:'10px 12px',fontWeight:700,color:'var(--forest)'}}>{change.campaign_title}</td>
+                      <td style={{padding:'10px 12px'}}>
+                        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                          {change.changed_fields.map((field)=>(
+                            <span key={field} className="badge badge-navy" style={{fontSize:10}}>{field.replace('_',' ')}</span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{padding:'10px 12px',color:'var(--text2)'}}>{change.summary}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div style={{padding:18,border:'1px dashed var(--border)',borderRadius:10,color:'var(--text2)',fontSize:13}}>
+              No organizer campaign edits have been recorded yet.
+            </div>
+          )}
+        </div>
+
+        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r)',padding:24,marginBottom:24}}>
+          <div className="flex flex-center flex-between mb-20" style={{gap:16,flexWrap:'wrap'}}>
+            <h3 style={{fontSize:18,fontWeight:700,color:'var(--forest)',display:'flex',alignItems:'center',gap:8}}>
+              <XCircle size={18} color="#DC2626" strokeWidth={1.8}/> Campaign Delete Requests
+            </h3>
+            <span className="badge badge-gold">{deleteRequests.filter((item)=>item.changes?.delete_request?.status === 'pending').length} pending</span>
+          </div>
+
+          {deleteRequests.length > 0 ? (
+            <div style={{display:'grid',gap:10}}>
+              {deleteRequests.map((request)=>{
+                const status = request.changes?.delete_request?.status || "pending";
+                const pending = status === "pending";
+                return (
+                  <div key={request.id} style={{border:'1px solid var(--border)',borderRadius:12,padding:14,display:'grid',gridTemplateColumns:'1fr auto',gap:14,alignItems:'center'}}>
+                    <div>
+                      <div style={{fontWeight:800,color:'var(--forest)',marginBottom:4}}>{request.campaign_title}</div>
+                      <div style={{fontSize:12,color:'var(--text2)'}}>{request.actor_name} requested deletion review · {new Date(request.created_at).toLocaleString('en-PH', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</div>
+                      <div style={{fontSize:12,color:'var(--text3)',marginTop:4}}>{request.actor_email}</div>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+                      <span className={`badge ${pending ? 'badge-gold' : status === 'approved' ? 'badge-emerald' : 'badge-navy'}`}>{status}</span>
+                      {pending && (
+                        <>
+                          <button type="button" className="btn btn-sm btn-emerald" onClick={()=>reviewDeleteRequest(request.id, "approve")}>Approve</button>
+                          <button type="button" className="btn btn-sm btn-outline" onClick={()=>reviewDeleteRequest(request.id, "reject")}>Reject</button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{padding:18,border:'1px dashed var(--border)',borderRadius:10,color:'var(--text2)',fontSize:13}}>
+              No campaign deletion requests are waiting for admin review.
+            </div>
+          )}
         </div>
 
         <div className="grid-2 mb-24" style={{alignItems:'start'}}>

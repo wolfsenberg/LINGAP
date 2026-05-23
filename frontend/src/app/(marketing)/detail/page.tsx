@@ -1,18 +1,15 @@
 "use client";
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useFreighter } from "@/hooks/useFreighter";
-import { donationsApi, paymongoApi } from "@/lib/api";
-import {
-  STELLAR_CONFIG,
-  buildPaymentTransaction,
-  getStellarExpertTxUrl,
-  submitSignedTransactionXdr,
-} from "@/lib/stellar";
-import { CAMPAIGNS, getCampaign } from "@/lib/campaigns";
+import { balanceApi, campaignsApi, donationsApi, type BalanceApi } from "@/lib/api";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
+import { applyCampaignSummary, CAMPAIGNS, getCampaign, type PublicCampaignSummary } from "@/lib/campaigns";
+import { useAuthStore } from "@/store/authStore";
 import toast from "react-hot-toast";
 import VotingPanel from "@/components/stellar/VotingPanel";
+import SafeImageFrame from "@/components/campaign/SafeImageFrame";
 import {
   AlertCircle, CheckCircle2, Lock, Star, Handshake, MapPin, Calendar,
   Hospital, Anchor, School, ShieldCheck, Clock, Users,
@@ -21,16 +18,13 @@ import {
 
 const AMOUNTS = [100, 250, 500, 1000, 5000];
 const PHP_AMOUNTS = [50, 100, 250, 500, 1000];
-const DEMO_XLM_TO_PHP = 10;
-const LINGAP_RECEIVER_PUBLIC_KEY = process.env.NEXT_PUBLIC_LINGAP_RECEIVER_PUBLIC_KEY || "";
-
-type FreighterSignResult =
-  | string
-  | {
-      signedTxXdr?: string;
-      signedTxXDR?: string;
-      error?: string;
-    };
+const DEMO_XLM_TO_PHP = 8.93;
+const DEFAULT_BALANCE: BalanceApi = {
+  xlm_balance: 0,
+  php_equivalent: 0,
+  xlm_to_php_rate: DEMO_XLM_TO_PHP,
+  transactions: [],
+};
 
 function getDonationErrorMessage(error: unknown) {
   const err = error as { message?: string; response?: { data?: { detail?: string } } };
@@ -38,13 +32,7 @@ function getDonationErrorMessage(error: unknown) {
 }
 
 function formatXlmAmount(amount: number) {
-  return amount.toFixed(7).replace(/\.?0+$/, "");
-}
-
-function getSignedXdr(signResult: FreighterSignResult) {
-  if (typeof signResult === "string") return signResult;
-  if (signResult.error) throw new Error(signResult.error);
-  return signResult.signedTxXdr ?? signResult.signedTxXDR;
+  return amount.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
 const CATEGORY_ICON: Record<string, React.ElementType> = {
@@ -58,74 +46,112 @@ function DetailContent() {
   const campaignId = parseInt(params.get("id") ?? "0", 10);
   const campaign = getCampaign(campaignId) ?? CAMPAIGNS[0];
   const CampaignIcon = CATEGORY_ICON[campaign.category] ?? Hospital;
+  const user = useAuthStore((state) => state.user);
 
   const { connected, publicKey, connect } = useFreighter();
-  const [tab, setTab] = useState<"stellar" | "php">("stellar");
   const [selectedAmount, setSelectedAmount] = useState(500);
   const [customAmount, setCustomAmount] = useState("");
   const [useCustom, setUseCustom] = useState(false);
-  const [selectedPhp, setSelectedPhp] = useState(250);
-  const [customPhp, setCustomPhp] = useState("");
-  const [useCustomPhp, setUseCustomPhp] = useState(false);
+  const [amountMode, setAmountMode] = useState<"xlm" | "php">("xlm");
   const [donating, setDonating] = useState(false);
-  const [payingPhp, setPayingPhp] = useState(false);
   const [confirmedDonationXlm, setConfirmedDonationXlm] = useState(0);
   const [lastTxHash, setLastTxHash] = useState("");
+  const [liveSummary, setLiveSummary] = useState<PublicCampaignSummary | null>(null);
+  const [balance, setBalance] = useState<BalanceApi>(DEFAULT_BALANCE);
 
-  const effectiveAmount = useCustom ? parseFloat(customAmount) || 0 : selectedAmount;
-  const effectivePhp = useCustomPhp ? parseFloat(customPhp) || 0 : selectedPhp;
-  const displayRaised = campaign.raised + confirmedDonationXlm * DEMO_XLM_TO_PHP;
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCampaign() {
+      try {
+        const res = await campaignsApi.publicOne(campaign.slug);
+        if (mounted) setLiveSummary(res.data.data);
+      } catch {
+        if (mounted) setLiveSummary(null);
+      }
+    }
+
+    loadCampaign();
+    const timer = window.setInterval(loadCampaign, 10000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [campaign.slug]);
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadBalance() {
+      if (!user?.id) return;
+      try {
+        const res = await balanceApi.mine();
+        if (mounted) setBalance(res.data.data);
+      } catch {
+        if (mounted) setBalance(DEFAULT_BALANCE);
+      }
+    }
+    loadBalance();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
+
+  const conversionRate = balance.xlm_to_php_rate || DEMO_XLM_TO_PHP;
+  const rawInputAmount = useCustom ? parseFloat(customAmount) || 0 : selectedAmount;
+  const effectiveAmount = amountMode === "php" ? rawInputAmount / conversionRate : rawInputAmount;
+  const effectiveAmountPhp = effectiveAmount * conversionRate;
+  const donationPresets = amountMode === "php" ? PHP_AMOUNTS : AMOUNTS;
+  const stellarVaultUrl = getStellarExpertContractUrl();
+  const activeCampaign = applyCampaignSummary(campaign, liveSummary ?? undefined);
+  const displayRaised = activeCampaign.raised + confirmedDonationXlm * DEMO_XLM_TO_PHP;
   const displayRaisedLabel = `₱${Math.round(displayRaised).toLocaleString()}`;
-  const displayPct = Math.min(100, Math.round((displayRaised / campaign.goal) * 100));
-  const displayDonors = campaign.donors + (confirmedDonationXlm > 0 ? 1 : 0);
+  const displayPct = Math.min(100, Math.round((displayRaised / activeCampaign.goal) * 100));
+  const displayDonors = activeCampaign.donors + (confirmedDonationXlm > 0 ? 1 : 0);
 
   async function handleDonate() {
-    if (!connected || !publicKey) { await connect(); return; }
+    if (!connected || !publicKey) {
+      toast.error("Connect your Stellar Wallet before donating.");
+      await connect();
+      return;
+    }
     if (effectiveAmount <= 0) { toast.error("Enter a valid amount."); return; }
-    if (!LINGAP_RECEIVER_PUBLIC_KEY) {
-      toast.error("LINGAP receiving wallet is not configured yet.");
+    if (balance.xlm_balance < effectiveAmount) {
+      toast.error("You do not have enough XLM balance to complete this donation. Please top up first.");
       return;
     }
     setDonating(true);
     try {
-      const transaction = await buildPaymentTransaction(
-        publicKey,
-        LINGAP_RECEIVER_PUBLIC_KEY,
-        formatXlmAmount(effectiveAmount),
-        undefined,
-        `LINGAP:${campaign.id}`
-      );
-      const { signTransaction } = await import("@stellar/freighter-api");
-      const signResult = (await signTransaction(transaction.toXDR(), { networkPassphrase: STELLAR_CONFIG.network })) as FreighterSignResult;
-      const signedXdr = getSignedXdr(signResult);
-      if (!signedXdr) throw new Error("Freighter did not return a signed transaction.");
-      const submitRes = await submitSignedTransactionXdr(signedXdr);
-      const txHash = submitRes.hash;
-      await donationsApi.create({
-        amount: effectiveAmount,
+      const donationPurpose = `campaign:${campaign.slug}`;
+      const donationRes = await donationsApi.create({
+        amount: Number(effectiveAmount.toFixed(2)),
         asset: "XLM",
-        purpose: `campaign:${campaign.slug}`,
-        stellarTxHash: txHash,
+        purpose: donationPurpose,
+        fundingSource: "lingap_balance",
+        spendBalance: true,
+        walletAddress: publicKey,
       });
+      const txHash = donationRes.data.data.stellarTxHash;
       setConfirmedDonationXlm((current) => current + effectiveAmount);
       setLastTxHash(txHash);
-      toast.success(`Donation confirmed! Tx: ${txHash.slice(0, 8)}…`);
+      setBalance((current) => ({
+        ...current,
+        xlm_balance: Math.max(current.xlm_balance - effectiveAmount, 0),
+        php_equivalent: Math.max((current.xlm_balance - effectiveAmount) * conversionRate, 0),
+      }));
+      setConfirmedDonationXlm(0);
+      try {
+        const latest = await campaignsApi.publicOne(campaign.slug);
+        if (latest.data.data) setLiveSummary(latest.data.data);
+        const nextBalance = await balanceApi.mine();
+        setBalance(nextBalance.data.data);
+      } catch {
+        // Donation is already recorded; the polling loop will pick up fresh totals.
+      }
+      toast.success(`Donation confirmed! Ref: ${txHash.slice(0, 12)}...`);
     } catch (e: unknown) {
       toast.error(getDonationErrorMessage(e));
     } finally {
       setDonating(false);
-    }
-  }
-
-  async function handlePhpPay() {
-    if (effectivePhp < 20) { toast.error("Minimum donation is ₱20."); return; }
-    setPayingPhp(true);
-    try {
-      const res = await paymongoApi.checkout(effectivePhp, campaign.title);
-      window.location.href = res.data.data.checkout_url;
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : "Payment failed");
-      setPayingPhp(false);
     }
   }
 
@@ -134,9 +160,14 @@ function DetailContent() {
       <div className="detail-grid">
         {/* LEFT */}
         <div>
-          <div className="detail-img" style={{ background: campaign.heroGradient }}>
-            <CampaignIcon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />
-          </div>
+          <SafeImageFrame
+            src={campaign.imageSrc}
+            alt={campaign.title}
+            className="detail-img"
+            photoClassName="detail-img-photo"
+            style={{ background: campaign.heroGradient }}
+            fallback={<CampaignIcon size={80} color="rgba(255,255,255,.6)" strokeWidth={1.2} />}
+          />
           <div className="flex gap-8 mb-16" style={{ flexWrap: "wrap" }}>
             {campaign.urgencyLabel && (
               <span className={`badge ${campaign.urgencyClass}`}><AlertCircle size={11} /> {campaign.urgencyLabel}</span>
@@ -196,15 +227,19 @@ function DetailContent() {
               ))}
             </div>
           </div>
+
+          <div style={{ marginTop: 24 }}>
+            <VotingPanel campaignId={activeCampaign.sorobanCampaignId ?? campaign.slug} campaignName={campaign.title} />
+          </div>
         </div>
 
         {/* RIGHT — sticky donate card */}
         <div>
-          <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28, marginBottom: 20, position: "sticky", top: 84 }}>
+          <div className="detail-donate-card" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 28, marginBottom: 20, position: "sticky", top: 84 }}>
             <div className="flex flex-center flex-between mb-16">
               <div>
                 <div style={{ fontFamily: "Sora,sans-serif", fontSize: 28, fontWeight: 800, color: "var(--forest)" }}>{displayRaisedLabel}</div>
-                <div style={{ fontSize: 13, color: "var(--text3)" }}>raised of {campaign.goalLabel} goal</div>
+                <div style={{ fontSize: 13, color: "var(--text3)" }}>raised of {activeCampaign.goalLabel} goal</div>
               </div>
               <div className="text-right">
                 <div style={{ fontSize: 22, fontWeight: 700, color: "var(--canopy)" }}>{displayPct}%</div>
@@ -214,28 +249,44 @@ function DetailContent() {
             <div className="prog-track mb-8" style={{ height: 12 }}><div className="prog-fill prog-emerald" style={{ width: `${displayPct}%` }} /></div>
             <div className="flex flex-center flex-between mb-24" style={{ fontSize: 13, color: "var(--text3)" }}>
               <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Users size={13} /> {displayDonors.toLocaleString()} donors</span>
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={13} /> {campaign.daysLeft} days left</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 4 }}><Clock size={13} /> {activeCampaign.daysLeft} days left</span>
             </div>
 
-            {/* Tab switcher */}
-            <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-              <button onClick={() => setTab("stellar")} className={`btn btn-sm ${tab === "stellar" ? "btn-primary" : "btn-outline"}`} style={{ flex: 1, justifyContent: "center" }}>⭐ Stellar (XLM)</button>
-              <button onClick={() => setTab("php")} className={`btn btn-sm ${tab === "php" ? "btn-primary" : "btn-outline"}`} style={{ flex: 1, justifyContent: "center" }}>📱 GCash / Maya</button>
+            <div style={{ marginBottom: 14, padding: "12px 14px", background: "rgba(74,155,106,.06)", border: "1px solid rgba(74,155,106,.18)", borderRadius: 10 }}>
+              <div style={{ fontSize: 12, color: "var(--text3)", marginBottom: 4 }}>Your available balance</div>
+              <div style={{ fontWeight: 800, color: "var(--forest)" }}>{formatXlmAmount(balance.xlm_balance)} XLM</div>
+              <div style={{ fontSize: 12, color: "var(--text2)" }}>≈ ₱{balance.php_equivalent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              <Link href="/donor#balance" style={{ display: "inline-flex", marginTop: 8, color: "var(--canopy)", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>Top up balance</Link>
             </div>
 
-            {tab === "stellar" && (
-              <>
+            <div style={{ marginBottom: 14, padding: "10px 14px", background: "rgba(200,134,10,.08)", border: "1px solid rgba(200,134,10,.22)", borderRadius: 10, fontSize: 12, color: "var(--text2)", lineHeight: 1.55 }}>
+              PDAX, GCash, and Maya are top-up channels. Donate here using your LINGAP XLM balance so every campaign record stays traceable.
+            </div>
                 <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 10 }}>Choose amount (XLM):</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
-                    {AMOUNTS.map((a) => (
-                      <button key={a} onClick={() => { setSelectedAmount(a); setUseCustom(false); }} className={`btn btn-sm ${!useCustom && selectedAmount === a ? "btn-primary" : "btn-outline"}`}>{a} XLM</button>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: "var(--forest)" }}>Amount</div>
+                      <div style={{ fontSize: 11, color: "var(--text3)" }}>1 XLM = ₱{conversionRate.toFixed(2)}</div>
+                    </div>
+                    <div style={{ display: "inline-grid", gridTemplateColumns: "1fr 1fr", gap: 4, padding: 3, border: "1px solid var(--border)", borderRadius: 999, background: "var(--bg)" }}>
+                      <button type="button" onClick={() => { setAmountMode("xlm"); setUseCustom(false); setSelectedAmount(AMOUNTS[0]); }} className={`btn btn-sm ${amountMode === "xlm" ? "btn-primary" : "btn-ghost"}`} style={{ borderRadius: 999, minWidth: 58, justifyContent: "center" }}>XLM</button>
+                      <button type="button" onClick={() => { setAmountMode("php"); setUseCustom(false); setSelectedAmount(PHP_AMOUNTS[2]); }} className={`btn btn-sm ${amountMode === "php" ? "btn-primary" : "btn-ghost"}`} style={{ borderRadius: 999, minWidth: 58, justifyContent: "center" }}>PHP</button>
+                    </div>
+                  </div>
+                  <div className="donation-amount-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
+                    {donationPresets.map((a) => (
+                      <button key={`${amountMode}-${a}`} onClick={() => { setSelectedAmount(a); setUseCustom(false); }} className={`btn btn-sm ${!useCustom && selectedAmount === a ? "btn-primary" : "btn-outline"}`}>
+                        {amountMode === "xlm" ? `${a} XLM` : `₱${a.toLocaleString()}`}
+                      </button>
                     ))}
                     <button onClick={() => setUseCustom(true)} className={`btn btn-sm ${useCustom ? "btn-primary" : "btn-outline"}`}>Custom</button>
                   </div>
                   {useCustom && (
-                    <input type="number" min="1" value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} placeholder="Enter XLM amount" style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+                    <input type="number" min="1" value={customAmount} onChange={(e) => setCustomAmount(e.target.value)} placeholder={amountMode === "php" ? "Enter PHP amount" : "Enter XLM amount"} style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
                   )}
+                  <div style={{ marginTop: 8, fontSize: 12, color: "var(--text3)" }}>
+                    {formatXlmAmount(effectiveAmount)} XLM ≈ ₱{effectiveAmountPhp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </div>
                 </div>
                 {!connected && (
                   <div style={{ marginBottom: 12, padding: "10px 14px", background: "rgba(74,155,106,.06)", border: "1px solid rgba(74,155,106,.2)", borderRadius: 8, fontSize: 12, color: "var(--forest-light)", display: "flex", alignItems: "center", gap: 6 }}>
@@ -248,46 +299,34 @@ function DetailContent() {
                   </div>
                 )}
                 <button onClick={handleDonate} disabled={donating} className="btn btn-emerald btn-lg" style={{ width: "100%", justifyContent: "center", marginBottom: 12, opacity: donating ? 0.7 : 1 }}>
-                  {donating ? "Submitting to Stellar…" : connected ? `Donate ${effectiveAmount} XLM` : "Connect Wallet to Donate"}
+                  {donating ? "Submitting to LINGAP..." : connected ? `Donate ${formatXlmAmount(effectiveAmount)} XLM` : "Connect Wallet to Donate"}
                 </button>
                 {lastTxHash && (
-                  <a
-                    href={getStellarExpertTxUrl(lastTxHash)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="btn btn-outline"
-                    style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}
-                  >
-                    <CheckCircle2 size={14} /> View transaction on Stellar Explorer
-                  </a>
+                  !isStellarTxHash(lastTxHash) ? (
+                    <div className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+                      <CheckCircle2 size={14} /> Ledger reference: {formatLedgerReference(lastTxHash).slice(0, 22)}...
+                      {stellarVaultUrl && (
+                        <a href={stellarVaultUrl} target="_blank" rel="noreferrer" style={{ color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
+                          View vault on Stellar
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <a
+                      href={getStellarExpertTxUrl(lastTxHash)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-outline"
+                      style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}
+                    >
+                      <CheckCircle2 size={14} /> View transaction on Stellar Explorer
+                    </a>
+                  )
                 )}
-              </>
-            )}
-
-            {tab === "php" && (
-              <>
-                <div style={{ marginBottom: 18 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 10 }}>Choose amount (PHP ₱):</div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: 10 }}>
-                    {PHP_AMOUNTS.map((a) => (
-                      <button key={a} onClick={() => { setSelectedPhp(a); setUseCustomPhp(false); }} className={`btn btn-sm ${!useCustomPhp && selectedPhp === a ? "btn-primary" : "btn-outline"}`}>₱{a}</button>
-                    ))}
-                    <button onClick={() => setUseCustomPhp(true)} className={`btn btn-sm ${useCustomPhp ? "btn-primary" : "btn-outline"}`}>Custom</button>
-                  </div>
-                  {useCustomPhp && (
-                    <input type="number" min="20" value={customPhp} onChange={(e) => setCustomPhp(e.target.value)} placeholder="Enter PHP amount" style={{ width: "100%", border: "1px solid var(--border)", borderRadius: 8, padding: "8px 12px", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
-                  )}
-                </div>
-                <button onClick={handlePhpPay} disabled={payingPhp} className="btn btn-emerald btn-lg" style={{ width: "100%", justifyContent: "center", marginBottom: 12, opacity: payingPhp ? 0.7 : 1 }}>
-                  {payingPhp ? "⏳ Opening checkout…" : `📱 Pay ₱${effectivePhp} via GCash / Maya`}
-                </button>
-              </>
-            )}
-
             <button className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6 }}>
               <RefreshCw size={14} /> Set Monthly Donation
             </button>
-            <Link href="/escrow" className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
+            <Link href={`/escrow?campaign=${activeCampaign.slug}`} className="btn btn-outline" style={{ width: "100%", justifyContent: "center", fontSize: 14, display: "flex", alignItems: "center", gap: 6, marginTop: 10 }}>
               <Lock size={14} /> View Escrow Dashboard
             </Link>
 
@@ -330,7 +369,7 @@ function DetailContent() {
 
           <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: "var(--r)", padding: 20 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text2)", marginBottom: 12 }}>Share this campaign:</div>
-            <div className="flex gap-8">
+            <div className="flex gap-8 share-buttons">
               <button className="btn btn-sm" style={{ background: "#1877F2", color: "#fff", flex: 1, justifyContent: "center", gap: 6 }}>
                 <Facebook size={13} /> Facebook
               </button>
@@ -342,8 +381,6 @@ function DetailContent() {
               </button>
             </div>
           </div>
-
-          <VotingPanel campaignId={campaign.id} campaignName={campaign.title} />
         </div>
       </div>
     </div>

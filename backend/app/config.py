@@ -14,12 +14,15 @@ class Settings(BaseSettings):
     STELLAR_NETWORK: str = "testnet"
     STELLAR_HORIZON_URL: str = "https://horizon-testnet.stellar.org"
     STELLAR_SOURCE_SECRET_KEY: str = ""
+    LINGAP_RECEIVER_PUBLIC_KEY: str = ""
+    XLM_TO_PHP_RATE: float = 8.93
 
     CONTRACT_AID_PROVENANCE: str = "CC5EBH4P72CSGGSDM22UJSBHPV7G5BFFSQCDPAOGACQNG6KJWVZ5GDSC"
     CONTRACT_DONATION_VAULT: str = "CDZTFM2BHBLYQLIJSSF7UOSWCQMQMOUATXEJTDOHKBIZ6R4DFZKB7DDP"
     CONTRACT_BENEFICIARY_REGISTRY: str = "CDPQC74JGFZ5BUNUELBO7M5ZNO6EEPEG4QYATODEWLDEMCI6I7YMGJDT"
 
     CORS_ORIGINS: str = "http://localhost:3000,https://lingap-ledger.vercel.app"
+    CORS_ORIGIN_REGEX: str = r"https://.*\.vercel\.app|http://localhost:\d+"
 
     # Proof of Reality / file uploads
     UPLOAD_DIR: str = "/app/uploads/proofs"

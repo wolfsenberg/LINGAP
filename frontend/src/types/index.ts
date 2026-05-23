@@ -35,6 +35,8 @@ export interface Donation {
   blockchainConfirmed: boolean;
   disbursed: boolean;
   disbursedAmount: number;
+  fundingSource?: string;
+  amountPhp?: number;
   createdAt: string;
 }
 

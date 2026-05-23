@@ -1,11 +1,13 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
   Award,
-  Calendar,
+  BadgeDollarSign,
   CheckCircle2,
+  Edit3,
   Flame,
   Handshake,
   Heart,
@@ -19,63 +21,257 @@ import {
   Star,
   Trophy,
   Users,
+  Wallet,
 } from "lucide-react";
-import { organizedDrives } from "@/lib/mockCampaignDrives";
+import {
+  balanceApi,
+  campaignsApi,
+  donationsApi,
+  donorsApi,
+  type BalanceApi,
+  type BalanceTransactionApi,
+  type CampaignDriveApi,
+  type LeaderboardDonorApi,
+  profilesApi,
+} from "@/lib/api";
+import { CAMPAIGNS } from "@/lib/campaigns";
+import {
+  getPendingDonations,
+  removePendingDonation,
+  toDonation,
+} from "@/lib/pendingDonations";
 import { getFirstName } from "@/lib/userName";
 import { useAuthStore } from "@/store/authStore";
-import { CAMPAIGNS } from "@/lib/campaigns";
+import type { Donation } from "@/types";
+import SafeImageFrame from "@/components/campaign/SafeImageFrame";
+import TopUpModal from "@/components/balance/TopUpModal";
+import { formatLedgerReference, getStellarExpertContractUrl, getStellarExpertTxUrl, isStellarTxHash } from "@/lib/stellar";
 
-const donationTimeline = [
-  {
-    amount: "₱5,000",
-    campaign: CAMPAIGNS[0].shortTitle,
-    sub: `Nov 28 · Milestone 1 released to ${CAMPAIGNS[0].institution}`,
-    badge: "badge-emerald",
-    badgeText: "Impact Verified",
-    escrow: "Released from escrow",
-    stellar: "STLR-9F2A-771C",
-    done: true,
-  },
-  {
-    amount: "₱2,500",
-    campaign: CAMPAIGNS[1].shortTitle,
-    sub: `Nov 14 · Funds released to ${CAMPAIGNS[1].institution}`,
-    badge: "badge-emerald",
-    badgeText: "Impact Verified",
-    escrow: "Institution paid",
-    stellar: "STLR-4B88-20AE",
-    done: true,
-  },
-  {
-    amount: "₱3,000",
-    campaign: CAMPAIGNS[2].shortTitle,
-    sub: `Nov 5 · Tuition receipt pending ${CAMPAIGNS[2].institution} verification`,
-    badge: "badge-gold",
-    badgeText: "Pending Proof",
-    escrow: "Locked in escrow",
-    stellar: "STLR-83AC-541D",
-    done: false,
-  },
-  {
-    amount: "₱14,000",
-    campaign: "Multiple Campaigns",
-    sub: "Oct 2025 · 5 campaigns completed all milestones",
-    badge: "badge-emerald",
-    badgeText: "All Verified",
-    escrow: "Closed cleanly",
-    stellar: "STLR-BATCH-1025",
-    done: true,
-  },
-];
+const XLM_TO_PHP = 8.93;
+
+const DEFAULT_BALANCE: BalanceApi = {
+  xlm_balance: 0,
+  php_equivalent: 0,
+  xlm_to_php_rate: XLM_TO_PHP,
+  transactions: [],
+};
+
+function formatPeso(value: number) {
+  return `₱${Math.round(value).toLocaleString()}`;
+}
+
+function formatXlm(value: number) {
+  return `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`;
+}
+
+function formatPhp(value: number) {
+  return `₱${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "No activity yet";
+  return new Intl.DateTimeFormat("en-PH", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+function formatRelativeDate(value: string) {
+  const date = new Date(value);
+  const diffDays = Math.floor((Date.now() - date.getTime()) / 86400000);
+  if (diffDays <= 0) return "Updated today";
+  if (diffDays === 1) return "Updated yesterday";
+  return `Updated ${diffDays} days ago`;
+}
+
+function campaignNameFromPurpose(purpose?: string) {
+  const slug = purpose?.replace("campaign:", "");
+  return CAMPAIGNS.find((campaign) => campaign.slug === slug)?.shortTitle || slug || "LINGAP campaign";
+}
+
+function transactionTitle(tx: BalanceTransactionApi) {
+  if (tx.kind === "top_up") return `${tx.payment_method.toUpperCase()} top-up`;
+  return `Donation to ${tx.campaign_id || "campaign"}`;
+}
+
+function stellarTransactionUrl(tx: BalanceTransactionApi) {
+  if (isStellarTxHash(tx.stellar_tx_hash)) {
+    return getStellarExpertTxUrl(tx.stellar_tx_hash || "");
+  }
+  return getStellarExpertContractUrl();
+}
 
 export default function DonorPage() {
-  const latestDrives = organizedDrives.slice(0, 3);
-  const hasMoreDrives = organizedDrives.length > latestDrives.length;
   const user = useAuthStore((state) => state.user);
-  const firstName = getFirstName(user?.name);
+  const [profileName, setProfileName] = useState(user?.name ?? "");
+  const firstName = getFirstName(profileName || user?.name);
+  const [drives, setDrives] = useState<CampaignDriveApi[]>([]);
+  const [donations, setDonations] = useState<Donation[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardDonorApi[]>([]);
+  const [balance, setBalance] = useState<BalanceApi>(DEFAULT_BALANCE);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [impact, setImpact] = useState({
+    total_donated: 0,
+    campaigns_helped: 0,
+    lives_impacted: 0,
+  });
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadImpactData() {
+      const pending = getPendingDonations(user?.id);
+      if (active && pending.length > 0) {
+        setDonations((current) => {
+          const existingHashes = new Set(current.map((donation) => donation.stellarTxHash));
+          return [
+            ...pending.filter((item) => !existingHashes.has(item.stellarTxHash)).map(toDonation),
+            ...current,
+          ];
+        });
+      }
+
+      if (!user?.id) return;
+
+      for (const item of pending) {
+        try {
+          await donationsApi.create({
+            amount: item.amount,
+            asset: item.asset,
+            purpose: item.purpose,
+            stellarTxHash: item.stellarTxHash,
+          });
+          removePendingDonation(item.stellarTxHash);
+        } catch {
+          // Keep it locally and retry on the next dashboard visit.
+        }
+      }
+
+      const [profileResult, donationResult, leaderboardResult, campaignsResult, balanceResult] = await Promise.allSettled([
+        profilesApi.me(),
+        donationsApi.mine(1, 25),
+        donorsApi.leaderboard(10),
+        campaignsApi.mine(),
+        balanceApi.mine(),
+      ]);
+
+      if (!active) return;
+
+      const publicProfile = profileResult.status === "fulfilled" ? profileResult.value.data.data : null;
+      const backendDonations = donationResult.status === "fulfilled" ? donationResult.value.data.items : [];
+      const backendDrives = campaignsResult.status === "fulfilled" ? campaignsResult.value.data.data : [];
+      const liveLeaderboard = leaderboardResult.status === "fulfilled" ? leaderboardResult.value.data.data : [];
+      const liveBalance = balanceResult.status === "fulfilled" ? balanceResult.value.data.data : DEFAULT_BALANCE;
+
+      if (publicProfile) {
+        setProfileName(publicProfile?.user.display_name ?? user.name);
+      } else {
+        setProfileName(user.name);
+      }
+
+      const profileActivityFallback: Donation[] = (publicProfile?.activity ?? []).map((activity) => ({
+          id: activity.id,
+          donorId: user.id,
+          donorName: user.name,
+          amount: activity.amount,
+          asset: activity.asset,
+          purpose: `campaign:${activity.campaign_id}`,
+          stellarTxHash: activity.stellar_tx_hash,
+          blockchainConfirmed: activity.blockchain_confirmed ?? true,
+          disbursed: false,
+          disbursedAmount: 0,
+          createdAt: activity.created_at,
+      }));
+
+      const remainingPending = getPendingDonations(user?.id).map(toDonation);
+      const backendHashes = new Set(backendDonations.map((donation) => donation.stellarTxHash));
+      const profileOnlyDonations = profileActivityFallback.filter((donation) => !backendHashes.has(donation.stellarTxHash));
+      const allKnownHashes = new Set([
+        ...backendDonations.map((donation) => donation.stellarTxHash),
+        ...profileOnlyDonations.map((donation) => donation.stellarTxHash),
+      ]);
+      const syncedDonations = [
+        ...remainingPending.filter((donation) => !allKnownHashes.has(donation.stellarTxHash)),
+        ...backendDonations,
+        ...profileOnlyDonations,
+      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      const profileDrives = publicProfile?.campaigns ?? [];
+      const driveIds = new Set(profileDrives.map((drive) => drive.id));
+      const mergedDrives = [
+        ...profileDrives,
+        ...backendDrives.filter((drive) => !driveIds.has(drive.id)),
+      ];
+      const donatedCampaigns = new Set(
+        syncedDonations
+          .map((donation) => donation.purpose?.replace("campaign:", ""))
+          .filter(Boolean)
+      );
+      const totalTrackedXlm = syncedDonations.reduce((sum, donation) => sum + donation.amount, 0);
+      const totalXlm = Math.max(publicProfile?.impact.total_donated_xlm ?? 0, totalTrackedXlm);
+      const totalPhp = totalXlm * XLM_TO_PHP;
+
+      setDrives(mergedDrives);
+      setDonations(syncedDonations);
+      setLeaderboard(liveLeaderboard);
+      setBalance(liveBalance);
+      setImpact({
+        total_donated: totalXlm,
+        campaigns_helped: donatedCampaigns.size,
+        lives_impacted: totalXlm > 0 ? Math.max(1, Math.floor(totalPhp / 2000)) : 0,
+      });
+    }
+
+    loadImpactData();
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  const latestDrives = drives.slice(0, 3);
+  const hasMoreDrives = drives.length > latestDrives.length;
+  const conversionRate = balance.xlm_to_php_rate || XLM_TO_PHP;
+  const totalDonatedPhp = impact.total_donated * conversionRate;
+  const verifiedDonations = donations.filter((donation) => donation.blockchainConfirmed);
+  const releasedPhp = verifiedDonations.reduce((sum, donation) => sum + donation.amount * conversionRate, 0);
+  const lockedPhp = Math.max(totalDonatedPhp - releasedPhp, 0);
+  const recentBalanceTransactions = balance.transactions.slice(0, 5);
+
+  const donationTimeline = useMemo(
+    () =>
+      donations.map((donation) => ({
+        amount: formatXlm(donation.amount),
+        campaign: campaignNameFromPurpose(donation.purpose),
+        sub: `${formatDate(donation.createdAt)} · ${
+          donation.blockchainConfirmed ? "Stellar transaction confirmed" : "Waiting for Stellar verification"
+        }`,
+        funding: donation.fundingSource ? donation.fundingSource.replace(/_/g, " ") : "direct wallet",
+        badge: donation.blockchainConfirmed ? "badge-emerald" : "badge-gold",
+        badgeText: donation.blockchainConfirmed ? "Verified" : "Pending",
+        escrow: donation.disbursed ? "Released from escrow" : "Tracked in donation vault",
+          stellar: donation.stellarTxHash
+          ? `${formatLedgerReference(donation.stellarTxHash).slice(0, 10)}...${formatLedgerReference(donation.stellarTxHash).slice(-6)}`
+          : "No tx hash",
+        done: donation.blockchainConfirmed,
+      })),
+    [donations]
+  );
 
   return (
     <div>
+      <TopUpModal
+        open={topUpOpen}
+        onClose={() => setTopUpOpen(false)}
+        rate={conversionRate}
+        onConfirmed={(nextBalance, tx) => {
+          setBalance((current) => ({
+            ...current,
+            ...nextBalance,
+            transactions: [tx, ...current.transactions].slice(0, 10),
+          }));
+        }}
+      />
       <div className="donor-hero">
         <div className="container">
           <div className="donor-hero-grid">
@@ -84,14 +280,16 @@ export default function DonorPage() {
             </div>
             <div className="donor-hero-content">
               <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, color: "var(--canopy)", marginBottom: 12 }}>MY IMPACT DASHBOARD</div>
-              <h1 style={{ fontSize: 36, fontWeight: 800, color: "#fff", marginBottom: 8 }}>Magandang araw, <span style={{ color: "var(--amber-pale)" }}>{firstName}!</span></h1>
-              <p style={{ color: "rgba(255,255,255,.65)", fontSize: 16, marginBottom: 24 }}>You&apos;ve changed lives. Here&apos;s your verified impact story.</p>
+              <h1 style={{ fontSize: 36, fontWeight: 800, color: "#fff", marginBottom: 8 }}>
+                Magandang araw, <span style={{ color: "var(--amber-pale)" }}>{firstName}!</span>
+              </h1>
+              <p style={{ color: "rgba(255,255,255,.65)", fontSize: 16, marginBottom: 24 }}>You've changed lives. Here's your verified impact story.</p>
               <div className="donor-stats-row">
                 {[
-                  { val: "₱24,500", label: "Total Donated", color: "#fff", Icon: Heart },
-                  { val: "8", label: "Campaigns Supported", color: "var(--amber-pale)", Icon: Users },
-                  { val: "23", label: "Lives Impacted", color: "var(--canopy-light)", Icon: Star },
-                  { val: "7", label: "Month Streak", color: "#F87171", Icon: Flame },
+                  { val: formatPeso(totalDonatedPhp), label: "Total Donated", color: "#fff", Icon: Heart },
+                  { val: impact.campaigns_helped.toLocaleString(), label: "Campaigns Supported", color: "var(--amber-pale)", Icon: Users },
+                  { val: impact.lives_impacted.toLocaleString(), label: "Lives Impacted", color: "var(--canopy-light)", Icon: Star },
+                  { val: donations.length > 0 ? "1" : "0", label: "Month Streak", color: "#F87171", Icon: Flame },
                 ].map((s) => (
                   <div key={s.label} className="donor-stat-card">
                     <div style={{ display: "flex", justifyContent: "center", marginBottom: 6 }}>
@@ -108,6 +306,64 @@ export default function DonorPage() {
       </div>
 
       <div className="page-inner">
+        <section id="balance" className="impact-panel impact-panel-focus" style={{ marginBottom: 22 }}>
+          <div className="impact-panel-head">
+            <div>
+              <div className="section-label">LINGAP BALANCE</div>
+              <h2 className="impact-panel-title">Your Available Balance</h2>
+              <p className="impact-panel-copy">
+                LINGAP supports PDAX, GCash, Maya, and Stellar Wallet to make giving accessible while keeping donations transparent through Stellar-powered tracking.
+              </p>
+            </div>
+            <button type="button" onClick={() => setTopUpOpen(true)} className="btn btn-emerald">
+              <BadgeDollarSign size={15} /> Top Up
+            </button>
+          </div>
+
+          <div className="transparency-grid">
+            <div className="transparency-card">
+              <div className="transparency-icon"><Wallet size={17} strokeWidth={1.8} /></div>
+              <div className="transparency-label">Available Balance</div>
+              <div className="transparency-value">{formatXlm(balance.xlm_balance)}</div>
+              <div className="transparency-sub">≈ {formatPhp(balance.php_equivalent)}</div>
+            </div>
+            <div className="transparency-card">
+              <div className="transparency-icon"><Network size={17} strokeWidth={1.8} /></div>
+              <div className="transparency-label">XLM / PHP Converter</div>
+              <div className="transparency-value">1 XLM = {formatPhp(conversionRate)}</div>
+              <div className="transparency-sub">Rate synced by backend</div>
+            </div>
+          </div>
+
+          {recentBalanceTransactions.length > 0 && (
+            <div className="donation-timeline" style={{ marginTop: 8 }}>
+              {recentBalanceTransactions.map((tx) => (
+                <div key={tx.id} className="donation-row">
+                  <div className={`donation-dot ${tx.kind === "top_up" ? "is-done" : "is-pending"}`} />
+                  <div className="donation-main">
+                    <div className="donation-title">{transactionTitle(tx)}</div>
+                    <div className="donation-sub">
+                      {formatDate(tx.created_at)} · {formatXlm(tx.amount_xlm)} ≈ {formatPhp(tx.amount_php)}
+                    </div>
+                    <div className="donation-proof-row">
+                      <span><Landmark size={12} /> {formatLedgerReference(tx.payment_reference)}</span>
+                      <span><CheckCircle2 size={12} /> {tx.payment_status}</span>
+                      {stellarTransactionUrl(tx) && (
+                        <a href={stellarTransactionUrl(tx) ?? undefined} target="_blank" rel="noreferrer" style={{ color: "var(--canopy)", fontWeight: 800, textDecoration: "none" }}>
+                          <Network size={12} /> {isStellarTxHash(tx.stellar_tx_hash) ? "Stellar transaction" : "Vault reference"}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                  <span className={`badge ${tx.kind === "top_up" ? "badge-emerald" : "badge-gold"}`}>
+                    {tx.kind === "top_up" ? "Credit" : "Debit"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         <div className="impact-dashboard-grid">
           <main className="impact-main-stack">
             <section id="my-donations" className="impact-panel impact-panel-focus">
@@ -124,10 +380,10 @@ export default function DonorPage() {
 
               <div className="transparency-grid">
                 {[
-                  { Icon: Lock, label: "Escrow Locked", value: "₱3,000", sub: "1 pending milestone" },
-                  { Icon: ShieldCheck, label: "Escrow Released", value: "₱21,500", sub: "verified institutions only" },
+                  { Icon: Lock, label: "Escrow Locked", value: formatPeso(lockedPhp), sub: "pending verification" },
+                  { Icon: ShieldCheck, label: "Escrow Released", value: formatPeso(releasedPhp), sub: "verified transactions only" },
                   { Icon: Network, label: "Stellar Network", value: "Testnet", sub: "public transaction refs" },
-                  { Icon: ReceiptText, label: "Proof Status", value: "7 verified", sub: "receipts and documents" },
+                  { Icon: ReceiptText, label: "Proof Status", value: `${verifiedDonations.length} verified`, sub: "receipts and documents" },
                 ].map((item) => (
                   <div key={item.label} className="transparency-card">
                     <div className="transparency-icon"><item.Icon size={17} strokeWidth={1.8} /></div>
@@ -148,11 +404,20 @@ export default function DonorPage() {
                       <div className="donation-proof-row">
                         <span><Landmark size={12} /> {item.escrow}</span>
                         <span><Network size={12} /> {item.stellar}</span>
+                        <span><Wallet size={12} /> {item.funding}</span>
                       </div>
                     </div>
                     <span className={`badge ${item.badge}`}>{item.badgeText}</span>
                   </div>
                 ))}
+                {donationTimeline.length === 0 && (
+                  <div className="empty-impact-state">
+                    <Heart size={28} color="var(--canopy)" strokeWidth={1.7} />
+                    <h3>No donations yet</h3>
+                    <p>Your verified donation timeline will appear here after your first contribution.</p>
+                    <Link href="/discover" className="btn btn-emerald">Donate Now</Link>
+                  </div>
+                )}
               </div>
             </section>
 
@@ -175,28 +440,41 @@ export default function DonorPage() {
                 </div>
               </div>
 
-              <div className="campaign-grid">
-                {latestDrives.map((drive) => (
-                  <div key={drive.id} className="camp-card" style={{ cursor: "default" }}>
-                    <div className="camp-body">
-                      <div className="flex flex-center flex-between mb-12">
-                        <span className="badge badge-navy">{drive.category}</span>
-                        <span className={`badge ${drive.status === "Active" || drive.status === "Funded" ? "badge-emerald" : drive.status === "Draft" ? "badge-navy" : "badge-gold"}`}>{drive.status}</span>
-                      </div>
-                      <h3 className="camp-title">{drive.title}</h3>
+                <div className="campaign-grid">
+                  {latestDrives.map((drive) => (
+                    <div key={drive.id} className="camp-card" style={{ cursor: "default" }}>
+                      <SafeImageFrame
+                        src={drive.image_src}
+                        alt={drive.title}
+                        className="camp-img"
+                        photoClassName="camp-img-photo"
+                        fallback={<div className="camp-img-inner"><Megaphone size={44} strokeWidth={1.7} /></div>}
+                      >
+                        <div style={{ position: "absolute", top: 12, left: 12 }}>
+                          <span className="badge badge-navy">{drive.category}</span>
+                        </div>
+                        <div style={{ position: "absolute", top: 12, right: 12 }}>
+                          <span className={`badge ${drive.status === "Active" || drive.status === "Funded" ? "badge-emerald" : drive.status === "Draft" ? "badge-navy" : "badge-gold"}`}>{drive.status}</span>
+                        </div>
+                      </SafeImageFrame>
+                      <div className="camp-body">
+                        <h3 className="camp-title">{drive.title}</h3>
                       <p className="camp-desc" style={{ WebkitLineClamp: 1 }}>{drive.institution}</p>
                       <div className="camp-meta">
-                        <div><div className="camp-raised">{drive.raised}</div><div className="camp-goal">of {drive.goal} goal</div></div>
+                        <div><div className="camp-raised">{formatPeso(drive.raised_amount)}</div><div className="camp-goal">of {formatPeso(drive.goal_amount)} goal</div></div>
                         <div className="camp-donors"><Users size={12} /> {drive.donors.toLocaleString()} donors</div>
                       </div>
                       <div className="prog-track" style={{ height: 8 }}><div className="prog-fill prog-emerald" style={{ width: `${drive.progress}%` }} /></div>
-                      <div className="camp-footer">
-                        <span style={{ fontSize: 12, color: "var(--text3)" }}>{drive.updated}</span>
-                        <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 700 }}>{drive.progress}%</span>
+                        <div className="camp-footer">
+                          <span style={{ fontSize: 12, color: "var(--text3)" }}>{formatRelativeDate(drive.updated_at)}</span>
+                          <span style={{ fontSize: 12, color: "var(--canopy)", fontWeight: 700 }}>{drive.progress}%</span>
+                        </div>
+                        <Link href={`/campaigns/${drive.id}/edit`} className="btn btn-outline btn-sm mt-16" style={{ width: "100%", justifyContent: "center" }}>
+                          <Edit3 size={14} /> Edit Campaign
+                        </Link>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
 
               {latestDrives.length === 0 && (
@@ -222,15 +500,15 @@ export default function DonorPage() {
           </main>
 
           <aside className="impact-sidebar">
-            <section className="impact-panel">
+            <section className="impact-panel achievement-panel">
               <h3 className="sidebar-title">
                 <Trophy size={18} color="var(--amber)" strokeWidth={1.8} /> Achievement Badges
               </h3>
               <div className="achievement-grid">
                 {[
-                  { Icon: Heart, bg: "rgba(74,155,106,.1)", iconColor: "var(--canopy)", title: "Hope Giver", sub: "First donation made", earned: true },
-                  { Icon: Handshake, bg: "rgba(61,122,82,.1)", iconColor: "var(--forest-light)", title: "Community Hero", sub: "5+ campaigns supported", earned: true },
-                  { Icon: Star, bg: "rgba(220,38,38,.1)", iconColor: "#DC2626", title: "Life Saver", sub: "₱10,000+ donated", earned: true },
+                  { Icon: Heart, bg: "rgba(74,155,106,.1)", iconColor: "var(--canopy)", title: "Hope Giver", sub: "First donation made", earned: donations.length > 0 },
+                  { Icon: Handshake, bg: "rgba(61,122,82,.1)", iconColor: "var(--forest-light)", title: "Community Hero", sub: "5+ campaigns supported", earned: impact.campaigns_helped >= 5 },
+                  { Icon: Star, bg: "rgba(220,38,38,.1)", iconColor: "#DC2626", title: "Life Saver", sub: "₱10,000+ donated", earned: totalDonatedPhp >= 10000 },
                   { Icon: Award, bg: "rgba(200,134,10,.1)", iconColor: "var(--amber)", title: "Verified Humanitarian", sub: "12-month streak needed", earned: false },
                 ].map((a) => (
                   <div key={a.title} className="achievement-card" style={{ opacity: a.earned ? 1 : 0.5 }}>
@@ -251,28 +529,34 @@ export default function DonorPage() {
                 <h3 className="sidebar-title" style={{ marginBottom: 0 }}>
                   <Trophy size={18} color="var(--amber)" strokeWidth={1.8} /> Community Leaderboard
                 </h3>
-                <span className="badge badge-gold">Nov 2025</span>
+                <span className="badge badge-gold">
+                  {new Intl.DateTimeFormat("en-PH", { month: "short", year: "numeric" }).format(new Date())}
+                </span>
               </div>
               <div>
-                {[
-                  { rank: "1", rankColor: "var(--amber)", name: "Maria Gonzales", loc: "Pasig City · 8 campaigns", amount: "₱45,000", avatarBg: "rgba(200,134,10,.15)", me: false },
-                  { rank: "2", rankColor: "var(--ele-gray)", name: "Roberto Cruz", loc: "Makati City · 12 campaigns", amount: "₱38,500", avatarBg: "rgba(74,155,106,.12)", me: false },
-                  { rank: "3", rankColor: "var(--earth-light)", name: "Ana Ramos", loc: "QC · 6 campaigns", amount: "₱27,000", avatarBg: "rgba(61,122,82,.1)", me: false },
-                  { rank: "4", rankColor: "var(--forest-mid)", name: "Jose Dela Cruz", loc: "You · 7-mo streak", amount: "₱24,500", avatarBg: "rgba(200,134,10,.15)", me: true },
-                  { rank: "5", rankColor: "var(--text3)", name: "Liza Santos", loc: "Manila · 4 campaigns", amount: "₱19,800", avatarBg: "rgba(139,92,246,.1)", me: false },
-                ].map((lb) => (
-                  <div key={lb.name} className="leaderboard-item" style={lb.me ? { background: "rgba(200,134,10,.06)", borderRadius: 10, padding: "12px 8px", borderBottom: "none", border: "1px solid rgba(200,134,10,.2)", marginBottom: 4 } : {}}>
-                    <div className="lb-rank" style={{ color: lb.rankColor, fontSize: 15, fontWeight: 800 }}>#{lb.rank}</div>
-                    <div className="lb-avatar" style={{ background: lb.avatarBg }}>
-                      <Users size={16} color={lb.me ? "var(--amber)" : "var(--text3)"} strokeWidth={1.8} />
+                {leaderboard.map((lb) => {
+                  const isMe = lb.user_id === user?.id;
+                  return (
+                    <div key={lb.user_id} className="leaderboard-item" style={isMe ? { background: "rgba(200,134,10,.06)", borderRadius: 10, padding: "12px 8px", borderBottom: "none", border: "1px solid rgba(200,134,10,.2)", marginBottom: 4 } : {}}>
+                      <div className="lb-rank" style={{ color: lb.rank === 1 ? "var(--amber)" : "var(--text3)", fontSize: 15, fontWeight: 800 }}>#{lb.rank}</div>
+                      <div className="lb-avatar" style={{ background: isMe ? "rgba(200,134,10,.15)" : "rgba(74,155,106,.12)" }}>
+                        <Users size={16} color={isMe ? "var(--amber)" : "var(--text3)"} strokeWidth={1.8} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <Link href={`/profile/${lb.user_id}`} className="lb-name" style={isMe ? { color: "var(--forest-light)", textDecoration: "none" } : { textDecoration: "none" }}>{lb.name}</Link>
+                        <div style={{ fontSize: 12, color: "var(--text3)" }}>{isMe ? "You" : `${lb.donation_count} donation${lb.donation_count === 1 ? "" : "s"}`} · {formatDate(lb.last_donation_at)}</div>
+                      </div>
+                      <div className="lb-amount">{formatXlm(lb.total_donated)}</div>
                     </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="lb-name" style={lb.me ? { color: "var(--forest-light)" } : {}}>{lb.name}</div>
-                      <div style={{ fontSize: 12, color: "var(--text3)" }}>{lb.loc}</div>
-                    </div>
-                    <div className="lb-amount">{lb.amount}</div>
+                  );
+                })}
+                {leaderboard.length === 0 && (
+                  <div className="empty-impact-state">
+                    <Trophy size={28} color="var(--amber)" strokeWidth={1.7} />
+                    <h3>No leaderboard yet</h3>
+                    <p>Verified donors will appear here after the first synced donation.</p>
                   </div>
-                ))}
+                )}
               </div>
             </section>
           </aside>

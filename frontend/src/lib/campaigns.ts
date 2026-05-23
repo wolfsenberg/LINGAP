@@ -16,6 +16,7 @@ export type Milestone = {
 export type Campaign = {
   id: number;
   slug: string;
+  sorobanCampaignId?: number | null;
   category: "Community" | "Animal Rescue" | "Disaster Relief" | "Medical" | "Education";
   urgencyLabel: string | null;
   urgencyClass: string | null;
@@ -40,10 +41,57 @@ export type Campaign = {
   transparencyScore: number;
   heroGradient: string;
   heroIcon: string;
+  imageSrc: string;
   accentColor: string;
   spending: SpendItem[];
   milestones: Milestone[];
 };
+
+export type PublicCampaignSummary = {
+  id: string;
+  slug: string;
+  soroban_campaign_id?: number | null;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  raised_amount: number;
+  goal_amount: number;
+  raised_label?: string;
+  goal_label?: string;
+  progress: number;
+  donors: number;
+  institution: string;
+  location: string;
+  image_src?: string | null;
+  updated_at: string;
+  source: string;
+  organizer_name?: string | null;
+};
+
+function pesoLabel(amount: number) {
+  return `₱${Math.round(amount).toLocaleString()}`;
+}
+
+export function applyCampaignSummary(campaign: Campaign, summary?: PublicCampaignSummary): Campaign {
+  if (!summary) return campaign;
+
+  return {
+    ...campaign,
+    raised: summary.raised_amount,
+    raisedLabel: summary.raised_label ?? pesoLabel(summary.raised_amount),
+    goal: summary.goal_amount,
+    goalLabel: summary.goal_label ?? pesoLabel(summary.goal_amount),
+    donors: summary.donors,
+    pct: summary.progress,
+    sorobanCampaignId: summary.soroban_campaign_id ?? campaign.sorobanCampaignId ?? null,
+  };
+}
+
+export function mergeCampaignSummaries(summaries: PublicCampaignSummary[]) {
+  const bySlug = new Map(summaries.map((item) => [item.slug, item]));
+  return CAMPAIGNS.map((campaign) => applyCampaignSummary(campaign, bySlug.get(campaign.slug)));
+}
 
 export const CAMPAIGNS: Campaign[] = [
   {
@@ -67,17 +115,18 @@ export const CAMPAIGNS: Campaign[] = [
     institution: "BayanihanPH",
     institutionBadge: "Verified Community Crowdfunding Platform",
     institutionDesc: "BayanihanPH Verified",
-    raisedLabel: "₱7,498",
-    raised: 7498,
+    raisedLabel: "₱0",
+    raised: 0,
     goal: 15000,
     goalLabel: "₱15,000",
-    donors: 6,
+    donors: 0,
     daysLeft: 30,
     pct: 50,
     credibility: 9.2,
     transparencyScore: 92,
     heroGradient: "linear-gradient(135deg,#1a2a3a,#2d4a6a)",
     heroIcon: "🏠",
+    imageSrc: "/images/help_kuya_gino.png",
     accentColor: "var(--canopy)",
     spending: [
       { label: "🚪 Doors & Window Frames", pct: 55, amount: "₱8,250", bg: "linear-gradient(90deg,var(--forest),var(--forest-light))" },
@@ -113,17 +162,18 @@ export const CAMPAIGNS: Campaign[] = [
     institution: "GoFundMe Campaign",
     institutionBadge: "Verified GoFundMe Fundraiser",
     institutionDesc: "GoFundMe Verified",
-    raisedLabel: "₱756,728",
-    raised: 756728,
+    raisedLabel: "₱0",
+    raised: 0,
     goal: 900000,
     goalLabel: "₱900,000",
-    donors: 523,
+    donors: 0,
     daysLeft: 14,
     pct: 84,
     credibility: 9.0,
     transparencyScore: 90,
     heroGradient: "linear-gradient(135deg,#1a2a1a,#2d5a2d)",
     heroIcon: "🐱",
+    imageSrc: "/images/help_build_a_safe_shelter.png",
     accentColor: "var(--forest)",
     spending: [
       { label: "🏗️ Shelter Construction", pct: 50, amount: "₱450,000", bg: "linear-gradient(90deg,var(--forest),var(--forest-light))" },
@@ -160,17 +210,18 @@ export const CAMPAIGNS: Campaign[] = [
     institution: "GoFundMe Campaign",
     institutionBadge: "Verified GoFundMe Fundraiser",
     institutionDesc: "GoFundMe Verified",
-    raisedLabel: "₱13,110",
-    raised: 13110,
+    raisedLabel: "₱0",
+    raised: 0,
     goal: 51300,
     goalLabel: "₱51,300",
-    donors: 10,
+    donors: 0,
     daysLeft: 60,
     pct: 26,
     credibility: 8.7,
     transparencyScore: 87,
     heroGradient: "linear-gradient(135deg,#2a1a1a,#5a2d2d)",
     heroIcon: "🐾",
+    imageSrc: "/images/rescue_and_care.png",
     accentColor: "var(--amber)",
     spending: [
       { label: "🩺 Veterinary Care & Meds", pct: 45, amount: "₱23,085", bg: "linear-gradient(90deg,var(--amber),var(--amber-light))" },

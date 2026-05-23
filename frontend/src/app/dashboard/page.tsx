@@ -84,18 +84,18 @@ export default function DashboardPage() {
   // Active Campaigns: count where status === 'active' (or approved/pending as active equivalents)
   const activeCampaigns = campaigns.filter(
     (c) => c.status === "active" || c.status === "approved" || c.status === "pending"
-  ).length + CAMPAIGNS.length;
+  ).length;
 
   // Verified Campaigns: count where is_verified === true
   const verifiedCampaigns = campaigns.filter(
     (c) => c.is_verified === true
-  ).length + CAMPAIGNS.length;
+  ).length;
 
   // Total Requested: aggregate sum of requested_amount
   const totalRequested = campaigns.reduce(
     (sum: number, c: any) => sum + (c.requested_amount || c.requestedAmount || 0),
     0
-  ) + CAMPAIGNS.reduce((sum, c) => sum + c.goal, 0);
+  );
 
   // Confirmed Fraud: count where status === 'fraud' or classification === 'fraud'
   const confirmedFraud = campaigns.filter(

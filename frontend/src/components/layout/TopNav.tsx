@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import WalletButton from "@/components/wallet/WalletButton";
-import { Compass, Heart, Home, LogOut, ShieldCheck } from "lucide-react";
+import { Compass, Heart, Home, LogOut, ShieldCheck, Users } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 
 const links = [
   { href: "/", label: "Home", icon: Home },
   { href: "/discover", label: "Discover", icon: Compass },
   { href: "/proof", label: "Proof Center", icon: ShieldCheck },
+  { href: "/community", label: "Community", icon: Users },
 ];
 
 export default function TopNav() {
@@ -40,7 +41,7 @@ export default function TopNav() {
               <Heart size={14} strokeWidth={2}/>
               My Impact
             </Link>
-            <Link href="/discover" className="btn btn-emerald btn-sm">Donate Now</Link>
+            <Link href="/discover" className="btn btn-emerald">Donate Now</Link>
             <WalletButton />
             <button type="button" onClick={clearAuth} className="nav-logout" aria-label="Sign out" title="Sign out">
               <LogOut size={13}/>
@@ -51,7 +52,7 @@ export default function TopNav() {
             <Link href="/login" className={`nav-login${pathname === "/login" ? " active" : ""}`}>
               Sign In
             </Link>
-            <Link href="/discover" className="btn btn-emerald btn-sm">Donate Now</Link>
+            <Link href="/discover" className="btn btn-emerald">Donate Now</Link>
           </>
         )}
       </div>
