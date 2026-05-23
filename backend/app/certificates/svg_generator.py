@@ -57,8 +57,8 @@ def generate_html_certificate(
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta property="og:title" content="LINGAP Certificate of Humanitarian Impact - {donor_name}">
-  <meta property="og:description" content="Blockchain-verified donation of ?{amount:,.2f} to {beneficiary_name}">
+  <meta property="og:title" content="LINGAP Certificate of Humanitarian Impact — {donor_name}">
+  <meta property="og:description" content="Blockchain-verified donation of xlm{amount:,.2f} to {beneficiary_name}">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
   <title>LINGAP Certificate - {certificate_id}</title>
