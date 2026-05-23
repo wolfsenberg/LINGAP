@@ -21,14 +21,16 @@ from .profiles import router as profiles_router
 from .balance import router as balance_router
 from .certificates import router as certificates_router
 from .onchain_certificates import router as onchain_certificates_router
+from .fund_release import router as fund_release_router
+from .streaks import donor_router as donor_streak_router, admin_router as admin_streak_router
 
 api_router = APIRouter(prefix="/api/v1")
 
 api_router.include_router(auth_router)
 api_router.include_router(donations_router)
 api_router.include_router(beneficiaries_router)
-api_router.include_router(aid_requests_router)
 api_router.include_router(geo_router)
+api_router.include_router(aid_requests_router)
 api_router.include_router(dashboard_router)
 api_router.include_router(stellar_router)
 api_router.include_router(proofs_router)
@@ -45,3 +47,6 @@ api_router.include_router(profiles_router)
 api_router.include_router(balance_router)
 api_router.include_router(certificates_router)
 api_router.include_router(onchain_certificates_router)
+api_router.include_router(fund_release_router)
+api_router.include_router(donor_streak_router)
+api_router.include_router(admin_streak_router)
