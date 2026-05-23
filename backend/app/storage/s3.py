@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
-from datetime import timedelta
 
 import boto3
 from botocore.exceptions import ClientError

@@ -48,7 +48,6 @@ def generate_certificate_pdf(
 
     emerald = HexColor("#10B891")
     navy = HexColor("#0F172A")
-    gold = HexColor("#F5B923")
     text_color = HexColor("#4B5563")
 
     title_style = ParagraphStyle(
